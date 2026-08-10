@@ -16,6 +16,8 @@ import {
 } from "../../core/geometry/math";
 import type { Geometry, Point } from "../../core/geometry/types";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
+import { constrainPoint } from "../../core/precision/constraints";
+import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
 import { geometryToPathData } from "../../objects/render";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
@@ -51,6 +53,9 @@ export function StudioCanvas() {
   const view = useStudio((s) => s.view);
   const tool = useStudio((s) => s.tool);
   const snapSettings = useStudio((s) => s.snap);
+  const precision = useStudio((s) => s.precision);
+  const measurement = useStudio((s) => s.measurement);
+  const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
   const setView = useStudio((s) => s.setView);
   const setCursor = useStudio((s) => s.setCursor);
@@ -62,6 +67,8 @@ export function StudioCanvas() {
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
   const [snap, setSnap] = useState<SnapResult | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+  const [shiftDown, setShiftDown] = useState(false);
+  const [measureStart, setMeasureStart] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
@@ -142,9 +149,11 @@ export function StudioCanvas() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space") setSpaceDown(true);
+      if (e.key === "Shift") setShiftDown(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === "Space") setSpaceDown(false);
+      if (e.key === "Shift") setShiftDown(false);
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -167,6 +176,12 @@ export function StudioCanvas() {
       return { point: result ? result.point : world, snap: result };
     },
     [gridData, objectGeometry, snapSettings, view.zoom],
+  );
+
+  const applyPrecision = useCallback(
+    (anchor: Point | null, point: Point, shift: boolean): Point =>
+      anchor ? constrainPoint(anchor, point, precision, shift) : point,
+    [precision],
   );
 
   const hitTest = useCallback(
@@ -193,7 +208,20 @@ export function StudioCanvas() {
     if (e.button !== 0) return;
 
     const world = toWorld(e.clientX, e.clientY);
-    const { point } = resolveCursor(world);
+    const { point: snapped } = resolveCursor(world);
+    const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
+    const point = applyPrecision(anchor, snapped, e.shiftKey);
+
+    if (tool === "measure") {
+      if (!measureStart) {
+        setMeasureStart(point);
+        setMeasurement(null);
+      } else {
+        setMeasurement(measure(measureStart, point));
+        setMeasureStart(null);
+      }
+      return;
+    }
 
     if (tool === "select") {
       const hit = hitTest(world);
@@ -236,7 +264,9 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
-    const { point, snap: s } = resolveCursor(world);
+    const { point: snapped, snap: s } = resolveCursor(world);
+    const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
+    const point = applyPrecision(anchor, snapped, e.shiftKey);
     setSnap(s);
     setHoverWorld(tool === "select" ? world : point);
     setCursor(tool === "select" ? world : point);
@@ -264,6 +294,17 @@ export function StudioCanvas() {
   };
 
   const preview = draft && hoverWorld ? draftGeometry(draft, hoverWorld) : null;
+  const liveMeasure =
+    measureStart && hoverWorld ? measure(measureStart, hoverWorld) : measurement;
+  const measureLine = liveMeasure ? { a: liveMeasure.a, b: liveMeasure.b } : null;
+  const unit = doc.artboard.unit;
+  const readout = !precision.showReadout
+    ? null
+    : tool === "measure" && liveMeasure
+      ? `${formatLength(liveMeasure.length, unit)} · ${formatAngle(liveMeasure.angle)} · dx ${formatLength(liveMeasure.dx, unit)} dy ${formatLength(liveMeasure.dy, unit)}`
+      : preview
+        ? `${draftReadout(preview, unit)}${shiftDown || precision.angleLock ? ` · locked ${precision.angleStep}°` : ""}`
+        : null;
   const selectionBounds =
     selection.length > 0
       ? unionBounds(
@@ -290,10 +331,14 @@ export function StudioCanvas() {
         setSnap(null);
         setCursor(null);
       }}
-      onDoubleClick={() => setDraft(null)}
+      onDoubleClick={() => {
+        setDraft(null);
+        setMeasureStart(null);
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         setDraft(null);
+        setMeasureStart(null);
       }}
     >
       <svg className="h-full w-full" role="img" aria-label="Logo construction canvas">
@@ -375,10 +420,39 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Measurement */}
+          {measureLine && (
+            <g>
+              <line
+                x1={measureLine.a.x}
+                y1={measureLine.a.y}
+                x2={measureLine.b.x}
+                y2={measureLine.b.y}
+                stroke="var(--color-accent-foreground)"
+                strokeWidth={1}
+                strokeDasharray="5 3"
+                vectorEffect="non-scaling-stroke"
+              />
+              {[measureLine.a, measureLine.b].map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3 / view.zoom}
+                  fill="var(--color-accent-foreground)"
+                />
+              ))}
+            </g>
+          )}
           {/* Snap indicator */}
           {snap && tool !== "select" && <SnapIndicator snap={snap} zoom={view.zoom} />}
         </g>
       </svg>
+      {readout && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-border bg-card/90 px-3 py-1 font-mono text-[11px] text-foreground shadow-sm">
+          {readout}
+        </div>
+      )}
     </div>
   );
 }

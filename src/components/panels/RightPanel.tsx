@@ -4,11 +4,13 @@ import type { Unit } from "../../core/coordinates/units";
 import { fromPx, toPx } from "../../core/coordinates/units";
 import type { Geometry } from "../../core/geometry/types";
 import { SNAP_LABEL, type SnapType } from "../../core/snapping/snap";
+import { ANGLE_STEPS, RATIOS } from "../../core/precision/constraints";
+import { describeGeometry, formatAngle, formatLength } from "../../core/precision/measure";
 import type { Grid } from "../../grids";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 
-const TABS = ["Properties", "Grids", "Snap", "History"] as const;
+const TABS = ["Properties", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
 
 const fieldCls =
@@ -326,6 +328,126 @@ function SnapTab() {
   );
 }
 
+function PrecisionTab() {
+  const precision = useStudio((s) => s.precision);
+  const setPrecision = useStudio((s) => s.setPrecision);
+  const measurement = useStudio((s) => s.measurement);
+  const scaleSelection = useStudio((s) => s.scaleSelection);
+  const selection = useStudio((s) => s.selection);
+  const objects = useStudio((s) => s.doc.objects);
+  const unit = useStudio((s) => s.doc.artboard.unit);
+  const selected = objects.filter((o) => selection.includes(o.id));
+
+  return (
+    <div className="space-y-4">
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold text-foreground">Constraints</h2>
+        <label className="flex items-center gap-2 text-xs text-foreground">
+          <input
+            type="checkbox"
+            checked={precision.angleLock}
+            onChange={(e) => setPrecision({ angleLock: e.target.checked })}
+          />
+          Angle lock (hold Shift for temporary lock)
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {ANGLE_STEPS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => setPrecision({ angleStep: a })}
+              className={cn(
+                "rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                precision.angleStep === a && "bg-accent text-accent-foreground",
+              )}
+            >
+              {a}°
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <NumberField
+            label="Length step"
+            value={precision.lengthStep}
+            step={1}
+            onChange={(v) => setPrecision({ lengthStep: Math.max(0, v) })}
+          />
+          <label className="flex items-center gap-2 pt-5 text-xs text-foreground">
+            <input
+              type="checkbox"
+              checked={precision.showReadout}
+              onChange={(e) => setPrecision({ showReadout: e.target.checked })}
+            />
+            Live readout
+          </label>
+        </div>
+      </section>
+
+      <hr className="border-border" />
+
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold text-foreground">Ratio scaling</h2>
+        <p className="text-[11px] text-muted-foreground">
+          Scales the selection around its own centre.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {RATIOS.map((r) => (
+            <span key={r.id} className="inline-flex overflow-hidden rounded-md border border-border">
+              <button
+                type="button"
+                disabled={selection.length === 0}
+                onClick={() => scaleSelection(r.value)}
+                className="px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
+              >
+                ×{r.label}
+              </button>
+              <button
+                type="button"
+                disabled={selection.length === 0}
+                onClick={() => scaleSelection(1 / r.value)}
+                className="border-l border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
+              >
+                ÷
+              </button>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <hr className="border-border" />
+
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold text-foreground">Measurements</h2>
+        {measurement ? (
+          <dl className="grid grid-cols-2 gap-1 font-mono text-[11px] text-muted-foreground">
+            <dt>Length</dt>
+            <dd className="text-foreground">{formatLength(measurement.length, unit)}</dd>
+            <dt>Angle</dt>
+            <dd className="text-foreground">{formatAngle(measurement.angle)}</dd>
+            <dt>dx</dt>
+            <dd className="text-foreground">{formatLength(measurement.dx, unit)}</dd>
+            <dt>dy</dt>
+            <dd className="text-foreground">{formatLength(measurement.dy, unit)}</dd>
+          </dl>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            Pick the Measure tool (M) and click two points.
+          </p>
+        )}
+        {selected.length > 0 && (
+          <ul className="space-y-1 font-mono text-[11px] text-muted-foreground">
+            {selected.map((o) => (
+              <li key={o.id}>
+                <span className="text-foreground">{o.name}</span> — {describeGeometry(o.geometry, unit)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function HistoryTab() {
   const past = useStudio((s) => s.past);
   const future = useStudio((s) => s.future);
@@ -386,6 +508,7 @@ export function RightPanel() {
         )}
         {tab === "Grids" && <GridsTab />}
         {tab === "Snap" && <SnapTab />}
+        {tab === "Precision" && <PrecisionTab />}
         {tab === "History" && <HistoryTab />}
       </div>
     </aside>

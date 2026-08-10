@@ -6,6 +6,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   l: "line",
   c: "circle",
   a: "arc",
+  m: "measure",
   h: "pan",
 };
 
@@ -36,6 +37,7 @@ export function useStudioShortcuts(): void {
       }
       if (e.key === "Escape") {
         store.clearSelection();
+        store.setMeasurement(null);
         return;
       }
       if (mod) return;

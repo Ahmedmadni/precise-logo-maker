@@ -16,13 +16,18 @@ import {
   type VectorObject,
 } from "../core/geometry/types";
 import {
+  DEFAULT_PRECISION,
+  type PrecisionSettings,
+} from "../core/precision/constraints";
+import type { Measurement } from "../core/precision/measure";
+import {
   createConcentricGrid,
   createRadialGrid,
   createSquareGrid,
   type Grid,
 } from "../grids";
 
-export type ToolId = "select" | "line" | "circle" | "arc" | "pan";
+export type ToolId = "select" | "line" | "circle" | "arc" | "measure" | "pan";
 
 export interface Artboard {
   width: number;
@@ -51,6 +56,8 @@ export interface StudioState {
   tool: ToolId;
   selection: string[];
   snap: SnapSettings;
+  precision: PrecisionSettings;
+  measurement: Measurement | null;
   cursor: Point | null;
   viewport: { width: number; height: number };
   setViewport: (size: { width: number; height: number }) => void;
@@ -72,6 +79,10 @@ export interface StudioState {
   setSelection: (ids: string[]) => void;
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
+
+  setPrecision: (patch: Partial<PrecisionSettings>) => void;
+  setMeasurement: (m: Measurement | null) => void;
+  scaleSelection: (factor: number) => void;
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
@@ -138,6 +149,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     snap: DEFAULT_SNAP_SETTINGS,
+    precision: DEFAULT_PRECISION,
+    measurement: null,
     cursor: null,
 
     setView: (view) => set({ view }),
@@ -224,6 +237,34 @@ export const useStudio = create<StudioState>()((set, get) => {
           : [...s.selection, id],
       })),
     clearSelection: () => set({ selection: [] }),
+
+    setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
+    setMeasurement: (measurement) => set({ measurement }),
+
+    scaleSelection: (factor) => {
+      const ids = get().selection;
+      if (ids.length === 0 || factor <= 0) return;
+      commit(`Scale ×${factor.toFixed(3)}`, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) => {
+          if (!ids.includes(o.id) || o.locked) return o;
+          const g = o.geometry;
+          if (g.kind === "line") {
+            const cx = (g.a.x + g.b.x) / 2;
+            const cy = (g.a.y + g.b.y) / 2;
+            return {
+              ...o,
+              geometry: {
+                ...g,
+                a: pt(cx + (g.a.x - cx) * factor, cy + (g.a.y - cy) * factor),
+                b: pt(cx + (g.b.x - cx) * factor, cy + (g.b.y - cy) * factor),
+              },
+            };
+          }
+          return { ...o, geometry: { ...g, radius: g.radius * factor } };
+        }),
+      }));
+    },
 
     setSnapEnabled: (enabled) => set((s) => ({ snap: { ...s.snap, enabled } })),
     toggleSnapType: (type) =>
