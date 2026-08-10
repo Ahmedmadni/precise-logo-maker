@@ -83,8 +83,8 @@ export function TopBar() {
     "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
-    <header className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
-      <h1 className="text-sm font-semibold tracking-tight text-foreground">
+    <header className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 [scrollbar-width:none]">
+      <h1 className="flex-none whitespace-nowrap text-sm font-semibold tracking-tight text-foreground">
         {t("Logo Grid Studio")}
       </h1>
       <span className="hidden text-[11px] text-muted-foreground sm:inline">
@@ -93,7 +93,7 @@ export function TopBar() {
 
       <button
         type="button"
-        className={btn}
+        className={`${btn} flex-none`}
         onClick={() => setLang(lang === "ar" ? "en" : "ar")}
         title={t("Language")}
         aria-label={t("Language")}
@@ -102,7 +102,7 @@ export function TopBar() {
         {lang === "ar" ? "English" : "العربية"}
       </button>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-none items-center gap-1.5">
         <button
           type="button"
           className={btn}
@@ -156,7 +156,7 @@ export function TopBar() {
       </div>
 
 
-      <div className="ms-auto flex flex-wrap items-center gap-1.5">
+      <div className="ms-auto flex flex-none items-center gap-1.5">
         <button type="button" className={btn} onClick={fitArtboard}>
           <Maximize2 className="h-3.5 w-3.5" aria-hidden /> {t("Fit artboard")}
         </button>
@@ -208,7 +208,12 @@ export function TopBar() {
         </button>
 
         {ZOOM_LEVELS.map((z) => (
-          <button key={z} type="button" className={btn} onClick={() => setZoom(z)}>
+          <button
+            key={z}
+            type="button"
+            className={`${btn} hidden sm:inline-flex`}
+            onClick={() => setZoom(z)}
+          >
             {z * 100}%
           </button>
         ))}
