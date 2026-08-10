@@ -391,6 +391,21 @@ export const useStudio = create<StudioState>()((set, get) => {
         snap: { ...s.snap, types: { ...s.snap.types, [type]: !s.snap.types[type] } },
       })),
 
+    loadDocument: (next, label = "Open project") => {
+      const { doc, past, historyLog } = get();
+      set({
+        doc: next,
+        past: [...past, { label, state: doc }].slice(-HISTORY_LIMIT),
+        future: [],
+        historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
+        selection: [],
+        measurement: null,
+      });
+    },
+
+    newDocument: () => get().loadDocument(initialDoc(), "New document"),
+
+
     undo: () => {
       const { past, doc, future, historyLog } = get();
       const prev = past[past.length - 1];
