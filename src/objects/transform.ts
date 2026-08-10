@@ -37,7 +37,7 @@ export const mirrorGeometry = (g: Geometry, axis: "x" | "y", origin: Point): Geo
   const flip = (p: Point): Point =>
     axis === "x" ? pt(2 * origin.x - p.x, p.y) : pt(p.x, 2 * origin.y - p.y);
   const mirrored = mapPoints(g, flip);
-  if (mirrored.kind === "arc") {
+  if (g.kind === "arc" && mirrored.kind === "arc") {
     const start = pointOnCircle(g.center, g.radius, g.startAngle);
     const end = pointOnCircle(g.center, g.radius, g.endAngle);
     return {
