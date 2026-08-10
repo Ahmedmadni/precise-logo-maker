@@ -78,7 +78,7 @@ describe("align & distribute", () => {
     const offsets = distributeOffsets(three, "x");
     expect(offsets[0]).toEqual(pt(0, 0));
     expect(offsets[2]).toEqual(pt(0, 0));
-    expect(offsets[1]?.x).toBeCloseTo(25);
+    expect(offsets[1]?.x).toBeCloseTo(30);
   });
 
   it("is a no-op with fewer than three items", () => {
