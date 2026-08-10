@@ -86,6 +86,13 @@ export function StudioCanvas() {
   } | null>(null);
 
   const panRef = useRef<{ x: number; y: number } | null>(null);
+  // Multi-touch (Android/tablet): two fingers pinch-zoom and pan together.
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{
+    dist: number;
+    mid: { x: number; y: number };
+    view: ViewTransform;
+  } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
 
   const gridData = useMemo(() => {
@@ -213,8 +220,32 @@ export function StudioCanvas() {
     [doc.objects, view.zoom],
   );
 
+  const beginPinch = () => {
+    const pts = [...pointersRef.current.values()];
+    const [a, b] = pts;
+    if (!a || !b) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    pinchRef.current = {
+      dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+      mid: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
+      view: viewRef.current,
+    };
+    // Cancel any in-progress single-finger interaction.
+    panRef.current = null;
+    dragRef.current = null;
+    setDragOffset(null);
+    setBox(null);
+    setHandleDrag(null);
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size >= 2) {
+      beginPinch();
+      return;
+    }
     const isPan = spaceDown || e.button === 1 || tool === "pan";
     if (isPan) {
       panRef.current = { x: e.clientX, y: e.clientY };
@@ -289,6 +320,25 @@ export function StudioCanvas() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    if (pinchRef.current && pointersRef.current.size >= 2) {
+      const [a, b] = [...pointersRef.current.values()];
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!a || !b || !rect) return;
+      const start = pinchRef.current;
+      const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const mid = { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top };
+      const zoom = Math.min(64, Math.max(0.02, start.view.zoom * (d / start.dist)));
+      const world = screenToWorld(pt(start.mid.x, start.mid.y), start.view);
+      setView({
+        ...start.view,
+        zoom,
+        pan: { x: mid.x - world.x * zoom, y: mid.y - world.y * zoom },
+      });
+      return;
+    }
     if (panRef.current) {
       const dx = e.clientX - panRef.current.x;
       const dy = e.clientY - panRef.current.y;
@@ -321,7 +371,12 @@ export function StudioCanvas() {
     if (box) setBox({ ...box, end: world });
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e?: React.PointerEvent<HTMLDivElement>) => {
+    if (e) pointersRef.current.delete(e.pointerId);
+    if (pinchRef.current) {
+      if (pointersRef.current.size < 2) pinchRef.current = null;
+      return;
+    }
     panRef.current = null;
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
