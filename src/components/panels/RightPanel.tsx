@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, FlipHorizontal, FlipVertical, RotateCw, Trash2 } from "lucide-react";
 import type { Unit } from "../../core/coordinates/units";
 import { fromPx, toPx } from "../../core/coordinates/units";
 import type { Geometry } from "../../core/geometry/types";
@@ -10,7 +10,7 @@ import type { Grid } from "../../grids";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 
-const TABS = ["Properties", "Grids", "Snap", "Precision", "History"] as const;
+const TABS = ["Properties", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
 
 const fieldCls =
@@ -193,6 +193,139 @@ function ObjectSection() {
         </label>
       </div>
     </section>
+  );
+}
+
+function TransformSection() {
+  const selection = useStudio((s) => s.selection);
+  const rotateSelection = useStudio((s) => s.rotateSelection);
+  const mirrorSelection = useStudio((s) => s.mirrorSelection);
+  const duplicateSelection = useStudio((s) => s.duplicateSelection);
+  const radialRepeat = useStudio((s) => s.radialRepeat);
+  const translateSelection = useStudio((s) => s.translateSelection);
+  const [angle, setAngle] = useState(15);
+  const [count, setCount] = useState(6);
+  const disabled = selection.length === 0;
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-semibold text-foreground">Transform</h2>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" className={btn} disabled={disabled} onClick={duplicateSelection}>
+          <Copy className="h-3 w-3" aria-hidden /> Duplicate
+        </button>
+        <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("x")}>
+          <FlipHorizontal className="h-3 w-3" aria-hidden /> Mirror H
+        </button>
+        <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("y")}>
+          <FlipVertical className="h-3 w-3" aria-hidden /> Mirror V
+        </button>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <NumberField label="Rotate °" value={angle} onChange={setAngle} />
+        </div>
+        <button type="button" className={btn} disabled={disabled} onClick={() => rotateSelection(angle)}>
+          <RotateCw className="h-3 w-3" aria-hidden /> Apply
+        </button>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <NumberField label="Radial repeat" value={count} onChange={(v) => setCount(Math.max(2, Math.round(v)))} />
+        </div>
+        <button type="button" className={btn} disabled={disabled} onClick={() => radialRepeat(count)}>
+          Repeat
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {([["← 10", -10, 0], ["→ 10", 10, 0], ["↑ 10", 0, -10], ["↓ 10", 0, 10]] as const).map(
+          ([label, dx, dy]) => (
+            <button
+              key={label}
+              type="button"
+              className={btn}
+              disabled={disabled}
+              onClick={() => translateSelection(dx, dy)}
+            >
+              {label}
+            </button>
+          ),
+        )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Arrow keys nudge by 1 (Shift = 10). Ctrl/Cmd+D duplicates. Drag with the Select tool to move.
+      </p>
+    </section>
+  );
+}
+
+function ObjectsTab() {
+  const objects = useStudio((s) => s.doc.objects);
+  const selection = useStudio((s) => s.selection);
+  const setSelection = useStudio((s) => s.setSelection);
+  const updateObject = useStudio((s) => s.updateObject);
+  const renameObject = useStudio((s) => s.renameObject);
+  const reorderObject = useStudio((s) => s.reorderObject);
+
+  return (
+    <div className="space-y-3">
+      <TransformSection />
+      <hr className="border-border" />
+      <section className="space-y-1">
+        <h2 className="text-xs font-semibold text-foreground">Objects ({objects.length})</h2>
+        {objects.length === 0 && (
+          <p className="text-[11px] text-muted-foreground">Draw something to populate this list.</p>
+        )}
+        {[...objects].reverse().map((o) => (
+          <div
+            key={o.id}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border border-transparent px-1.5 py-1",
+              selection.includes(o.id) && "border-border bg-accent",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={o.visible}
+              aria-label={`Toggle ${o.name} visibility`}
+              onChange={(e) => updateObject(o.id, { visible: e.target.checked }, "Toggle visibility")}
+            />
+            <input
+              className="min-w-0 flex-1 bg-transparent text-xs text-foreground focus-visible:outline-none"
+              value={o.name}
+              onFocus={() => setSelection([o.id])}
+              onChange={(e) => renameObject(o.id, e.target.value)}
+            />
+            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={o.locked}
+                onChange={(e) => updateObject(o.id, { locked: e.target.checked }, "Toggle lock")}
+              />
+              Lock
+            </label>
+            <button
+              type="button"
+              aria-label={`Move ${o.name} up`}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => reorderObject(o.id, 1)}
+            >
+              <ArrowUp className="h-3 w-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label={`Move ${o.name} down`}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => reorderObject(o.id, -1)}
+            >
+              <ArrowDown className="h-3 w-3" aria-hidden />
+            </button>
+          </div>
+        ))}
+      </section>
+    </div>
   );
 }
 
@@ -506,6 +639,7 @@ export function RightPanel() {
             <ObjectSection />
           </>
         )}
+        {tab === "Objects" && <ObjectsTab />}
         {tab === "Grids" && <GridsTab />}
         {tab === "Snap" && <SnapTab />}
         {tab === "Precision" && <PrecisionTab />}

@@ -21,6 +21,12 @@ import {
 } from "../core/precision/constraints";
 import type { Measurement } from "../core/precision/measure";
 import {
+  mirrorGeometry,
+  rotateGeometry,
+  translateGeometry,
+} from "../objects/transform";
+import { geometryBounds, unionBounds } from "../core/geometry/math";
+import {
   createConcentricGrid,
   createRadialGrid,
   createSquareGrid,
@@ -80,6 +86,14 @@ export interface StudioState {
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
 
+  translateSelection: (dx: number, dy: number) => void;
+  rotateSelection: (angle: number) => void;
+  mirrorSelection: (axis: "x" | "y") => void;
+  duplicateSelection: () => void;
+  radialRepeat: (count: number) => void;
+  reorderObject: (id: string, direction: -1 | 1) => void;
+  renameObject: (id: string, name: string) => void;
+
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
   scaleSelection: (factor: number) => void;
@@ -121,6 +135,14 @@ const nextObjectId = (): string => {
 };
 
 const HISTORY_LIMIT = 100;
+
+const selectionCenter = (doc: DocumentState, ids: string[]): Point | null => {
+  const list = doc.objects.filter((o) => ids.includes(o.id));
+  if (list.length === 0) return null;
+  const b = unionBounds(list.map((o) => geometryBounds(o.geometry)));
+  if (!Number.isFinite(b.minX)) return null;
+  return pt((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+};
 
 const geometryLabel: Record<Geometry["kind"], string> = {
   circle: "Circle",
@@ -238,7 +260,107 @@ export const useStudio = create<StudioState>()((set, get) => {
       })),
     clearSelection: () => set({ selection: [] }),
 
-    setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
+    translateSelection: (dx, dy) => {
+      const ids = get().selection;
+      if (ids.length === 0 || (dx === 0 && dy === 0)) return;
+      commit("Move selection", (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id) && !o.locked
+            ? { ...o, geometry: translateGeometry(o.geometry, dx, dy) }
+            : o,
+        ),
+      }));
+    },
+
+    rotateSelection: (angle) => {
+      const ids = get().selection;
+      if (ids.length === 0 || angle === 0) return;
+      const origin = selectionCenter(get().doc, ids);
+      if (!origin) return;
+      commit(`Rotate ${angle}°`, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id) && !o.locked
+            ? { ...o, geometry: rotateGeometry(o.geometry, angle, origin) }
+            : o,
+        ),
+      }));
+    },
+
+    mirrorSelection: (axis) => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      const origin = selectionCenter(get().doc, ids);
+      if (!origin) return;
+      commit(axis === "x" ? "Mirror horizontally" : "Mirror vertically", (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id) && !o.locked
+            ? { ...o, geometry: mirrorGeometry(o.geometry, axis, origin) }
+            : o,
+        ),
+      }));
+    },
+
+    duplicateSelection: () => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      const newIds: string[] = [];
+      commit("Duplicate selection", (doc) => {
+        const copies = doc.objects
+          .filter((o) => ids.includes(o.id))
+          .map((o) => {
+            const id = nextObjectId();
+            newIds.push(id);
+            return { ...o, id, name: `${o.name} copy`, geometry: { ...o.geometry } };
+          });
+        return { ...doc, objects: [...doc.objects, ...copies] };
+      });
+      set({ selection: newIds });
+    },
+
+    radialRepeat: (count) => {
+      const ids = get().selection;
+      if (ids.length === 0 || count < 2) return;
+      const origin = artboardCenter(get().doc.artboard);
+      commit(`Radial repeat ×${count}`, (doc) => {
+        const sources = doc.objects.filter((o) => ids.includes(o.id));
+        const clones: VectorObject[] = [];
+        for (let i = 1; i < count; i += 1) {
+          const angle = (360 / count) * i;
+          for (const o of sources) {
+            clones.push({
+              ...o,
+              id: nextObjectId(),
+              name: `${o.name} ${i + 1}`,
+              geometry: rotateGeometry(o.geometry, angle, origin),
+            });
+          }
+        }
+        return { ...doc, objects: [...doc.objects, ...clones] };
+      });
+    },
+
+    reorderObject: (id, direction) =>
+      commit("Reorder object", (doc) => {
+        const index = doc.objects.findIndex((o) => o.id === id);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= doc.objects.length) return doc;
+        const objects = [...doc.objects];
+        const [moved] = objects.splice(index, 1);
+        if (moved) objects.splice(target, 0, moved);
+        return { ...doc, objects };
+      }),
+
+    renameObject: (id, name) =>
+      commit("Rename object", (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) => (o.id === id ? { ...o, name } : o)),
+      })),
+
+
+  setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
     setMeasurement: (measurement) => set({ measurement }),
 
     scaleSelection: (factor) => {

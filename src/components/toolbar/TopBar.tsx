@@ -1,4 +1,5 @@
-import { Maximize2, Redo2, RotateCcw, Scan, Undo2 } from "lucide-react";
+import { Download, Maximize2, Redo2, RotateCcw, Scan, Undo2 } from "lucide-react";
+import { downloadSvg } from "../../objects/export";
 import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
@@ -47,7 +48,7 @@ export function TopBar() {
       <h1 className="text-sm font-semibold tracking-tight text-foreground">
         Logo Grid Studio
       </h1>
-      <span className="text-[11px] text-muted-foreground">Phase 1 — Geometry Core</span>
+      <span className="text-[11px] text-muted-foreground">Phase 3 — Composition & Export</span>
 
       <div className="ml-4 flex items-center gap-1.5">
         <button type="button" className={btn} onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
@@ -83,6 +84,15 @@ export function TopBar() {
           title="Reset view"
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset
+        </button>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => downloadSvg(doc)}
+          disabled={doc.objects.length === 0}
+          title="Export SVG"
+        >
+          <Download className="h-3.5 w-3.5" aria-hidden /> SVG
         </button>
         {ZOOM_LEVELS.map((z) => (
           <button key={z} type="button" className={btn} onClick={() => setZoom(z)}>
