@@ -17,7 +17,6 @@ import {
 } from "../core/geometry/types";
 import {
   DEFAULT_PRECISION,
-  constrainPoint,
   type PrecisionSettings,
 } from "../core/precision/constraints";
 import type { Measurement } from "../core/precision/measure";

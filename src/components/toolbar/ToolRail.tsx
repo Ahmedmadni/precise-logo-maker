@@ -1,6 +1,7 @@
 import {
   CircleDashed,
   Hand,
+  Ruler,
   Minus,
   MousePointer2,
   Spline,
@@ -14,6 +15,7 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: typeof Hand }[] = [
   { id: "line", label: "Line", key: "L", icon: Minus },
   { id: "circle", label: "Circle", key: "C", icon: CircleDashed },
   { id: "arc", label: "Arc", key: "A", icon: Spline },
+  { id: "measure", label: "Measure", key: "M", icon: Ruler },
   { id: "pan", label: "Pan", key: "H", icon: Hand },
 ];
 
