@@ -70,7 +70,7 @@ function ArtboardSection() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xs font-semibold text-foreground">Artboard</h2>
+      <h2 className="text-xs font-semibold text-foreground">{t("Artboard")}</h2>
       <div className="flex flex-wrap gap-1.5">
         {[512, 1024, 2048].map((s) => (
           <button
@@ -87,7 +87,7 @@ function ArtboardSection() {
           className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           onClick={() => setArtboard({ width: artboard.height, height: artboard.width })}
         >
-          Swap orientation
+          {t("Swap orientation")}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -102,7 +102,7 @@ function ArtboardSection() {
           onChange={(v) => setArtboard({ height: toPx(v, unit) })}
         />
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Unit</span>
+          <span className={labelCls}>{t("Unit")}</span>
           <select
             className={fieldCls}
             value={unit}
@@ -116,7 +116,7 @@ function ArtboardSection() {
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Background</span>
+          <span className={labelCls}>{t("Background")}</span>
           <input
             type="color"
             className="h-[26px] w-full rounded-md border border-border bg-background"
@@ -140,7 +140,7 @@ function ObjectSection() {
   if (!selected) {
     return (
       <p className="text-xs text-muted-foreground">
-        Select an object to edit its geometry numerically.
+        {t("Select an object to edit its geometry numerically.")}
       </p>
     );
   }
@@ -158,7 +158,7 @@ function ObjectSection() {
           onClick={deleteSelection}
           className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
         >
-          <Trash2 className="h-3 w-3" aria-hidden /> Delete
+          <Trash2 className="h-3 w-3" aria-hidden /> {t("Delete")}
         </button>
       </div>
 
@@ -200,7 +200,7 @@ function ObjectSection() {
           }
         />
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Stroke</span>
+          <span className={labelCls}>{t("Stroke")}</span>
           <input
             type="color"
             className="h-[26px] w-full rounded-md border border-border bg-background"
@@ -231,16 +231,16 @@ function TransformSection() {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-xs font-semibold text-foreground">Transform</h2>
+      <h2 className="text-xs font-semibold text-foreground">{t("Transform")}</h2>
       <div className="flex flex-wrap gap-1.5">
         <button type="button" className={btn} disabled={disabled} onClick={duplicateSelection}>
-          <Copy className="h-3 w-3" aria-hidden /> Duplicate
+          <Copy className="h-3 w-3" aria-hidden /> {t("Duplicate")}
         </button>
         <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("x")}>
-          <FlipHorizontal className="h-3 w-3" aria-hidden /> Mirror H
+          <FlipHorizontal className="h-3 w-3" aria-hidden /> {t("Mirror H")}
         </button>
         <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("y")}>
-          <FlipVertical className="h-3 w-3" aria-hidden /> Mirror V
+          <FlipVertical className="h-3 w-3" aria-hidden /> {t("Mirror V")}
         </button>
       </div>
       <div className="flex items-end gap-2">
@@ -248,7 +248,7 @@ function TransformSection() {
           <NumberField label={t("Rotate °")} value={angle} onChange={setAngle} />
         </div>
         <button type="button" className={btn} disabled={disabled} onClick={() => rotateSelection(angle)}>
-          <RotateCw className="h-3 w-3" aria-hidden /> Apply
+          <RotateCw className="h-3 w-3" aria-hidden /> {t("Apply")}
         </button>
       </div>
       <div className="flex items-end gap-2">
@@ -275,7 +275,7 @@ function TransformSection() {
         )}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Arrow keys nudge by 1 (Shift = 10). Ctrl/Cmd+D duplicates. Drag with the Select tool to move.
+        {t("Arrow keys nudge by 1 (Shift = 10). Ctrl/Cmd+D duplicates. Drag with the Select tool to move.")}
       </p>
     </section>
   );
@@ -301,7 +301,7 @@ function AlignSection() {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-xs font-semibold text-foreground">Align &amp; distribute</h2>
+      <h2 className="text-xs font-semibold text-foreground">{t("Align & distribute")}</h2>
       <div className="flex flex-wrap gap-1.5">
         {modes.map(([label, mode, Icon]) => (
           <button
@@ -312,7 +312,7 @@ function AlignSection() {
             title={`Align ${label.toLowerCase()}`}
             onClick={() => alignSelection(mode)}
           >
-            <Icon className="h-3 w-3" aria-hidden /> {label}
+            <Icon className="h-3 w-3" aria-hidden /> {t(label)}
           </button>
         ))}
       </div>
@@ -335,7 +335,7 @@ function AlignSection() {
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        One object aligns to the artboard; several align to their shared bounds. Distribute needs 3+.
+        {t("One object aligns to the artboard; several align to their shared bounds. Distribute needs 3+.")}
       </p>
     </section>
   );
@@ -358,9 +358,9 @@ function ObjectsTab() {
 
       <hr className="border-border" />
       <section className="space-y-1">
-        <h2 className="text-xs font-semibold text-foreground">Objects ({objects.length})</h2>
+        <h2 className="text-xs font-semibold text-foreground">{t("Objects")} ({objects.length})</h2>
         {objects.length === 0 && (
-          <p className="text-[11px] text-muted-foreground">Draw something to populate this list.</p>
+          <p className="text-[11px] text-muted-foreground">{t("Draw something to populate this list.")}</p>
         )}
         {[...objects].reverse().map((o) => (
           <div
@@ -388,7 +388,7 @@ function ObjectsTab() {
                 checked={o.locked}
                 onChange={(e) => updateObject(o.id, { locked: e.target.checked }, "Toggle lock")}
               />
-              Lock
+              {t("Lock")}
             </label>
             <button
               type="button"
@@ -511,12 +511,12 @@ function GridRow({ grid }: { grid: Grid }) {
                 checked={grid.spiral}
                 onChange={(e) => updateGrid(grid.id, { spiral: e.target.checked })}
               />
-              Golden spiral arcs
+              {t("Golden spiral arcs")}
             </label>
           </>
         )}
         <label className="flex flex-col gap-1">
-          <span className={labelCls}>Color</span>
+          <span className={labelCls}>{t("Color")}</span>
           <input
             type="color"
             className="h-[26px] w-full rounded-md border border-border bg-background"
@@ -554,14 +554,14 @@ function GridsTab() {
             className="rounded-md border border-border px-2 py-1 text-[11px] capitalize text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             onClick={() => addGrid(k)}
           >
-            + {k}
+            + {t(k)}
           </button>
         ))}
       </div>
       {grids.map((g) => (
         <GridRow key={g.id} grid={g} />
       ))}
-      {grids.length === 0 && <p className="text-xs text-muted-foreground">No grids yet.</p>}
+      {grids.length === 0 && <p className="text-xs text-muted-foreground">{t("No grids yet.")}</p>}
     </div>
   );
 }
@@ -580,10 +580,10 @@ function SnapTab() {
           checked={snap.enabled}
           onChange={(e) => setSnapEnabled(e.target.checked)}
         />
-        Smart snapping enabled
+        {t("Smart snapping enabled")}
       </label>
       <div className="space-y-1.5">
-        <p className={labelCls}>Types (priority order)</p>
+        <p className={labelCls}>{t("Types (priority order)")}</p>
         {snap.priority.map((t: SnapType, i) => (
           <label key={t} className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="w-4 text-right text-[10px]">{i + 1}</span>
@@ -592,7 +592,7 @@ function SnapTab() {
               checked={snap.types[t]}
               onChange={() => toggleSnapType(t)}
             />
-            {SNAP_LABEL[t]}
+            {tr(SNAP_LABEL[ty])}
           </label>
         ))}
       </div>
@@ -614,14 +614,14 @@ function PrecisionTab() {
   return (
     <div className="space-y-4">
       <section className="space-y-2">
-        <h2 className="text-xs font-semibold text-foreground">Constraints</h2>
+        <h2 className="text-xs font-semibold text-foreground">{t("Constraints")}</h2>
         <label className="flex items-center gap-2 text-xs text-foreground">
           <input
             type="checkbox"
             checked={precision.angleLock}
             onChange={(e) => setPrecision({ angleLock: e.target.checked })}
           />
-          Angle lock (hold Shift for temporary lock)
+          {t("Angle lock (hold Shift for temporary lock)")}
         </label>
         <div className="flex flex-wrap gap-1.5">
           {ANGLE_STEPS.map((a) => (
@@ -651,7 +651,7 @@ function PrecisionTab() {
               checked={precision.showReadout}
               onChange={(e) => setPrecision({ showReadout: e.target.checked })}
             />
-            Live readout
+            {t("Live readout")}
           </label>
         </div>
       </section>
@@ -659,9 +659,9 @@ function PrecisionTab() {
       <hr className="border-border" />
 
       <section className="space-y-2">
-        <h2 className="text-xs font-semibold text-foreground">Ratio scaling</h2>
+        <h2 className="text-xs font-semibold text-foreground">{t("Ratio scaling")}</h2>
         <p className="text-[11px] text-muted-foreground">
-          Scales the selection around its own centre.
+          {t("Scales the selection around its own centre.")}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {RATIOS.map((r) => (
@@ -690,12 +690,12 @@ function PrecisionTab() {
       <hr className="border-border" />
 
       <section className="space-y-2">
-        <h2 className="text-xs font-semibold text-foreground">Measurements</h2>
+        <h2 className="text-xs font-semibold text-foreground">{t("Measurements")}</h2>
         {measurement ? (
           <dl className="grid grid-cols-2 gap-1 font-mono text-[11px] text-muted-foreground">
-            <dt>Length</dt>
+            <dt>{t("Length")}</dt>
             <dd className="text-foreground">{formatLength(measurement.length, unit)}</dd>
-            <dt>Angle</dt>
+            <dt>{t("Angle")}</dt>
             <dd className="text-foreground">{formatAngle(measurement.angle)}</dd>
             <dt>dx</dt>
             <dd className="text-foreground">{formatLength(measurement.dx, unit)}</dd>
@@ -704,7 +704,7 @@ function PrecisionTab() {
           </dl>
         ) : (
           <p className="text-[11px] text-muted-foreground">
-            Pick the Measure tool (M) and click two points.
+            {t("Pick the Measure tool (M) and click two points.")}
           </p>
         )}
         {selected.length > 0 && (
@@ -740,10 +740,10 @@ function HistoryTab() {
           </button>
         </li>
       ))}
-      <li className="rounded bg-accent px-2 py-1 text-accent-foreground">Current state</li>
+      <li className="rounded bg-accent px-2 py-1 text-accent-foreground">{t("Current state")}</li>
       {future.map((entry, i) => (
         <li key={`f-${entry.label}-${i}`} className="px-2 py-1 text-muted-foreground/50">
-          {entry.label} (redo)
+          {entry.label} ({t("redo")})
         </li>
       ))}
     </ol>
@@ -769,7 +769,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
               tab === t && "border-b-2 border-primary text-foreground",
             )}
           >
-            {t}
+            {t(tab_)}
           </button>
         ))}
       </div>
