@@ -348,6 +348,8 @@ function ObjectsTab() {
   return (
     <div className="space-y-3">
       <TransformSection />
+      <AlignSection />
+
       <hr className="border-border" />
       <section className="space-y-1">
         <h2 className="text-xs font-semibold text-foreground">Objects ({objects.length})</h2>
