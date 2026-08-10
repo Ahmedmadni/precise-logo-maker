@@ -163,6 +163,173 @@ const buildRadial = (grid: RadialGrid): GridGeometry => {
   return { major, minor: [], points };
 };
 
+const RAD = Math.PI / 180;
+
+/** A line of given angle offset perpendicular by `offset`, clipped to `half` length. */
+const angledLine = (grid: Grid, angleDeg: number, offset: number, half: number): Geometry => {
+  const a = angleDeg * RAD;
+  const ux = Math.cos(a);
+  const uy = Math.sin(a);
+  const px = -uy * offset;
+  const py = ux * offset;
+  return line(
+    applyGrid(grid, pt(px - ux * half, py - uy * half)),
+    applyGrid(grid, pt(px + ux * half, py + uy * half)),
+  );
+};
+
+const latticePoints = (
+  grid: Grid,
+  angleA: number,
+  angleB: number,
+  spacing: number,
+  steps: number,
+): Point[] => {
+  const out: Point[] = [];
+  const ax = Math.cos(angleA * RAD) * spacing;
+  const ay = Math.sin(angleA * RAD) * spacing;
+  const bx = Math.cos(angleB * RAD) * spacing;
+  const by = Math.sin(angleB * RAD) * spacing;
+  for (let i = -steps; i <= steps; i += 1) {
+    for (let j = -steps; j <= steps; j += 1) {
+      out.push(applyGrid(grid, pt(i * ax + j * bx, i * ay + j * by)));
+    }
+  }
+  return out;
+};
+
+const buildIsometric = (grid: IsometricGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const half = grid.extent / 2;
+  const spacing = Math.max(1, grid.spacing);
+  const steps = Math.floor(half / spacing);
+  const angles = [grid.axisAngle, -grid.axisAngle, 90];
+  for (const angle of angles) {
+    for (let i = -steps; i <= steps; i += 1) {
+      major.push(angledLine(grid, angle, i * spacing, half * 2));
+    }
+  }
+  return {
+    major,
+    minor: [],
+    points: latticePoints(grid, grid.axisAngle, -grid.axisAngle, spacing, steps),
+  };
+};
+
+const buildTriangular = (grid: TriangularGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const half = grid.extent / 2;
+  const spacing = Math.max(1, grid.spacing);
+  const steps = Math.floor(half / spacing);
+  for (const angle of [0, 60, -60]) {
+    for (let i = -steps; i <= steps; i += 1) {
+      major.push(angledLine(grid, angle, i * spacing, half * 2));
+    }
+  }
+  return { major, minor: [], points: latticePoints(grid, 0, 60, spacing, steps) };
+};
+
+const buildHexagonal = (grid: HexagonalGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const points: Point[] = [];
+  const size = Math.max(1, grid.size);
+  const rings = Math.max(0, Math.round(grid.rings));
+  const cornerOffset = grid.pointyTop ? 30 : 0;
+  const centerOf = (q: number, r: number): Point =>
+    grid.pointyTop
+      ? pt(size * Math.sqrt(3) * (q + r / 2), size * 1.5 * r)
+      : pt(size * 1.5 * q, size * Math.sqrt(3) * (r + q / 2));
+
+  for (let q = -rings; q <= rings; q += 1) {
+    for (let r = -rings; r <= rings; r += 1) {
+      if (Math.abs(q + r) > rings) continue;
+      const c = centerOf(q, r);
+      const corners: Point[] = [];
+      for (let k = 0; k < 6; k += 1) {
+        const a = (60 * k + cornerOffset) * RAD;
+        corners.push(applyGrid(grid, pt(c.x + size * Math.cos(a), c.y + size * Math.sin(a))));
+      }
+      for (let k = 0; k < 6; k += 1) {
+        const a = corners[k]!;
+        const b = corners[(k + 1) % 6]!;
+        major.push(line(a, b));
+        points.push(a);
+      }
+      points.push(applyGrid(grid, c));
+    }
+  }
+  return { major, minor: [], points };
+};
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+const buildGolden = (grid: GoldenGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const minor: Geometry[] = [];
+  const points: Point[] = [];
+  let x = -grid.width / 2;
+  let y = -grid.height / 2;
+  let w = grid.width;
+  let h = grid.height;
+
+  const rect = (rx: number, ry: number, rw: number, rh: number, target: Geometry[]) => {
+    const c = [
+      pt(rx, ry),
+      pt(rx + rw, ry),
+      pt(rx + rw, ry + rh),
+      pt(rx, ry + rh),
+    ].map((p) => applyGrid(grid, p));
+    for (let k = 0; k < 4; k += 1) {
+      target.push(line(c[k]!, c[(k + 1) % 4]!));
+      points.push(c[k]!);
+    }
+  };
+
+  rect(x, y, w, h, major);
+  const steps = Math.max(1, Math.round(grid.steps));
+  for (let i = 0; i < steps; i += 1) {
+    const horizontal = i % 2 === 0;
+    if (horizontal) {
+      const cut = w / PHI;
+      rect(x, y, cut, h, minor);
+      if (grid.spiral) {
+        const cx = i % 4 === 0 ? x + cut : x + cut;
+        const cy = i % 4 === 0 ? y + h : y;
+        const start = i % 4 === 0 ? 180 : 90;
+        major.push({
+          kind: "arc",
+          center: applyGrid(grid, pt(cx, cy)),
+          radius: cut * grid.scale,
+          startAngle: normalizeAngle(start + grid.rotation),
+          endAngle: normalizeAngle(start + 90 + grid.rotation),
+        });
+      }
+      x += cut;
+      w -= cut;
+    } else {
+      const cut = h / PHI;
+      rect(x, y, w, cut, minor);
+      if (grid.spiral) {
+        const cx = x;
+        const cy = y + cut;
+        const start = i % 4 === 1 ? 270 : 0;
+        major.push({
+          kind: "arc",
+          center: applyGrid(grid, pt(cx, cy)),
+          radius: cut * grid.scale,
+          startAngle: normalizeAngle(start + grid.rotation),
+          endAngle: normalizeAngle(start + 90 + grid.rotation),
+        });
+      }
+      y += cut;
+      h -= cut;
+    }
+    if (w < 1 || h < 1) break;
+  }
+  points.push(applyGrid(grid, pt(0, 0)));
+  return { major, minor, points };
+};
+
 export const buildGridGeometry = (grid: Grid): GridGeometry => {
   switch (grid.kind) {
     case "square":
@@ -171,6 +338,14 @@ export const buildGridGeometry = (grid: Grid): GridGeometry => {
       return buildConcentric(grid);
     case "radial":
       return buildRadial(grid);
+    case "isometric":
+      return buildIsometric(grid);
+    case "triangular":
+      return buildTriangular(grid);
+    case "hexagonal":
+      return buildHexagonal(grid);
+    case "golden":
+      return buildGolden(grid);
   }
 };
 
