@@ -93,6 +93,10 @@ export interface StudioState {
   radialRepeat: (count: number) => void;
   reorderObject: (id: string, direction: -1 | 1) => void;
   renameObject: (id: string, name: string) => void;
+  setGeometry: (id: string, geometry: Geometry, label: string) => void;
+  alignSelection: (mode: AlignMode) => void;
+  distributeSelection: (axis: DistributeAxis) => void;
+
 
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
