@@ -323,7 +323,16 @@ export function StudioCanvas() {
 
   const onPointerUp = () => {
     panRef.current = null;
+    if (handleDrag) {
+      const base = doc.objects.find((o) => o.id === handleDrag.objectId);
+      if (base && base.geometry !== handleDrag.geometry) {
+        setGeometry(handleDrag.objectId, handleDrag.geometry, "Edit handle");
+      }
+      setHandleDrag(null);
+      return;
+    }
     if (dragRef.current) {
+
       const offset = dragOffset;
       dragRef.current = null;
       setDragOffset(null);
