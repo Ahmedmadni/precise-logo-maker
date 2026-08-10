@@ -230,13 +230,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       commit(`Add ${kind} grid`, (doc) => {
         const center = artboardCenter(doc.artboard);
         const size = Math.max(doc.artboard.width, doc.artboard.height);
-        const grid =
-          kind === "square"
-            ? createSquareGrid(center, size)
-            : kind === "concentric"
-              ? createConcentricGrid(center, size)
-              : createRadialGrid(center, size);
-        return { ...doc, grids: [...doc.grids, grid] };
+        return { ...doc, grids: [...doc.grids, createGrid(kind, center, size)] };
       }),
 
     updateGrid: (id, patch) =>
