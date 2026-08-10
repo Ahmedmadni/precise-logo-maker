@@ -25,6 +25,7 @@ import { describeGeometry, formatAngle, formatLength } from "../../core/precisio
 import type { Grid } from "../../grids";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
+import { useT } from "../../i18n";
 
 const TABS = ["Properties", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -44,6 +45,7 @@ function NumberField({
   onChange: (v: number) => void;
   step?: number;
 }) {
+  const t = useT();
   return (
     <label className="flex flex-col gap-1">
       <span className={labelCls}>{label}</span>
@@ -62,6 +64,7 @@ function NumberField({
 }
 
 function ArtboardSection() {
+  const t = useT();
   const artboard = useStudio((s) => s.doc.artboard);
   const setArtboard = useStudio((s) => s.setArtboard);
   const unit = artboard.unit;
@@ -128,6 +131,7 @@ function ArtboardSection() {
 }
 
 function ObjectSection() {
+  const t = useT();
   const selection = useStudio((s) => s.selection);
   const objects = useStudio((s) => s.doc.objects);
   const updateObject = useStudio((s) => s.updateObject);
@@ -162,34 +166,34 @@ function ObjectSection() {
       <div className="grid grid-cols-2 gap-2">
         {g.kind === "line" && (
           <>
-            <NumberField label="X1" value={g.a.x} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, x: v } })} />
-            <NumberField label="Y1" value={g.a.y} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, y: v } })} />
-            <NumberField label="X2" value={g.b.x} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, x: v } })} />
-            <NumberField label="Y2" value={g.b.y} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, y: v } })} />
+            <NumberField label={t("X1")} value={g.a.x} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, x: v } })} />
+            <NumberField label={t("Y1")} value={g.a.y} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, y: v } })} />
+            <NumberField label={t("X2")} value={g.b.x} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, x: v } })} />
+            <NumberField label={t("Y2")} value={g.b.y} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, y: v } })} />
           </>
         )}
         {g.kind === "circle" && (
           <>
-            <NumberField label="Center X" value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
-            <NumberField label="Center Y" value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
-            <NumberField label="Radius" value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
-            <NumberField label="Diameter" value={g.radius * 2} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v / 2) })} />
+            <NumberField label={t("Center X")} value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
+            <NumberField label={t("Center Y")} value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
+            <NumberField label={t("Radius")} value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
+            <NumberField label={t("Diameter")} value={g.radius * 2} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v / 2) })} />
           </>
         )}
         {g.kind === "arc" && (
           <>
-            <NumberField label="Center X" value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
-            <NumberField label="Center Y" value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
-            <NumberField label="Radius" value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
-            <NumberField label="Start °" value={g.startAngle} onChange={(v) => patchGeometry({ ...g, startAngle: v })} />
-            <NumberField label="End °" value={g.endAngle} onChange={(v) => patchGeometry({ ...g, endAngle: v })} />
+            <NumberField label={t("Center X")} value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
+            <NumberField label={t("Center Y")} value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
+            <NumberField label={t("Radius")} value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
+            <NumberField label={t("Start °")} value={g.startAngle} onChange={(v) => patchGeometry({ ...g, startAngle: v })} />
+            <NumberField label={t("End °")} value={g.endAngle} onChange={(v) => patchGeometry({ ...g, endAngle: v })} />
           </>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <NumberField
-          label="Stroke width"
+          label={t("Stroke width")}
           value={selected.style.strokeWidth}
           step={0.5}
           onChange={(v) =>
@@ -213,6 +217,7 @@ function ObjectSection() {
 }
 
 function TransformSection() {
+  const t = useT();
   const selection = useStudio((s) => s.selection);
   const rotateSelection = useStudio((s) => s.rotateSelection);
   const mirrorSelection = useStudio((s) => s.mirrorSelection);
@@ -241,7 +246,7 @@ function TransformSection() {
       </div>
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <NumberField label="Rotate °" value={angle} onChange={setAngle} />
+          <NumberField label={t("Rotate °")} value={angle} onChange={setAngle} />
         </div>
         <button type="button" className={btn} disabled={disabled} onClick={() => rotateSelection(angle)}>
           <RotateCw className="h-3 w-3" aria-hidden /> Apply
@@ -249,7 +254,7 @@ function TransformSection() {
       </div>
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <NumberField label="Radial repeat" value={count} onChange={(v) => setCount(Math.max(2, Math.round(v)))} />
+          <NumberField label={t("Radial repeat")} value={count} onChange={(v) => setCount(Math.max(2, Math.round(v)))} />
         </div>
         <button type="button" className={btn} disabled={disabled} onClick={() => radialRepeat(count)}>
           Repeat
@@ -278,6 +283,7 @@ function TransformSection() {
 }
 
 function AlignSection() {
+  const t = useT();
   const selection = useStudio((s) => s.selection);
   const alignSelection = useStudio((s) => s.alignSelection);
   const distributeSelection = useStudio((s) => s.distributeSelection);
@@ -338,6 +344,7 @@ function AlignSection() {
 
 
 function ObjectsTab() {
+  const t = useT();
   const objects = useStudio((s) => s.doc.objects);
   const selection = useStudio((s) => s.selection);
   const setSelection = useStudio((s) => s.setSelection);
@@ -439,50 +446,50 @@ function GridRow({ grid }: { grid: Grid }) {
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberField label="Rotation °" value={grid.rotation} onChange={(v) => updateGrid(grid.id, { rotation: v })} />
-        <NumberField label="Scale" value={grid.scale} step={0.1} onChange={(v) => updateGrid(grid.id, { scale: Math.max(0.01, v) })} />
-        <NumberField label="Origin X" value={grid.origin.x} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, x: v } })} />
-        <NumberField label="Origin Y" value={grid.origin.y} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, y: v } })} />
-        <NumberField label="Opacity" value={grid.opacity} step={0.05} onChange={(v) => updateGrid(grid.id, { opacity: Math.min(1, Math.max(0, v)) })} />
-        <NumberField label="Stroke" value={grid.strokeWidth} step={0.25} onChange={(v) => updateGrid(grid.id, { strokeWidth: Math.max(0.1, v) })} />
+        <NumberField label={t("Rotation °")} value={grid.rotation} onChange={(v) => updateGrid(grid.id, { rotation: v })} />
+        <NumberField label={t("Scale")} value={grid.scale} step={0.1} onChange={(v) => updateGrid(grid.id, { scale: Math.max(0.01, v) })} />
+        <NumberField label={t("Origin X")} value={grid.origin.x} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, x: v } })} />
+        <NumberField label={t("Origin Y")} value={grid.origin.y} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, y: v } })} />
+        <NumberField label={t("Opacity")} value={grid.opacity} step={0.05} onChange={(v) => updateGrid(grid.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+        <NumberField label={t("Stroke")} value={grid.strokeWidth} step={0.25} onChange={(v) => updateGrid(grid.id, { strokeWidth: Math.max(0.1, v) })} />
         {grid.kind === "square" && (
           <>
-            <NumberField label="Spacing" value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label="Subdivisions" value={grid.subdivisions} onChange={(v) => updateGrid(grid.id, { subdivisions: Math.max(1, Math.round(v)) })} />
-            <NumberField label="Extent" value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
+            <NumberField label={t("Subdivisions")} value={grid.subdivisions} onChange={(v) => updateGrid(grid.id, { subdivisions: Math.max(1, Math.round(v)) })} />
+            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
           </>
         )}
         {grid.kind === "concentric" && (
           <>
-            <NumberField label="Start radius" value={grid.startRadius} onChange={(v) => updateGrid(grid.id, { startRadius: Math.max(0, v) })} />
-            <NumberField label="Radius step" value={grid.radiusStep} onChange={(v) => updateGrid(grid.id, { radiusStep: Math.max(1, v) })} />
-            <NumberField label="Count" value={grid.count} onChange={(v) => updateGrid(grid.id, { count: Math.max(1, Math.round(v)) })} />
+            <NumberField label={t("Start radius")} value={grid.startRadius} onChange={(v) => updateGrid(grid.id, { startRadius: Math.max(0, v) })} />
+            <NumberField label={t("Radius step")} value={grid.radiusStep} onChange={(v) => updateGrid(grid.id, { radiusStep: Math.max(1, v) })} />
+            <NumberField label={t("Count")} value={grid.count} onChange={(v) => updateGrid(grid.id, { count: Math.max(1, Math.round(v)) })} />
           </>
         )}
         {grid.kind === "radial" && (
           <>
-            <NumberField label="Rays" value={grid.rays} onChange={(v) => updateGrid(grid.id, { rays: Math.max(1, Math.round(v)) })} />
-            <NumberField label="Angle offset °" value={grid.angleOffset} onChange={(v) => updateGrid(grid.id, { angleOffset: v })} />
-            <NumberField label="Length" value={grid.length} onChange={(v) => updateGrid(grid.id, { length: Math.max(1, v) })} />
+            <NumberField label={t("Rays")} value={grid.rays} onChange={(v) => updateGrid(grid.id, { rays: Math.max(1, Math.round(v)) })} />
+            <NumberField label={t("Angle offset °")} value={grid.angleOffset} onChange={(v) => updateGrid(grid.id, { angleOffset: v })} />
+            <NumberField label={t("Length")} value={grid.length} onChange={(v) => updateGrid(grid.id, { length: Math.max(1, v) })} />
           </>
         )}
         {grid.kind === "isometric" && (
           <>
-            <NumberField label="Spacing" value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label="Extent" value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
-            <NumberField label="Axis angle °" value={grid.axisAngle} onChange={(v) => updateGrid(grid.id, { axisAngle: Math.min(89, Math.max(1, v)) })} />
+            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
+            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField label={t("Axis angle °")} value={grid.axisAngle} onChange={(v) => updateGrid(grid.id, { axisAngle: Math.min(89, Math.max(1, v)) })} />
           </>
         )}
         {grid.kind === "triangular" && (
           <>
-            <NumberField label="Spacing" value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label="Extent" value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
+            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
           </>
         )}
         {grid.kind === "hexagonal" && (
           <>
-            <NumberField label="Hex size" value={grid.size} onChange={(v) => updateGrid(grid.id, { size: Math.max(2, v) })} />
-            <NumberField label="Rings" value={grid.rings} onChange={(v) => updateGrid(grid.id, { rings: Math.min(20, Math.max(0, Math.round(v))) })} />
+            <NumberField label={t("Hex size")} value={grid.size} onChange={(v) => updateGrid(grid.id, { size: Math.max(2, v) })} />
+            <NumberField label={t("Rings")} value={grid.rings} onChange={(v) => updateGrid(grid.id, { rings: Math.min(20, Math.max(0, Math.round(v))) })} />
             <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
@@ -495,9 +502,9 @@ function GridRow({ grid }: { grid: Grid }) {
         )}
         {grid.kind === "golden" && (
           <>
-            <NumberField label="Width" value={grid.width} onChange={(v) => updateGrid(grid.id, { width: Math.max(10, v) })} />
-            <NumberField label="Height" value={grid.height} onChange={(v) => updateGrid(grid.id, { height: Math.max(10, v) })} />
-            <NumberField label="Steps" value={grid.steps} onChange={(v) => updateGrid(grid.id, { steps: Math.min(16, Math.max(1, Math.round(v))) })} />
+            <NumberField label={t("Width")} value={grid.width} onChange={(v) => updateGrid(grid.id, { width: Math.max(10, v) })} />
+            <NumberField label={t("Height")} value={grid.height} onChange={(v) => updateGrid(grid.id, { height: Math.max(10, v) })} />
+            <NumberField label={t("Steps")} value={grid.steps} onChange={(v) => updateGrid(grid.id, { steps: Math.min(16, Math.max(1, Math.round(v))) })} />
             <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
@@ -523,6 +530,7 @@ function GridRow({ grid }: { grid: Grid }) {
 }
 
 function GridsTab() {
+  const t = useT();
   const grids = useStudio((s) => s.doc.grids);
   const addGrid = useStudio((s) => s.addGrid);
 
@@ -559,6 +567,7 @@ function GridsTab() {
 }
 
 function SnapTab() {
+  const t = useT();
   const snap = useStudio((s) => s.snap);
   const setSnapEnabled = useStudio((s) => s.setSnapEnabled);
   const toggleSnapType = useStudio((s) => s.toggleSnapType);
@@ -592,6 +601,7 @@ function SnapTab() {
 }
 
 function PrecisionTab() {
+  const t = useT();
   const precision = useStudio((s) => s.precision);
   const setPrecision = useStudio((s) => s.setPrecision);
   const measurement = useStudio((s) => s.measurement);
@@ -630,7 +640,7 @@ function PrecisionTab() {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <NumberField
-            label="Length step"
+            label={t("Length step")}
             value={precision.lengthStep}
             step={1}
             onChange={(v) => setPrecision({ lengthStep: Math.max(0, v) })}
@@ -712,6 +722,7 @@ function PrecisionTab() {
 }
 
 function HistoryTab() {
+  const t = useT();
   const past = useStudio((s) => s.past);
   const future = useStudio((s) => s.future);
   const jumpTo = useStudio((s) => s.jumpTo);
@@ -744,7 +755,7 @@ export function RightPanel() {
 
   return (
     <aside className="flex h-full w-72 flex-col border-l border-border bg-card">
-      <div className="flex border-b border-border" role="tablist" aria-label="Studio panels">
+      <div className="flex border-b border-border" role="tablist" aria-label={t("Studio panels")}>
         {TABS.map((t) => (
           <button
             key={t}
