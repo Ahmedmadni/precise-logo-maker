@@ -65,6 +65,8 @@ export function StudioCanvas() {
   const setSelection = useStudio((s) => s.setSelection);
   const translateSelection = useStudio((s) => s.translateSelection);
   const toggleSelection = useStudio((s) => s.toggleSelection);
+  const setGeometry = useStudio((s) => s.setGeometry);
+
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
