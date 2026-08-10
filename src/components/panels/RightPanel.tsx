@@ -92,12 +92,12 @@ function ArtboardSection() {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <NumberField
-          label={`Width (${unit})`}
+          label={`${t("Width")} (${unit})`}
           value={fromPx(artboard.width, unit)}
           onChange={(v) => setArtboard({ width: toPx(v, unit) })}
         />
         <NumberField
-          label={`Height (${unit})`}
+          label={`${t("Height")} (${unit})`}
           value={fromPx(artboard.height, unit)}
           onChange={(v) => setArtboard({ height: toPx(v, unit) })}
         />
@@ -323,7 +323,7 @@ function AlignSection() {
           disabled={selection.length < 3}
           onClick={() => distributeSelection("x")}
         >
-          Distribute H
+          {t("Distribute H")}
         </button>
         <button
           type="button"
@@ -331,7 +331,7 @@ function AlignSection() {
           disabled={selection.length < 3}
           onClick={() => distributeSelection("y")}
         >
-          Distribute V
+          {t("Distribute V")}
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground">
@@ -434,7 +434,7 @@ function GridRow({ grid }: { grid: Grid }) {
             checked={grid.locked}
             onChange={(e) => updateGrid(grid.id, { locked: e.target.checked })}
           />
-          Lock
+          {t("Lock")}
         </label>
         <button
           type="button"
@@ -584,15 +584,15 @@ function SnapTab() {
       </label>
       <div className="space-y-1.5">
         <p className={labelCls}>{t("Types (priority order)")}</p>
-        {snap.priority.map((t: SnapType, i) => (
-          <label key={t} className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="w-4 text-right text-[10px]">{i + 1}</span>
+        {snap.priority.map((type: SnapType, i) => (
+          <label key={type} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-4 text-end text-[10px]">{i + 1}</span>
             <input
               type="checkbox"
-              checked={snap.types[t]}
-              onChange={() => toggleSnapType(t)}
+              checked={snap.types[type]}
+              onChange={() => toggleSnapType(type)}
             />
-            {tr(SNAP_LABEL[ty])}
+            {t(SNAP_LABEL[type])}
           </label>
         ))}
       </div>
@@ -757,19 +757,19 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
   return (
     <aside className="flex h-full w-72 flex-col border-l border-border bg-card">
       <div className="flex border-b border-border" role="tablist" aria-label={t("Studio panels")}>
-        {TABS.map((t) => (
+        {TABS.map((name) => (
           <button
-            key={t}
+            key={name}
             role="tab"
-            aria-selected={tab === t}
+            aria-selected={tab === name}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(name)}
             className={cn(
               "flex-1 px-2 py-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground",
-              tab === t && "border-b-2 border-primary text-foreground",
+              tab === name && "border-b-2 border-primary text-foreground",
             )}
           >
-            {t(tab_)}
+            {t(name)}
           </button>
         ))}
       </div>
