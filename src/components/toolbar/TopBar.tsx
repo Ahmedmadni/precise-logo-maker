@@ -1,5 +1,18 @@
-import { Download, Maximize2, Redo2, RotateCcw, Scan, Undo2 } from "lucide-react";
-import { downloadSvg } from "../../objects/export";
+import { useRef, useState } from "react";
+import {
+  Download,
+  FilePlus2,
+  FolderOpen,
+  Image,
+  Maximize2,
+  Redo2,
+  RotateCcw,
+  Save,
+  Scan,
+  Undo2,
+} from "lucide-react";
+import { downloadPng, downloadSvg } from "../../objects/export";
+import { downloadProject, readProjectFile } from "../../objects/project";
 import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
