@@ -360,6 +360,58 @@ export const useStudio = create<StudioState>()((set, get) => {
         objects: doc.objects.map((o) => (o.id === id ? { ...o, name } : o)),
       })),
 
+    setGeometry: (id, geometry, label) =>
+      commit(label, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) => (o.id === id ? { ...o, geometry } : o)),
+      })),
+
+    alignSelection: (mode) => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      commit(`Align ${mode}`, (doc) => {
+        const targets = doc.objects.filter((o) => ids.includes(o.id) && !o.locked);
+        if (targets.length === 0) return doc;
+        const boundsList = targets.map((o) => geometryBounds(o.geometry));
+        const target =
+          targets.length > 1
+            ? unionBounds(boundsList)
+            : artboardWorldBounds(doc.artboard);
+        const offsets = alignOffsets(boundsList, mode, target);
+        const byId = new Map(targets.map((o, i) => [o.id, offsets[i]]));
+        return {
+          ...doc,
+          objects: doc.objects.map((o) => {
+            const d = byId.get(o.id);
+            return d ? { ...o, geometry: translateGeometry(o.geometry, d.x, d.y) } : o;
+          }),
+        };
+      });
+    },
+
+    distributeSelection: (axis) => {
+      const ids = get().selection;
+      if (ids.length < 3) return;
+      commit(`Distribute ${axis === "x" ? "horizontally" : "vertically"}`, (doc) => {
+        const targets = doc.objects.filter((o) => ids.includes(o.id) && !o.locked);
+        if (targets.length < 3) return doc;
+        const offsets = distributeOffsets(
+          targets.map((o) => geometryBounds(o.geometry)),
+          axis,
+        );
+        const byId = new Map(targets.map((o, i) => [o.id, offsets[i]]));
+        return {
+          ...doc,
+          objects: doc.objects.map((o) => {
+            const d = byId.get(o.id);
+            return d ? { ...o, geometry: translateGeometry(o.geometry, d.x, d.y) } : o;
+          }),
+        };
+      });
+    },
+
+
+
 
   setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
     setMeasurement: (measurement) => set({ measurement }),
