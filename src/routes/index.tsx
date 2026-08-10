@@ -5,6 +5,7 @@ import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { TopBar } from "../components/toolbar/TopBar";
+import { useAutosave } from "../hooks/useAutosave";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 
 export const Route = createFileRoute("/")({
