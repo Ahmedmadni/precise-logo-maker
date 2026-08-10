@@ -468,7 +468,29 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Edit handles for a single selected object */}
+          {editHandles.map((h) => (
+            <rect
+              key={h.id}
+              x={h.point.x - 4 / view.zoom}
+              y={h.point.y - 4 / view.zoom}
+              width={8 / view.zoom}
+              height={8 / view.zoom}
+              rx={h.role === "center" ? 4 / view.zoom : 1 / view.zoom}
+              fill={
+                handleDrag?.handleId === h.id
+                  ? "var(--color-primary)"
+                  : "var(--color-background)"
+              }
+              stroke="var(--color-primary)"
+              strokeWidth={1.25}
+              vectorEffect="non-scaling-stroke"
+            >
+              <title>{h.label}</title>
+            </rect>
+          ))}
           {/* Selection bounds */}
+
           {selectionBounds && Number.isFinite(selectionBounds.minX) && (
             <rect
               x={selectionBounds.minX}
