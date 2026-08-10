@@ -21,6 +21,12 @@ import {
 } from "../core/precision/constraints";
 import type { Measurement } from "../core/precision/measure";
 import {
+  mirrorGeometry,
+  rotateGeometry,
+  translateGeometry,
+} from "../objects/transform";
+import { geometryBounds, unionBounds } from "../core/geometry/math";
+import {
   createConcentricGrid,
   createRadialGrid,
   createSquareGrid,
@@ -80,6 +86,14 @@ export interface StudioState {
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
 
+  translateSelection: (dx: number, dy: number) => void;
+  rotateSelection: (angle: number) => void;
+  mirrorSelection: (axis: "x" | "y") => void;
+  duplicateSelection: () => void;
+  radialRepeat: (count: number) => void;
+  reorderObject: (id: string, direction: -1 | 1) => void;
+  renameObject: (id: string, name: string) => void;
+
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
   scaleSelection: (factor: number) => void;
@@ -121,6 +135,14 @@ const nextObjectId = (): string => {
 };
 
 const HISTORY_LIMIT = 100;
+
+const selectionCenter = (doc: DocumentState, ids: string[]): Point | null => {
+  const list = doc.objects.filter((o) => ids.includes(o.id));
+  if (list.length === 0) return null;
+  const b = unionBounds(list.map((o) => geometryBounds(o.geometry)));
+  if (!Number.isFinite(b.minX)) return null;
+  return pt((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+};
 
 const geometryLabel: Record<Geometry["kind"], string> = {
   circle: "Circle",
@@ -238,7 +260,15 @@ export const useStudio = create<StudioState>()((set, get) => {
       })),
     clearSelection: () => set({ selection: [] }),
 
-    setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
+    translateSelection: (dx: number, dy: number) => void;
+  rotateSelection: (angle: number) => void;
+  mirrorSelection: (axis: "x" | "y") => void;
+  duplicateSelection: () => void;
+  radialRepeat: (count: number) => void;
+  reorderObject: (id: string, direction: -1 | 1) => void;
+  renameObject: (id: string, name: string) => void;
+
+  setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
     setMeasurement: (measurement) => set({ measurement }),
 
     scaleSelection: (factor) => {
