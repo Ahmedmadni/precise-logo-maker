@@ -388,6 +388,48 @@ function GridRow({ grid }: { grid: Grid }) {
             <NumberField label="Length" value={grid.length} onChange={(v) => updateGrid(grid.id, { length: Math.max(1, v) })} />
           </>
         )}
+        {grid.kind === "isometric" && (
+          <>
+            <NumberField label="Spacing" value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
+            <NumberField label="Extent" value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField label="Axis angle °" value={grid.axisAngle} onChange={(v) => updateGrid(grid.id, { axisAngle: Math.min(89, Math.max(1, v)) })} />
+          </>
+        )}
+        {grid.kind === "triangular" && (
+          <>
+            <NumberField label="Spacing" value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
+            <NumberField label="Extent" value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+          </>
+        )}
+        {grid.kind === "hexagonal" && (
+          <>
+            <NumberField label="Hex size" value={grid.size} onChange={(v) => updateGrid(grid.id, { size: Math.max(2, v) })} />
+            <NumberField label="Rings" value={grid.rings} onChange={(v) => updateGrid(grid.id, { rings: Math.min(20, Math.max(0, Math.round(v))) })} />
+            <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={grid.pointyTop}
+                onChange={(e) => updateGrid(grid.id, { pointyTop: e.target.checked })}
+              />
+              Pointy-top orientation
+            </label>
+          </>
+        )}
+        {grid.kind === "golden" && (
+          <>
+            <NumberField label="Width" value={grid.width} onChange={(v) => updateGrid(grid.id, { width: Math.max(10, v) })} />
+            <NumberField label="Height" value={grid.height} onChange={(v) => updateGrid(grid.id, { height: Math.max(10, v) })} />
+            <NumberField label="Steps" value={grid.steps} onChange={(v) => updateGrid(grid.id, { steps: Math.min(16, Math.max(1, Math.round(v))) })} />
+            <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={grid.spiral}
+                onChange={(e) => updateGrid(grid.id, { spiral: e.target.checked })}
+              />
+              Golden spiral arcs
+            </label>
+          </>
+        )}
         <label className="flex flex-col gap-1">
           <span className={labelCls}>Color</span>
           <input
@@ -409,7 +451,17 @@ function GridsTab() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
-        {(["square", "concentric", "radial"] as const).map((k) => (
+        {(
+          [
+            "square",
+            "concentric",
+            "radial",
+            "isometric",
+            "triangular",
+            "hexagonal",
+            "golden",
+          ] as const
+        ).map((k) => (
           <button
             key={k}
             type="button"

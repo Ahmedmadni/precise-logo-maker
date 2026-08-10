@@ -28,7 +28,7 @@ import {
 import { geometryBounds, unionBounds } from "../core/geometry/math";
 import {
   createConcentricGrid,
-  createRadialGrid,
+  createGrid,
   createSquareGrid,
   type Grid,
 } from "../grids";
@@ -100,6 +100,9 @@ export interface StudioState {
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
+
+  loadDocument: (doc: DocumentState, label?: string) => void;
+  newDocument: () => void;
 
   undo: () => void;
   redo: () => void;
@@ -230,13 +233,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       commit(`Add ${kind} grid`, (doc) => {
         const center = artboardCenter(doc.artboard);
         const size = Math.max(doc.artboard.width, doc.artboard.height);
-        const grid =
-          kind === "square"
-            ? createSquareGrid(center, size)
-            : kind === "concentric"
-              ? createConcentricGrid(center, size)
-              : createRadialGrid(center, size);
-        return { ...doc, grids: [...doc.grids, grid] };
+        return { ...doc, grids: [...doc.grids, createGrid(kind, center, size)] };
       }),
 
     updateGrid: (id, patch) =>
@@ -393,6 +390,21 @@ export const useStudio = create<StudioState>()((set, get) => {
       set((s) => ({
         snap: { ...s.snap, types: { ...s.snap.types, [type]: !s.snap.types[type] } },
       })),
+
+    loadDocument: (next, label = "Open project") => {
+      const { doc, past, historyLog } = get();
+      set({
+        doc: next,
+        past: [...past, { label, state: doc }].slice(-HISTORY_LIMIT),
+        future: [],
+        historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
+        selection: [],
+        measurement: null,
+      });
+    },
+
+    newDocument: () => get().loadDocument(initialDoc(), "New document"),
+
 
     undo: () => {
       const { past, doc, future, historyLog } = get();
