@@ -49,7 +49,48 @@ export interface RadialGrid extends GridBase {
   length: number;
 }
 
-export type Grid = SquareGrid | ConcentricGrid | RadialGrid;
+export interface IsometricGrid extends GridBase {
+  kind: "isometric";
+  spacing: number;
+  extent: number;
+  /** Axis angle in degrees from horizontal (30° = classic isometric). */
+  axisAngle: number;
+}
+
+export interface TriangularGrid extends GridBase {
+  kind: "triangular";
+  spacing: number;
+  extent: number;
+}
+
+export interface HexagonalGrid extends GridBase {
+  kind: "hexagonal";
+  /** Circumradius of a single hexagon. */
+  size: number;
+  /** Number of rings around the centre hexagon. */
+  rings: number;
+  /** Flat-top or pointy-top orientation. */
+  pointyTop: boolean;
+}
+
+export interface GoldenGrid extends GridBase {
+  kind: "golden";
+  width: number;
+  height: number;
+  /** Number of golden subdivisions. */
+  steps: number;
+  /** Draw the quarter-circle spiral arcs. */
+  spiral: boolean;
+}
+
+export type Grid =
+  | SquareGrid
+  | ConcentricGrid
+  | RadialGrid
+  | IsometricGrid
+  | TriangularGrid
+  | HexagonalGrid
+  | GoldenGrid;
 
 export interface GridGeometry {
   /** Full-strength lines/circles (major divisions). */
