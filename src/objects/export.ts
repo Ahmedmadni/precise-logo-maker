@@ -44,3 +44,44 @@ export const downloadSvg = (doc: DocumentState, filename = "logo.svg"): void => 
   link.click();
   URL.revokeObjectURL(url);
 };
+
+/** Rasterises the exported SVG to a PNG blob at the requested pixel width. */
+export const renderPng = async (doc: DocumentState, size: number): Promise<Blob> => {
+  const svg = buildSvgDocument(doc);
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    const image = new Image();
+    image.decoding = "sync";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Failed to rasterise SVG"));
+      image.src = url;
+    });
+    const ratio = doc.artboard.height / doc.artboard.width;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(size);
+    canvas.height = Math.round(size * ratio);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D context unavailable");
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("PNG encoding failed"))), "image/png");
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
+export const downloadPng = async (
+  doc: DocumentState,
+  size = 1024,
+  filename = `logo-${Math.round(size)}.png`,
+): Promise<void> => {
+  const blob = await renderPng(doc, size);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
