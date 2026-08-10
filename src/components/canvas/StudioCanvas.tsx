@@ -237,7 +237,23 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
+      // Handle editing takes priority over body dragging.
+      if (selection.length === 1) {
+        const target = doc.objects.find((o) => o.id === selection[0]);
+        if (target && !target.locked && target.visible) {
+          const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
+          if (h) {
+            setHandleDrag({
+              objectId: target.id,
+              handleId: h.id,
+              geometry: target.geometry,
+            });
+            return;
+          }
+        }
+      }
       const hit = hitTest(world);
+
       if (hit) {
         if (e.shiftKey) toggleSelection(hit);
         else if (!selection.includes(hit)) setSelection([hit]);
