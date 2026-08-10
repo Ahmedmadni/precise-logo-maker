@@ -371,7 +371,19 @@ export function StudioCanvas() {
       : preview
         ? `${draftReadout(preview, unit)}${shiftDown || precision.angleLock ? ` · locked ${precision.angleStep}°` : ""}`
         : null;
+  const editTarget =
+    tool === "select" && selection.length === 1
+      ? doc.objects.find((o) => o.id === selection[0] && o.visible && !o.locked)
+      : undefined;
+  const editHandles = editTarget
+    ? handlesOf(
+        handleDrag && handleDrag.objectId === editTarget.id
+          ? handleDrag.geometry
+          : editTarget.geometry,
+      )
+    : [];
   const selectionBounds =
+
     selection.length > 0
       ? unionBounds(
           doc.objects
