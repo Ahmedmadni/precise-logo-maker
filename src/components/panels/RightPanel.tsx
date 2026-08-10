@@ -1,5 +1,21 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Copy, FlipHorizontal, FlipVertical, RotateCw, Trash2 } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignLeft,
+  AlignRight,
+  AlignStartVertical,
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  FlipHorizontal,
+  FlipVertical,
+  RotateCw,
+  Trash2,
+} from "lucide-react";
+import type { AlignMode } from "../../objects/align";
+
 import type { Unit } from "../../core/coordinates/units";
 import { fromPx, toPx } from "../../core/coordinates/units";
 import type { Geometry } from "../../core/geometry/types";
