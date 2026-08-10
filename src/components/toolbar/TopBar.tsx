@@ -4,6 +4,7 @@ import {
   FilePlus2,
   FolderOpen,
   Image,
+  Languages,
   Maximize2,
   Redo2,
   RotateCcw,
@@ -16,6 +17,7 @@ import { downloadProject, readProjectFile } from "../../objects/project";
 import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
+import { useLangStore, useT } from "../../i18n";
 
 const ZOOM_LEVELS = [1, 2, 4, 8];
 
@@ -34,12 +36,15 @@ export function TopBar() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [pngSize, setPngSize] = useState(1024);
   const [busy, setBusy] = useState(false);
+  const t = useT();
+  const lang = useLangStore((s) => s.lang);
+  const setLang = useLangStore((s) => s.setLang);
 
   const openProject = async (file: File | undefined) => {
     if (!file) return;
     const parsed = await readProjectFile(file);
     if (parsed) loadDocument(parsed, `Open ${file.name}`);
-    else window.alert("This file is not a valid .logo project.");
+    else window.alert(t("This file is not a valid .logo project."));
   };
 
   const exportPng = async () => {
@@ -78,38 +83,51 @@ export function TopBar() {
     "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-card px-3 py-2">
-      <h1 className="text-sm font-semibold tracking-tight text-foreground">
-        Logo Grid Studio
+    <header className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 [scrollbar-width:none]">
+      <h1 className="flex-none whitespace-nowrap text-sm font-semibold tracking-tight text-foreground">
+        {t("Logo Grid Studio")}
       </h1>
-      <span className="text-[11px] text-muted-foreground">Phase 5 — Handle Editing & Alignment</span>
+      <span className="hidden text-[11px] text-muted-foreground sm:inline">
+        {t("Phase 6 — Arabic UI & Mobile")}
+      </span>
 
-      <div className="ml-4 flex items-center gap-1.5">
+      <button
+        type="button"
+        className={`${btn} flex-none`}
+        onClick={() => setLang(lang === "ar" ? "en" : "ar")}
+        title={t("Language")}
+        aria-label={t("Language")}
+      >
+        <Languages className="h-3.5 w-3.5" aria-hidden />
+        {lang === "ar" ? "English" : "العربية"}
+      </button>
+
+      <div className="flex flex-none items-center gap-1.5">
         <button
           type="button"
           className={btn}
           onClick={() => {
-            if (doc.objects.length === 0 || window.confirm("Start a new document? Unsaved work is lost."))
+            if (doc.objects.length === 0 || window.confirm(t("Start a new document? Unsaved work is lost.")))
               newDocument();
           }}
-          title="New document"
+          title={t("New document")}
         >
-          <FilePlus2 className="h-3.5 w-3.5" aria-hidden /> New
+          <FilePlus2 className="h-3.5 w-3.5" aria-hidden /> {t("New")}
         </button>
         <button
           type="button"
           className={btn}
           onClick={() => fileInput.current?.click()}
-          title="Open .logo project"
+          title={t("Open .logo project")}
         >
-          <FolderOpen className="h-3.5 w-3.5" aria-hidden /> Open
+          <FolderOpen className="h-3.5 w-3.5" aria-hidden /> {t("Open")}
         </button>
         <input
           ref={fileInput}
           type="file"
           accept=".logo,application/json"
           className="hidden"
-          aria-label="Open project file"
+          aria-label={t("Open project file")}
           onChange={(e) => {
             void openProject(e.target.files?.[0]);
             e.target.value = "";
@@ -119,28 +137,28 @@ export function TopBar() {
           type="button"
           className={btn}
           onClick={() => downloadProject(doc)}
-          title="Save .logo project"
+          title={t("Save .logo project")}
         >
-          <Save className="h-3.5 w-3.5" aria-hidden /> Save
+          <Save className="h-3.5 w-3.5" aria-hidden /> {t("Save")}
         </button>
-        <button type="button" className={btn} onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
-          <Undo2 className="h-3.5 w-3.5" aria-hidden /> Undo
+        <button type="button" className={btn} onClick={undo} disabled={!canUndo} title={t("Undo (Ctrl+Z)")}>
+          <Undo2 className="h-3.5 w-3.5" aria-hidden /> {t("Undo")}
         </button>
         <button
           type="button"
           className={btn}
           onClick={redo}
           disabled={!canRedo}
-          title="Redo (Ctrl+Shift+Z)"
+          title={t("Redo (Ctrl+Shift+Z)")}
         >
-          <Redo2 className="h-3.5 w-3.5" aria-hidden /> Redo
+          <Redo2 className="h-3.5 w-3.5" aria-hidden /> {t("Redo")}
         </button>
       </div>
 
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ms-auto flex flex-none items-center gap-1.5">
         <button type="button" className={btn} onClick={fitArtboard}>
-          <Maximize2 className="h-3.5 w-3.5" aria-hidden /> Fit artboard
+          <Maximize2 className="h-3.5 w-3.5" aria-hidden /> {t("Fit artboard")}
         </button>
         <button
           type="button"
@@ -148,29 +166,29 @@ export function TopBar() {
           onClick={fitSelection}
           disabled={selection.length === 0}
         >
-          <Scan className="h-3.5 w-3.5" aria-hidden /> Fit selection
+          <Scan className="h-3.5 w-3.5" aria-hidden /> {t("Fit selection")}
         </button>
         <button
           type="button"
           className={btn}
           onClick={() => setView({ ...view, rotation: 0, zoom: 1, pan: { x: 0, y: 0 } })}
-          title="Reset view"
+          title={t("Reset view")}
         >
-          <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden /> {t("Reset")}
         </button>
         <button
           type="button"
           className={btn}
           onClick={() => downloadSvg(doc)}
           disabled={doc.objects.length === 0}
-          title="Export SVG"
+          title={t("Export SVG")}
         >
           <Download className="h-3.5 w-3.5" aria-hidden /> SVG
         </button>
         <select
           className="rounded-md border border-border bg-background px-1.5 py-1.5 text-xs text-muted-foreground"
           value={pngSize}
-          aria-label="PNG export size"
+          aria-label={t("PNG export size")}
           onChange={(e) => setPngSize(Number(e.target.value))}
         >
           {[512, 1024, 2048, 4096].map((s) => (
@@ -184,13 +202,18 @@ export function TopBar() {
           className={btn}
           onClick={() => void exportPng()}
           disabled={doc.objects.length === 0 || busy}
-          title="Export PNG"
+          title={t("Export PNG")}
         >
           <Image className="h-3.5 w-3.5" aria-hidden /> PNG
         </button>
 
         {ZOOM_LEVELS.map((z) => (
-          <button key={z} type="button" className={btn} onClick={() => setZoom(z)}>
+          <button
+            key={z}
+            type="button"
+            className={`${btn} hidden sm:inline-flex`}
+            onClick={() => setZoom(z)}
+          >
             {z * 100}%
           </button>
         ))}

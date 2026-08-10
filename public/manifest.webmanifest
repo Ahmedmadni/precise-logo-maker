@@ -1,0 +1,16 @@
+{
+  "name": "Logo Grid Studio",
+  "short_name": "LogoGrid",
+  "description": "استوديو بناء الشعارات الهندسية بالشبكات والالتقاط الذكي — Geometric logo construction studio.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0f12",
+  "theme_color": "#0d0f12",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

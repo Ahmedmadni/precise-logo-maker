@@ -1,5 +1,6 @@
 import { formatUnit } from "../../core/coordinates/units";
 import { useStudio } from "../../store/studioStore";
+import { useT } from "../../i18n";
 
 export function StatusBar() {
   const view = useStudio((s) => s.view);
@@ -9,24 +10,36 @@ export function StatusBar() {
   const grids = useStudio((s) => s.doc.grids);
   const tool = useStudio((s) => s.tool);
   const count = useStudio((s) => s.doc.objects.length);
+  const t = useT();
 
   const visibleGrids = grids.filter((g) => g.visible).length;
+  const toolLabel = tool.charAt(0).toUpperCase() + tool.slice(1);
 
   return (
-    <footer className="flex items-center gap-4 border-t border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
-      <span>Zoom {(view.zoom * 100).toFixed(0)}%</span>
+    <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
       <span>
+        {t("Zoom")} {(view.zoom * 100).toFixed(0)}%
+      </span>
+      <span dir="ltr">
         {cursor
           ? `X ${formatUnit(cursor.x, unit)}  Y ${formatUnit(cursor.y, unit)}`
           : "X —  Y —"}
       </span>
-      <span>Unit {unit}</span>
-      <span>Snap {snap.enabled ? "on" : "off"}</span>
       <span>
-        Grids {visibleGrids}/{grids.length}
+        {t("Unit")} {unit}
       </span>
-      <span>Objects {count}</span>
-      <span className="ml-auto capitalize">Tool: {tool}</span>
+      <span>
+        {t("Snap")} {snap.enabled ? t("on") : t("off")}
+      </span>
+      <span>
+        {t("Grids")} {visibleGrids}/{grids.length}
+      </span>
+      <span>
+        {t("Objects")} {count}
+      </span>
+      <span className="ms-auto">
+        {t("Tool")}: {t(toolLabel)}
+      </span>
     </footer>
   );
 }
