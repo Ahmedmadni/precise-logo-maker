@@ -167,6 +167,28 @@ export function TopBar() {
         >
           <Download className="h-3.5 w-3.5" aria-hidden /> SVG
         </button>
+        <select
+          className="rounded-md border border-border bg-background px-1.5 py-1.5 text-xs text-muted-foreground"
+          value={pngSize}
+          aria-label="PNG export size"
+          onChange={(e) => setPngSize(Number(e.target.value))}
+        >
+          {[512, 1024, 2048, 4096].map((s) => (
+            <option key={s} value={s}>
+              {s}px
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => void exportPng()}
+          disabled={doc.objects.length === 0 || busy}
+          title="Export PNG"
+        >
+          <Image className="h-3.5 w-3.5" aria-hidden /> PNG
+        </button>
+
         {ZOOM_LEVELS.map((z) => (
           <button key={z} type="button" className={btn} onClick={() => setZoom(z)}>
             {z * 100}%
