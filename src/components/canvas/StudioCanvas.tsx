@@ -61,6 +61,7 @@ export function StudioCanvas() {
   const setCursor = useStudio((s) => s.setCursor);
   const addObject = useStudio((s) => s.addObject);
   const setSelection = useStudio((s) => s.setSelection);
+  const translateSelection = useStudio((s) => s.translateSelection);
   const toggleSelection = useStudio((s) => s.toggleSelection);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -69,6 +70,8 @@ export function StudioCanvas() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
+  const dragRef = useRef<{ start: Point; last: Point } | null>(null);
+  const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
@@ -227,7 +230,9 @@ export function StudioCanvas() {
       const hit = hitTest(world);
       if (hit) {
         if (e.shiftKey) toggleSelection(hit);
-        else setSelection([hit]);
+        else if (!selection.includes(hit)) setSelection([hit]);
+        dragRef.current = { start: world, last: world };
+        setDragOffset(pt(0, 0));
         return;
       }
       if (!e.shiftKey) setSelection([]);
@@ -270,11 +275,24 @@ export function StudioCanvas() {
     setSnap(s);
     setHoverWorld(tool === "select" ? world : point);
     setCursor(tool === "select" ? world : point);
+    if (dragRef.current) {
+      setDragOffset(pt(point.x - dragRef.current.start.x, point.y - dragRef.current.start.y));
+      return;
+    }
     if (box) setBox({ ...box, end: world });
   };
 
   const onPointerUp = () => {
     panRef.current = null;
+    if (dragRef.current) {
+      const offset = dragOffset;
+      dragRef.current = null;
+      setDragOffset(null);
+      if (offset && (Math.abs(offset.x) > 1e-6 || Math.abs(offset.y) > 1e-6)) {
+        translateSelection(offset.x, offset.y);
+      }
+      return;
+    }
     if (box) {
       const minX = Math.min(box.start.x, box.end.x);
       const maxX = Math.max(box.start.x, box.end.x);
@@ -371,6 +389,11 @@ export function StudioCanvas() {
               o.visible ? (
                 <path
                   key={o.id}
+                  transform={
+                    dragOffset && selection.includes(o.id) && !o.locked
+                      ? `translate(${dragOffset.x} ${dragOffset.y})`
+                      : undefined
+                  }
                   d={geometryToPathData(o.geometry)}
                   fill={o.style.fill}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
