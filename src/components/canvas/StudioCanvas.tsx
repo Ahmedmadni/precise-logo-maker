@@ -28,6 +28,8 @@ import { SnapIndicator } from "./SnapIndicator";
 
 const SNAP_PIXELS = 12;
 const HIT_PIXELS = 8;
+const HANDLE_PIXELS = 9;
+
 
 interface Draft {
   kind: "line" | "circle" | "arc";
