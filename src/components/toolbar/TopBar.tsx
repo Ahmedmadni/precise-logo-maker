@@ -82,7 +82,7 @@ export function TopBar() {
       <h1 className="text-sm font-semibold tracking-tight text-foreground">
         Logo Grid Studio
       </h1>
-      <span className="text-[11px] text-muted-foreground">Phase 4 — Grids, Files & Raster Export</span>
+      <span className="text-[11px] text-muted-foreground">Phase 5 — Handle Editing & Alignment</span>
 
       <div className="ml-4 flex items-center gap-1.5">
         <button

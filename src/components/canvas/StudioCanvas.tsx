@@ -17,6 +17,8 @@ import {
 import type { Geometry, Point } from "../../core/geometry/types";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
 import { constrainPoint } from "../../core/precision/constraints";
+import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
+
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
 import { geometryToPathData } from "../../objects/render";
@@ -26,6 +28,8 @@ import { SnapIndicator } from "./SnapIndicator";
 
 const SNAP_PIXELS = 12;
 const HIT_PIXELS = 8;
+const HANDLE_PIXELS = 9;
+
 
 interface Draft {
   kind: "line" | "circle" | "arc";
@@ -63,6 +67,8 @@ export function StudioCanvas() {
   const setSelection = useStudio((s) => s.setSelection);
   const translateSelection = useStudio((s) => s.translateSelection);
   const toggleSelection = useStudio((s) => s.toggleSelection);
+  const setGeometry = useStudio((s) => s.setGeometry);
+
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
@@ -73,6 +79,12 @@ export function StudioCanvas() {
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
+  const [handleDrag, setHandleDrag] = useState<{
+    objectId: string;
+    handleId: string;
+    geometry: Geometry;
+  } | null>(null);
+
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
 
@@ -227,7 +239,23 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
+      // Handle editing takes priority over body dragging.
+      if (selection.length === 1) {
+        const target = doc.objects.find((o) => o.id === selection[0]);
+        if (target && !target.locked && target.visible) {
+          const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
+          if (h) {
+            setHandleDrag({
+              objectId: target.id,
+              handleId: h.id,
+              geometry: target.geometry,
+            });
+            return;
+          }
+        }
+      }
       const hit = hitTest(world);
+
       if (hit) {
         if (e.shiftKey) toggleSelection(hit);
         else if (!selection.includes(hit)) setSelection([hit]);
@@ -275,7 +303,18 @@ export function StudioCanvas() {
     setSnap(s);
     setHoverWorld(tool === "select" ? world : point);
     setCursor(tool === "select" ? world : point);
+    if (handleDrag) {
+      const base = doc.objects.find((o) => o.id === handleDrag.objectId);
+      if (base) {
+        setHandleDrag({
+          ...handleDrag,
+          geometry: applyHandle(base.geometry, handleDrag.handleId, point),
+        });
+      }
+      return;
+    }
     if (dragRef.current) {
+
       setDragOffset(pt(point.x - dragRef.current.start.x, point.y - dragRef.current.start.y));
       return;
     }
@@ -284,7 +323,16 @@ export function StudioCanvas() {
 
   const onPointerUp = () => {
     panRef.current = null;
+    if (handleDrag) {
+      const base = doc.objects.find((o) => o.id === handleDrag.objectId);
+      if (base && base.geometry !== handleDrag.geometry) {
+        setGeometry(handleDrag.objectId, handleDrag.geometry, "Edit handle");
+      }
+      setHandleDrag(null);
+      return;
+    }
     if (dragRef.current) {
+
       const offset = dragOffset;
       dragRef.current = null;
       setDragOffset(null);
@@ -323,7 +371,19 @@ export function StudioCanvas() {
       : preview
         ? `${draftReadout(preview, unit)}${shiftDown || precision.angleLock ? ` · locked ${precision.angleStep}°` : ""}`
         : null;
+  const editTarget =
+    tool === "select" && selection.length === 1
+      ? doc.objects.find((o) => o.id === selection[0] && o.visible && !o.locked)
+      : undefined;
+  const editHandles = editTarget
+    ? handlesOf(
+        handleDrag && handleDrag.objectId === editTarget.id
+          ? handleDrag.geometry
+          : editTarget.geometry,
+      )
+    : [];
   const selectionBounds =
+
     selection.length > 0
       ? unionBounds(
           doc.objects
@@ -394,7 +454,12 @@ export function StudioCanvas() {
                       ? `translate(${dragOffset.x} ${dragOffset.y})`
                       : undefined
                   }
-                  d={geometryToPathData(o.geometry)}
+                  d={geometryToPathData(
+                    handleDrag && handleDrag.objectId === o.id
+                      ? handleDrag.geometry
+                      : o.geometry,
+                  )}
+
                   fill={o.style.fill}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
@@ -415,7 +480,29 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Edit handles for a single selected object */}
+          {editHandles.map((h) => (
+            <rect
+              key={h.id}
+              x={h.point.x - 4 / view.zoom}
+              y={h.point.y - 4 / view.zoom}
+              width={8 / view.zoom}
+              height={8 / view.zoom}
+              rx={h.role === "center" ? 4 / view.zoom : 1 / view.zoom}
+              fill={
+                handleDrag?.handleId === h.id
+                  ? "var(--color-primary)"
+                  : "var(--color-background)"
+              }
+              stroke="var(--color-primary)"
+              strokeWidth={1.25}
+              vectorEffect="non-scaling-stroke"
+            >
+              <title>{h.label}</title>
+            </rect>
+          ))}
           {/* Selection bounds */}
+
           {selectionBounds && Number.isFinite(selectionBounds.minX) && (
             <rect
               x={selectionBounds.minX}

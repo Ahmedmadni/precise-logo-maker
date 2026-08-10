@@ -1,5 +1,21 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Copy, FlipHorizontal, FlipVertical, RotateCw, Trash2 } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignLeft,
+  AlignRight,
+  AlignStartVertical,
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  FlipHorizontal,
+  FlipVertical,
+  RotateCw,
+  Trash2,
+} from "lucide-react";
+import type { AlignMode } from "../../objects/align";
+
 import type { Unit } from "../../core/coordinates/units";
 import { fromPx, toPx } from "../../core/coordinates/units";
 import type { Geometry } from "../../core/geometry/types";
@@ -261,6 +277,66 @@ function TransformSection() {
   );
 }
 
+function AlignSection() {
+  const selection = useStudio((s) => s.selection);
+  const alignSelection = useStudio((s) => s.alignSelection);
+  const distributeSelection = useStudio((s) => s.distributeSelection);
+  const disabled = selection.length === 0;
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  const modes: Array<[string, AlignMode, typeof AlignLeft]> = [
+    ["Left", "left", AlignLeft],
+    ["Center", "centerX", AlignCenterHorizontal],
+    ["Right", "right", AlignRight],
+    ["Top", "top", AlignStartVertical],
+    ["Middle", "middleY", AlignCenterVertical],
+    ["Bottom", "bottom", AlignEndVertical],
+  ];
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-xs font-semibold text-foreground">Align &amp; distribute</h2>
+      <div className="flex flex-wrap gap-1.5">
+        {modes.map(([label, mode, Icon]) => (
+          <button
+            key={mode}
+            type="button"
+            className={btn}
+            disabled={disabled}
+            title={`Align ${label.toLowerCase()}`}
+            onClick={() => alignSelection(mode)}
+          >
+            <Icon className="h-3 w-3" aria-hidden /> {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={btn}
+          disabled={selection.length < 3}
+          onClick={() => distributeSelection("x")}
+        >
+          Distribute H
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={selection.length < 3}
+          onClick={() => distributeSelection("y")}
+        >
+          Distribute V
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        One object aligns to the artboard; several align to their shared bounds. Distribute needs 3+.
+      </p>
+    </section>
+  );
+}
+
+
 function ObjectsTab() {
   const objects = useStudio((s) => s.doc.objects);
   const selection = useStudio((s) => s.selection);
@@ -272,6 +348,8 @@ function ObjectsTab() {
   return (
     <div className="space-y-3">
       <TransformSection />
+      <AlignSection />
+
       <hr className="border-border" />
       <section className="space-y-1">
         <h2 className="text-xs font-semibold text-foreground">Objects ({objects.length})</h2>
