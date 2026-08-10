@@ -87,7 +87,12 @@ export function StudioCanvas() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setSize({ width: el.clientWidth, height: el.clientHeight });
+    const update = () => {
+      const next = { width: el.clientWidth, height: el.clientHeight };
+      setSize(next);
+      useStudio.getState().setViewport(next);
+    };
+
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
