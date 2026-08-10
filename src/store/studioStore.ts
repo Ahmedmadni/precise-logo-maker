@@ -25,6 +25,13 @@ import {
   rotateGeometry,
   translateGeometry,
 } from "../objects/transform";
+import {
+  alignOffsets,
+  distributeOffsets,
+  type AlignMode,
+  type DistributeAxis,
+} from "../objects/align";
+
 import { geometryBounds, unionBounds } from "../core/geometry/math";
 import {
   createConcentricGrid,
