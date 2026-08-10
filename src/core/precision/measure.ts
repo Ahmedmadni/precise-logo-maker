@@ -21,8 +21,7 @@ export const measure = (a: Point, b: Point): Measurement => ({
   dy: b.y - a.y,
 });
 
-export const formatLength = (px: number, unit: Unit): string =>
-  `${formatUnit(px, unit)} ${unit}`;
+export const formatLength = (px: number, unit: Unit): string => formatUnit(px, unit);
 
 export const formatAngle = (deg: number): string => `${normalizeAngle(deg).toFixed(1)}°`;
 
