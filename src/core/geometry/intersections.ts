@@ -85,10 +85,12 @@ const keepOnArc = (g: Geometry, points: Point[]): Point[] => {
 export const intersectGeometry = (g1: Geometry, g2: Geometry): Point[] => {
   const raw = ((): Point[] => {
     if (g1.kind === "line" && g2.kind === "line") return lineLineIntersection(g1, g2);
-    if (g1.kind === "line") return lineCircleIntersection(g1, asCircle(g2));
-    if (g2.kind === "line") return lineCircleIntersection(g2, asCircle(g1));
+    if (g1.kind === "line" && g2.kind !== "line") return lineCircleIntersection(g1, asCircle(g2));
+    if (g2.kind === "line" && g1.kind !== "line") return lineCircleIntersection(g2, asCircle(g1));
+    if (g1.kind === "line" || g2.kind === "line") return [];
     return circleCircleIntersection(asCircle(g1), asCircle(g2));
   })();
+
   return keepOnArc(g2, keepOnArc(g1, raw));
 };
 
