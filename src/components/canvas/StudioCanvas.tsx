@@ -132,6 +132,7 @@ export function StudioCanvas() {
   // resize (orientation change / drawer toggle) until the user moves the view.
   const autoFitView = useRef<typeof view | null>(null);
   useEffect(() => {
+    console.log("[fit]", size.width, size.height);
     if (size.width < 50 || size.height < 50) return;
     const current = useStudio.getState().view;
     if (autoFitView.current && autoFitView.current !== current) return;
