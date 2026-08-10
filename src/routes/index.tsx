@@ -1,24 +1,53 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ClientOnly } from "@tanstack/react-router";
+import { StudioCanvas } from "../components/canvas/StudioCanvas";
+import { RightPanel } from "../components/panels/RightPanel";
+import { StatusBar } from "../components/panels/StatusBar";
+import { ToolRail } from "../components/toolbar/ToolRail";
+import { TopBar } from "../components/toolbar/TopBar";
+import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Logo Grid Studio — Geometric Logo Construction" },
+      {
+        name: "description",
+        content:
+          "Vector-first studio for constructing geometric logos: world-space grids, smart snapping, circles, lines and arcs with real SVG geometry.",
+      },
+      { property: "og:title", content: "Logo Grid Studio — Geometric Logo Construction" },
+      {
+        property: "og:description",
+        content:
+          "Build precise geometric logos with multi-grid systems, smart snapping and editable SVG geometry.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: StudioPage,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function StudioPage() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="dark flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+      <TopBar />
+      <div className="flex min-h-0 flex-1">
+        <ToolRail />
+        <main className="min-w-0 flex-1">
+          <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
+            <CanvasWithShortcuts />
+          </ClientOnly>
+        </main>
+        <RightPanel />
+      </div>
+      <StatusBar />
     </div>
   );
+}
+
+function CanvasWithShortcuts() {
+  useStudioShortcuts();
+  return <StudioCanvas />;
 }
