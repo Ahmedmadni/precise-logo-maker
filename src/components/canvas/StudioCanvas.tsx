@@ -454,12 +454,16 @@ export function StudioCanvas() {
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full touch-none overflow-hidden bg-background select-none"
+      dir="ltr"
+      className="relative h-full w-full touch-none overflow-hidden overscroll-none bg-background select-none"
       style={{ cursor: cursorStyle }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerLeave={() => {
+      onPointerCancel={onPointerUp}
+      onPointerLeave={(e) => {
+        pointersRef.current.delete(e.pointerId);
+        if (pointersRef.current.size < 2) pinchRef.current = null;
         panRef.current = null;
         setSnap(null);
         setCursor(null);
