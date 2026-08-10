@@ -49,5 +49,6 @@ function StudioPage() {
 
 function CanvasWithShortcuts() {
   useStudioShortcuts();
+  useAutosave();
   return <StudioCanvas />;
 }
