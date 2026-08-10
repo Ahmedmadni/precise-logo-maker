@@ -28,7 +28,7 @@ import {
 import { geometryBounds, unionBounds } from "../core/geometry/math";
 import {
   createConcentricGrid,
-  createRadialGrid,
+  createGrid,
   createSquareGrid,
   type Grid,
 } from "../grids";
