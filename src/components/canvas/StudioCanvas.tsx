@@ -442,7 +442,12 @@ export function StudioCanvas() {
                       ? `translate(${dragOffset.x} ${dragOffset.y})`
                       : undefined
                   }
-                  d={geometryToPathData(o.geometry)}
+                  d={geometryToPathData(
+                    handleDrag && handleDrag.objectId === o.id
+                      ? handleDrag.geometry
+                      : o.geometry,
+                  )}
+
                   fill={o.style.fill}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
