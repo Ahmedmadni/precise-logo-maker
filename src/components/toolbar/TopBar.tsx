@@ -29,6 +29,27 @@ export function TopBar() {
   const redo = useStudio((s) => s.redo);
   const canUndo = useStudio((s) => s.past.length > 0);
   const canRedo = useStudio((s) => s.future.length > 0);
+  const loadDocument = useStudio((s) => s.loadDocument);
+  const newDocument = useStudio((s) => s.newDocument);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [pngSize, setPngSize] = useState(1024);
+  const [busy, setBusy] = useState(false);
+
+  const openProject = async (file: File | undefined) => {
+    if (!file) return;
+    const parsed = await readProjectFile(file);
+    if (parsed) loadDocument(parsed, `Open ${file.name}`);
+    else window.alert("This file is not a valid .logo project.");
+  };
+
+  const exportPng = async () => {
+    setBusy(true);
+    try {
+      await downloadPng(doc, pngSize);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const fitArtboard = () =>
     setView(fitBounds(artboardWorldBounds(doc.artboard), viewport.width, viewport.height));
