@@ -303,7 +303,18 @@ export function StudioCanvas() {
     setSnap(s);
     setHoverWorld(tool === "select" ? world : point);
     setCursor(tool === "select" ? world : point);
+    if (handleDrag) {
+      const base = doc.objects.find((o) => o.id === handleDrag.objectId);
+      if (base) {
+        setHandleDrag({
+          ...handleDrag,
+          geometry: applyHandle(base.geometry, handleDrag.handleId, point),
+        });
+      }
+      return;
+    }
     if (dragRef.current) {
+
       setDragOffset(pt(point.x - dragRef.current.start.x, point.y - dragRef.current.start.y));
       return;
     }
