@@ -394,3 +394,58 @@ export const createRadialGrid = (center: Point, size: number): RadialGrid => ({
   length: size / 2,
   color: "#3f8f86",
 });
+
+export const createIsometricGrid = (center: Point, size: number): IsometricGrid => ({
+  ...base("isometric", "Isometric Grid", center, "secondary"),
+  kind: "isometric",
+  spacing: size / 16,
+  extent: size,
+  axisAngle: 30,
+  color: "#4f8ccc",
+});
+
+export const createTriangularGrid = (center: Point, size: number): TriangularGrid => ({
+  ...base("triangular", "Triangular Grid", center, "secondary"),
+  kind: "triangular",
+  spacing: size / 16,
+  extent: size,
+  color: "#cc8f4f",
+});
+
+export const createHexagonalGrid = (center: Point, size: number): HexagonalGrid => ({
+  ...base("hexagonal", "Hexagonal Grid", center, "secondary"),
+  kind: "hexagonal",
+  size: size / 16,
+  rings: 5,
+  pointyTop: true,
+  color: "#4fbfa0",
+});
+
+export const createGoldenGrid = (center: Point, size: number): GoldenGrid => ({
+  ...base("golden", "Golden Ratio", center, "primary"),
+  kind: "golden",
+  width: size,
+  height: size / ((1 + Math.sqrt(5)) / 2),
+  steps: 8,
+  spiral: true,
+  color: "#d4a24c",
+});
+
+export const createGrid = (kind: GridKind, center: Point, size: number): Grid => {
+  switch (kind) {
+    case "square":
+      return createSquareGrid(center, size);
+    case "concentric":
+      return createConcentricGrid(center, size);
+    case "radial":
+      return createRadialGrid(center, size);
+    case "isometric":
+      return createIsometricGrid(center, size);
+    case "triangular":
+      return createTriangularGrid(center, size);
+    case "hexagonal":
+      return createHexagonalGrid(center, size);
+    case "golden":
+      return createGoldenGrid(center, size);
+  }
+};
