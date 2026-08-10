@@ -101,6 +101,9 @@ export interface StudioState {
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
 
+  loadDocument: (doc: DocumentState, label?: string) => void;
+  newDocument: () => void;
+
   undo: () => void;
   redo: () => void;
   jumpTo: (index: number) => void;
