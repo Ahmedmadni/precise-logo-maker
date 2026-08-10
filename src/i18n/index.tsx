@@ -105,10 +105,11 @@ export const AR: Record<string, string> = {
   // Align
   "Align & distribute": "المحاذاة والتوزيع",
   Left: "يسار",
-  Center: "توسيط أفقي",
+  Center: "مركز",
   Right: "يمين",
   Top: "أعلى",
-  Middle: "توسيط رأسي",
+  "Center H": "محاذاة أفقية للوسط",
+  "Center V": "محاذاة رأسية للوسط",
   Bottom: "أسفل",
   "Distribute H": "توزيع أفقي",
   "Distribute V": "توزيع رأسي",
@@ -156,6 +157,8 @@ export const AR: Record<string, string> = {
   Midpoint: "منتصف",
   Intersection: "تقاطع",
   Quadrant: "ربع الدائرة",
+  "On geometry": "على الشكل",
+  "Pointy-top orientation": "اتجاه رأس مدبب",
   Tangent: "مماس",
   Perpendicular: "عمودي",
 

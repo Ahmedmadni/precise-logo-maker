@@ -292,10 +292,10 @@ function AlignSection() {
 
   const modes: Array<[string, AlignMode, typeof AlignLeft]> = [
     ["Left", "left", AlignLeft],
-    ["Center", "centerX", AlignCenterHorizontal],
+    ["Center H", "centerX", AlignCenterHorizontal],
     ["Right", "right", AlignRight],
     ["Top", "top", AlignStartVertical],
-    ["Middle", "middleY", AlignCenterVertical],
+    ["Center V", "middleY", AlignCenterVertical],
     ["Bottom", "bottom", AlignEndVertical],
   ];
 
