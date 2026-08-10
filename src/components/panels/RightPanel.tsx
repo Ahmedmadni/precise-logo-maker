@@ -451,7 +451,17 @@ function GridsTab() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
-        {(["square", "concentric", "radial"] as const).map((k) => (
+        {(
+          [
+            "square",
+            "concentric",
+            "radial",
+            "isometric",
+            "triangular",
+            "hexagonal",
+            "golden",
+          ] as const
+        ).map((k) => (
           <button
             key={k}
             type="button"
