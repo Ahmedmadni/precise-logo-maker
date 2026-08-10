@@ -128,13 +128,18 @@ export function StudioCanvas() {
     return () => ro.disconnect();
   }, []);
 
-  // Initial fit to the artboard once we know the viewport size.
-  const didFit = useRef(false);
+  // Fit to the artboard once we know the viewport size, and keep re-fitting on
+  // resize (orientation change / drawer toggle) until the user moves the view.
+  const autoFitView = useRef<typeof view | null>(null);
   useEffect(() => {
-    if (didFit.current || size.width < 50) return;
-    didFit.current = true;
-    setView(fitBounds(artboardWorldBounds(doc.artboard), size.width, size.height));
+    if (size.width < 50 || size.height < 50) return;
+    const current = useStudio.getState().view;
+    if (autoFitView.current && autoFitView.current !== current) return;
+    const next = fitBounds(artboardWorldBounds(doc.artboard), size.width, size.height);
+    autoFitView.current = next;
+    setView(next);
   }, [size, doc.artboard, setView]);
+
 
   const toWorld = useCallback(
     (clientX: number, clientY: number): Point => {
