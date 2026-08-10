@@ -82,9 +82,47 @@ export function TopBar() {
       <h1 className="text-sm font-semibold tracking-tight text-foreground">
         Logo Grid Studio
       </h1>
-      <span className="text-[11px] text-muted-foreground">Phase 3 — Composition & Export</span>
+      <span className="text-[11px] text-muted-foreground">Phase 4 — Grids, Files & Raster Export</span>
 
       <div className="ml-4 flex items-center gap-1.5">
+        <button
+          type="button"
+          className={btn}
+          onClick={() => {
+            if (doc.objects.length === 0 || window.confirm("Start a new document? Unsaved work is lost."))
+              newDocument();
+          }}
+          title="New document"
+        >
+          <FilePlus2 className="h-3.5 w-3.5" aria-hidden /> New
+        </button>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => fileInput.current?.click()}
+          title="Open .logo project"
+        >
+          <FolderOpen className="h-3.5 w-3.5" aria-hidden /> Open
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".logo,application/json"
+          className="hidden"
+          aria-label="Open project file"
+          onChange={(e) => {
+            void openProject(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className={btn}
+          onClick={() => downloadProject(doc)}
+          title="Save .logo project"
+        >
+          <Save className="h-3.5 w-3.5" aria-hidden /> Save
+        </button>
         <button type="button" className={btn} onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
           <Undo2 className="h-3.5 w-3.5" aria-hidden /> Undo
         </button>
@@ -98,6 +136,7 @@ export function TopBar() {
           <Redo2 className="h-3.5 w-3.5" aria-hidden /> Redo
         </button>
       </div>
+
 
       <div className="ml-auto flex items-center gap-1.5">
         <button type="button" className={btn} onClick={fitArtboard}>
