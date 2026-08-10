@@ -1,7 +1,14 @@
 import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry/math";
 import type { Geometry, Point } from "../core/geometry/types";
 
-export type GridKind = "square" | "concentric" | "radial";
+export type GridKind =
+  | "square"
+  | "concentric"
+  | "radial"
+  | "isometric"
+  | "triangular"
+  | "hexagonal"
+  | "golden";
 
 export interface GridBase {
   id: string;
