@@ -40,6 +40,19 @@ export function useStudioShortcuts(): void {
         store.setMeasurement(null);
         return;
       }
+      if (mod && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        store.duplicateSelection();
+        return;
+      }
+      if (e.key.startsWith("Arrow") && store.selection.length > 0) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        store.translateSelection(dx, dy);
+        return;
+      }
       if (mod) return;
       const tool = TOOL_KEYS[e.key.toLowerCase()];
       if (tool) {
