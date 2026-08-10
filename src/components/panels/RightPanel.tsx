@@ -45,7 +45,6 @@ function NumberField({
   onChange: (v: number) => void;
   step?: number;
 }) {
-  const t = useT();
   return (
     <label className="flex flex-col gap-1">
       <span className={labelCls}>{label}</span>
@@ -415,6 +414,7 @@ function ObjectsTab() {
 }
 
 function GridRow({ grid }: { grid: Grid }) {
+  const t = useT();
   const updateGrid = useStudio((s) => s.updateGrid);
   const removeGrid = useStudio((s) => s.removeGrid);
 
@@ -750,7 +750,8 @@ function HistoryTab() {
   );
 }
 
-export function RightPanel() {
+export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("Properties");
 
   return (
