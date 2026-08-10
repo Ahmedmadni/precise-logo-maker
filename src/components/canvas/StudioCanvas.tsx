@@ -77,6 +77,12 @@ export function StudioCanvas() {
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
+  const [handleDrag, setHandleDrag] = useState<{
+    objectId: string;
+    handleId: string;
+    geometry: Geometry;
+  } | null>(null);
+
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
 
