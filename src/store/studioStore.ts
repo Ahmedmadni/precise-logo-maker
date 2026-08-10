@@ -52,6 +52,9 @@ export interface StudioState {
   selection: string[];
   snap: SnapSettings;
   cursor: Point | null;
+  viewport: { width: number; height: number };
+  setViewport: (size: { width: number; height: number }) => void;
+
 
   setView: (view: ViewTransform) => void;
   setTool: (tool: ToolId) => void;
@@ -140,6 +143,9 @@ export const useStudio = create<StudioState>()((set, get) => {
     setView: (view) => set({ view }),
     setTool: (tool) => set({ tool }),
     setCursor: (cursor) => set({ cursor }),
+    viewport: { width: 1200, height: 800 },
+    setViewport: (viewport) => set({ viewport }),
+
 
     setArtboard: (patch) =>
       commit("Change artboard", (doc) => ({
