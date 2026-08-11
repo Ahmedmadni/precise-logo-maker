@@ -14,6 +14,7 @@ export const geometryToPathData = (g: Geometry): string => {
       const body = rest.map((p) => `L ${f(p.x)} ${f(p.y)}`).join(" ");
       return `M ${f(first.x)} ${f(first.y)}${body ? ` ${body}` : ""}${g.closed ? " Z" : ""}`;
     }
+    case "circle": {
       const { center: c, radius: r } = g;
       return [
         `M ${f(c.x - r)} ${f(c.y)}`,
