@@ -76,12 +76,39 @@ export const closestPointOnCircle = (center: Point, radius: number, p: Point): P
   return add(center, scale(normalize(d), radius));
 };
 
+/** Segments of a poly-path (adds the closing segment when `closed`). */
+export const pathSegments = (points: Point[], closed: boolean): [Point, Point][] => {
+  const out: [Point, Point][] = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (a && b) out.push([a, b]);
+  }
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (closed && first && last && points.length > 2) out.push([last, first]);
+  return out;
+};
+
 export const closestPointOnGeometry = (g: Geometry, p: Point): Point => {
   switch (g.kind) {
     case "line":
       return closestPointOnSegment(g.a, g.b, p);
     case "circle":
       return closestPointOnCircle(g.center, g.radius, p);
+    case "path": {
+      let best: Point = g.points[0] ?? p;
+      let bestD = Infinity;
+      for (const [a, b] of pathSegments(g.points, g.closed)) {
+        const q = closestPointOnSegment(a, b, p);
+        const d = dist(q, p);
+        if (d < bestD) {
+          bestD = d;
+          best = q;
+        }
+      }
+      return best;
+    }
     case "arc": {
       const onCircle = closestPointOnCircle(g.center, g.radius, p);
       if (arcContainsAngle(g, angleOf(g.center, onCircle))) return onCircle;
