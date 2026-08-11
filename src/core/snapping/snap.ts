@@ -92,6 +92,19 @@ const featurePoints = (g: Geometry): SnapCandidate[] => {
         { type: "endpoint", point: g.b, label: SNAP_LABEL.endpoint },
         { type: "midpoint", point: mid(g.a, g.b), label: SNAP_LABEL.midpoint },
       ];
+    case "path": {
+      const out: SnapCandidate[] = g.points.map<SnapCandidate>((p) => ({
+        type: "endpoint",
+        point: p,
+        label: SNAP_LABEL.endpoint,
+      }));
+      for (let i = 1; i < g.points.length; i += 1) {
+        const a = g.points[i - 1];
+        const b = g.points[i];
+        if (a && b) out.push({ type: "midpoint", point: mid(a, b), label: SNAP_LABEL.midpoint });
+      }
+      return out;
+    }
     case "circle":
       return [
         { type: "center", point: g.center, label: SNAP_LABEL.center },

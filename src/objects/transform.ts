@@ -4,6 +4,7 @@ import type { Geometry, Point } from "../core/geometry/types";
 /** Apply a point map to every defining point of a primitive. */
 const mapPoints = (g: Geometry, fn: (p: Point) => Point): Geometry => {
   if (g.kind === "line") return { ...g, a: fn(g.a), b: fn(g.b) };
+  if (g.kind === "path") return { ...g, points: g.points.map(fn) };
   return { ...g, center: fn(g.center) };
 };
 

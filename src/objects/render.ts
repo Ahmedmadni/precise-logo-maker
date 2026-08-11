@@ -8,7 +8,12 @@ export const geometryToPathData = (g: Geometry): string => {
   switch (g.kind) {
     case "line":
       return `M ${f(g.a.x)} ${f(g.a.y)} L ${f(g.b.x)} ${f(g.b.y)}`;
-    case "circle": {
+    case "path": {
+      const [first, ...rest] = g.points;
+      if (!first) return "";
+      const body = rest.map((p) => `L ${f(p.x)} ${f(p.y)}`).join(" ");
+      return `M ${f(first.x)} ${f(first.y)}${body ? ` ${body}` : ""}${g.closed ? " Z" : ""}`;
+    }
       const { center: c, radius: r } = g;
       return [
         `M ${f(c.x - r)} ${f(c.y)}`,
