@@ -11,7 +11,7 @@ export type Lang = "en" | "ar";
 export const AR: Record<string, string> = {
   // App / shell
   "Logo Grid Studio": "استوديو شبكات الشعارات",
-  "Phase 6 — Arabic UI & Mobile": "المرحلة 6 — واجهة عربية وجوال",
+  "Phase 7 — Drawing & Paint": "المرحلة 7 — الرسم والتلوين",
   Language: "اللغة",
   English: "English",
   Arabic: "العربية",
