@@ -24,6 +24,7 @@ import {
 
 import { geometryBounds, unionBounds } from "../core/geometry/math";
 import { createConcentricGrid, createGrid, createSquareGrid, type Grid } from "../grids";
+import { cleanStroke } from "../core/tracing/simplify";
 import type { GridCell } from "../grids/cells";
 import type { ReferenceImage } from "../objects/reference";
 
@@ -66,6 +67,31 @@ export const DEFAULT_PAINT: PaintSettings = {
   sectors: 12,
 };
 
+/** Assistance applied to freehand strokes drawn over the reference picture. */
+export interface TraceSettings {
+  /** Clean up shaky strokes: average, simplify, and fit lines / arcs. */
+  smoothing: boolean;
+  /** Deviation allowed while simplifying, in world units. */
+  tolerance: number;
+  /** Promote a cleaned stroke to a line, arc or circle when it fits. */
+  fitShapes: boolean;
+  /** Pull strokes onto the edges found in the reference picture. */
+  magnetic: boolean;
+  /** How far the magnet reaches, in world units. */
+  magnetRadius: number;
+  /** Minimum edge strength (0–1) worth snapping to. */
+  edgeThreshold: number;
+}
+
+export const DEFAULT_TRACE: TraceSettings = {
+  smoothing: true,
+  tolerance: 2.5,
+  fitShapes: true,
+  magnetic: true,
+  magnetRadius: 14,
+  edgeThreshold: 0.18,
+};
+
 export interface HistoryEntry {
   label: string;
   state: DocumentState;
@@ -95,6 +121,11 @@ export interface StudioState {
   clearPaintedCells: () => void;
   setReference: (next: ReferenceImage | null) => void;
   updateReference: (patch: Partial<ReferenceImage>) => void;
+
+  trace: TraceSettings;
+  setTrace: (patch: Partial<TraceSettings>) => void;
+  /** Re-runs the stroke cleanup over every selected freehand path. */
+  smoothSelection: () => void;
 
   setView: (view: ViewTransform) => void;
   setTool: (tool: ToolId) => void;
@@ -329,6 +360,31 @@ export const useStudio = create<StudioState>()((set, get) => {
         objects: doc.objects.filter((o) => !o.cellKey),
       }));
       set({ selection: [] });
+    },
+
+    trace: DEFAULT_TRACE,
+    setTrace: (patch) => set((s) => ({ trace: { ...s.trace, ...patch } })),
+
+    smoothSelection: () => {
+      const ids = get().selection;
+      const { tolerance, fitShapes } = get().trace;
+      if (ids.length === 0) return;
+      const targets = get().doc.objects.filter(
+        (o) => ids.includes(o.id) && !o.locked && o.geometry.kind === "path",
+      );
+      if (targets.length === 0) return;
+      commit(`Smooth ${targets.length} path${targets.length > 1 ? "s" : ""}`, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) => {
+          if (!targets.some((t) => t.id === o.id) || o.geometry.kind !== "path") return o;
+          const cleaned = cleanStroke(
+            o.geometry.points,
+            { tolerance, smoothing: 2, fitShapes },
+            o.geometry.closed,
+          );
+          return cleaned ? { ...o, geometry: cleaned, type: cleaned.kind } : o;
+        }),
+      }));
     },
 
     setReference: (next) =>

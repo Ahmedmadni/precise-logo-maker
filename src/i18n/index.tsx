@@ -137,6 +137,22 @@ export const AR: Record<string, string> = {
   "Pick an image file (PNG, JPG, SVG, WebP).": "اختر ملف صورة (PNG أو JPG أو SVG أو WebP).",
   "Could not load that image.": "تعذّر تحميل هذه الصورة.",
 
+  // Trace assist
+  "Trace assist": "مساعد التتبّع",
+  "Draw with the Pen (P): the wobble is averaged out, and a stroke that is really a straight line or an arc becomes one.":
+    "ارسم بالقلم الحر (P): تُسوّى التعرجات تلقائيًا، وإذا كان الخط في الأصل مستقيمًا أو قوسًا يتحول إليه.",
+  "Smooth selection": "تسوية التحديد",
+  "Re-clean the selected freehand paths": "إعادة تسوية المسارات الحرة المحددة",
+  "Smooth freehand strokes": "تسوية الخطوط الحرة",
+  "Recognise straight lines and arcs": "التعرّف على الخطوط المستقيمة والأقواس",
+  "Smoothing strength": "قوة التسوية",
+  "Snap strokes to the picture's lines": "مطابقة الخطوط لحواف الصورة",
+  "Strokes are pulled onto the edges detected in the reference image.":
+    "تُسحب الخطوط إلى الحواف المكتشفة في الصورة المرجعية.",
+  "Insert a reference image to enable this.": "أدرج صورة مرجعية لتفعيل هذه الميزة.",
+  "Magnet radius": "مدى الجذب",
+  "Edge sensitivity": "حساسية الحواف",
+
   // Transform
   Transform: "التحويل",
   Duplicate: "تكرار",

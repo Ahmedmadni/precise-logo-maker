@@ -13,8 +13,11 @@ import {
   FlipHorizontal,
   FlipVertical,
   ImagePlus,
+  Magnet,
   PaintBucket,
+  PenTool,
   RotateCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import type { AlignMode } from "../../objects/align";
@@ -858,12 +861,134 @@ function ReferenceImageSection() {
   );
 }
 
+/** Freehand assistance: de-wobble strokes and stick them to the picture's lines. */
+function TraceAssistSection() {
+  const t = useT();
+  const trace = useStudio((s) => s.trace);
+  const setTrace = useStudio((s) => s.setTrace);
+  const setTool = useStudio((s) => s.setTool);
+  const tool = useStudio((s) => s.tool);
+  const smoothSelection = useStudio((s) => s.smoothSelection);
+  const reference = useStudio((s) => s.doc.reference);
+  const selection = useStudio((s) => s.selection);
+  const objects = useStudio((s) => s.doc.objects);
+  const smoothable = objects.filter(
+    (o) => selection.includes(o.id) && o.geometry.kind === "path" && !o.locked,
+  ).length;
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold text-foreground">{t("Trace assist")}</h2>
+      <p className="text-[11px] text-muted-foreground">
+        {t(
+          "Draw with the Pen (P): the wobble is averaged out, and a stroke that is really a straight line or an arc becomes one.",
+        )}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={cn(btn, tool === "pen" && "bg-accent text-accent-foreground")}
+          onClick={() => setTool("pen")}
+        >
+          <PenTool className="h-3 w-3" aria-hidden /> {t("Pen")}
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={smoothable === 0}
+          onClick={smoothSelection}
+          title={t("Re-clean the selected freehand paths")}
+        >
+          <Sparkles className="h-3 w-3" aria-hidden /> {t("Smooth selection")}
+        </button>
+      </div>
+
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.smoothing}
+          onChange={(e) => setTrace({ smoothing: e.target.checked })}
+        />
+        {t("Smooth freehand strokes")}
+      </label>
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.fitShapes}
+          onChange={(e) => setTrace({ fitShapes: e.target.checked })}
+        />
+        {t("Recognise straight lines and arcs")}
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Smoothing strength")} — {trace.tolerance.toFixed(1)}
+        </span>
+        <input
+          type="range"
+          min={0.5}
+          max={20}
+          step={0.5}
+          value={trace.tolerance}
+          onChange={(e) => setTrace({ tolerance: Number(e.target.value) })}
+        />
+      </label>
+
+      <hr className="border-border" />
+
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.magnetic}
+          onChange={(e) => setTrace({ magnetic: e.target.checked })}
+        />
+        <Magnet className="h-3 w-3" aria-hidden /> {t("Snap strokes to the picture's lines")}
+      </label>
+      <p className="text-[11px] text-muted-foreground">
+        {reference?.visible
+          ? t("Strokes are pulled onto the edges detected in the reference image.")
+          : t("Insert a reference image to enable this.")}
+      </p>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Magnet radius")} — {Math.round(trace.magnetRadius)}
+        </span>
+        <input
+          type="range"
+          min={2}
+          max={60}
+          step={1}
+          value={trace.magnetRadius}
+          onChange={(e) => setTrace({ magnetRadius: Number(e.target.value) })}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Edge sensitivity")} — {Math.round((1 - trace.edgeThreshold) * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0.02}
+          max={0.6}
+          step={0.02}
+          value={trace.edgeThreshold}
+          onChange={(e) => setTrace({ edgeThreshold: Number(e.target.value) })}
+        />
+      </label>
+    </section>
+  );
+}
+
 function CellsTab() {
   return (
     <div className="space-y-4">
       <CellPaintSection />
       <hr className="border-border" />
       <ReferenceImageSection />
+      <hr className="border-border" />
+      <TraceAssistSection />
     </div>
   );
 }

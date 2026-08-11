@@ -22,6 +22,8 @@ import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
 import { cellAt, paintableGrids, type GridCell } from "../../grids/cells";
+import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
+import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
@@ -66,6 +68,7 @@ export function StudioCanvas() {
   const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
   const paint = useStudio((s) => s.paint);
+  const trace = useStudio((s) => s.trace);
   const paintCells = useStudio((s) => s.paintCells);
   const showGrids = useStudio((s) => s.showGrids);
   const setView = useStudio((s) => s.setView);
@@ -119,6 +122,55 @@ export function StudioCanvas() {
     (world: Point): GridCell | null =>
       paintGrid ? cellAt(paintGrid, world, { sectors: paint.sectors }) : null,
     [paintGrid, paint.sectors],
+  );
+
+  // Edge map of the reference picture, rebuilt only when the picture or its
+  // placement changes. It is what makes freehand strokes follow the artwork.
+  const reference = doc.reference;
+  const [edgeField, setEdgeField] = useState<EdgeField | null>(null);
+  useEffect(() => {
+    if (!reference || !reference.visible) {
+      setEdgeField(null);
+      return;
+    }
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      setEdgeField(
+        edgeFieldFromImage(image, {
+          x: reference.x,
+          y: reference.y,
+          width: reference.width,
+          height: reference.height,
+        }),
+      );
+    };
+    image.onerror = () => {
+      if (!cancelled) setEdgeField(null);
+    };
+    image.src = reference.src;
+    return () => {
+      cancelled = true;
+    };
+  }, [reference]);
+
+  /**
+   * Pull a freehand sample onto the nearest picture edge, when asked to. The
+   * previous sample biases the search so the stroke keeps following one edge.
+   */
+  const magnetise = useCallback(
+    (p: Point, previous: Point | null = null): Point => {
+      if (!edgeField || !trace.magnetic) return p;
+      return (
+        snapToEdge(edgeField, p, {
+          radius: trace.magnetRadius,
+          threshold: trace.edgeThreshold,
+          bias: previous,
+        }) ?? p
+      );
+    },
+    [edgeField, trace.magnetic, trace.magnetRadius, trace.edgeThreshold],
   );
 
   const gridData = useMemo(() => {
@@ -328,7 +380,7 @@ export function StudioCanvas() {
 
     if (tool === "pen") {
       penActiveRef.current = true;
-      setPen([world]);
+      setPen([magnetise(world)]);
       return;
     }
 
@@ -451,7 +503,7 @@ export function StudioCanvas() {
         const list = prev ?? [];
         const last = list[list.length - 1];
         if (last && dist(last, world) < PEN_SAMPLE_PIXELS / view.zoom) return list;
-        return [...list, world];
+        return [...list, magnetise(world, last ?? null)];
       });
       return;
     }
@@ -490,7 +542,20 @@ export function StudioCanvas() {
       penActiveRef.current = false;
       const stroke = pen ?? [];
       if (stroke.length >= 2) {
-        const id = addObject({ kind: "path", points: stroke, closed: false }, "Freehand stroke");
+        // Straighten the wobble out of the stroke and promote it to a line or
+        // arc when that is what the hand was aiming for.
+        const cleaned = trace.smoothing
+          ? cleanStroke(stroke, {
+              tolerance: trace.tolerance,
+              smoothing: 2,
+              fitShapes: trace.fitShapes,
+            })
+          : null;
+        const geometry = cleaned ?? { kind: "path" as const, points: stroke, closed: false };
+        const id = addObject(
+          geometry,
+          geometry.kind === "path" ? "Freehand stroke" : `Freehand ${geometry.kind}`,
+        );
         setSelection([id]);
       }
       setPen(null);
@@ -530,6 +595,19 @@ export function StudioCanvas() {
       setBox(null);
     }
   };
+
+  // What the freehand stroke will become once released.
+  const penPreview = useMemo(
+    () =>
+      pen && pen.length >= 2 && trace.smoothing
+        ? cleanStroke(pen, {
+            tolerance: trace.tolerance,
+            smoothing: 2,
+            fitShapes: trace.fitShapes,
+          })
+        : null,
+    [pen, trace.smoothing, trace.tolerance, trace.fitShapes],
+  );
 
   const preview = draft && hoverWorld ? draftGeometry(draft, hoverWorld) : null;
   const liveMeasure = measureStart && hoverWorld ? measure(measureStart, hoverWorld) : measurement;
@@ -680,10 +758,22 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {/* Freehand pen stroke in progress */}
+          {/* Freehand pen stroke in progress: raw trail plus the cleaned result */}
           {pen && pen.length > 1 && (
             <path
               d={geometryToPathData({ kind: "path", points: pen, closed: false })}
+              fill="none"
+              stroke="var(--color-primary)"
+              strokeWidth={penPreview ? 1 : 2}
+              strokeOpacity={penPreview ? 0.4 : 1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {penPreview && (
+            <path
+              d={geometryToPathData(penPreview)}
               fill="none"
               stroke="var(--color-primary)"
               strokeWidth={2}
