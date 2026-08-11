@@ -95,7 +95,6 @@ export const AR: Record<string, string> = {
   Paint: "التلوين",
   Fill: "لون التعبئة",
   "Fill opacity": "شفافية التعبئة",
-  Opacity: "الشفافية",
   Dash: "تقطيع الخط",
   "No fill": "بدون تعبئة",
   Swatches: "ألوان جاهزة",
