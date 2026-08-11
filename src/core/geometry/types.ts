@@ -31,7 +31,17 @@ export interface ArcGeometry {
   endAngle: number;
 }
 
-export type Geometry = CircleGeometry | LineGeometry | ArcGeometry;
+/**
+ * Poly-path: freehand pen strokes and grid-cell chains share this shape.
+ * `closed` renders a closed (fillable) outline.
+ */
+export interface PathGeometry {
+  kind: "path";
+  points: Point[];
+  closed: boolean;
+}
+
+export type Geometry = CircleGeometry | LineGeometry | ArcGeometry | PathGeometry;
 
 export interface Transform {
   x: number;
@@ -45,6 +55,12 @@ export interface Style {
   stroke: string;
   strokeWidth: number;
   fill: string;
+  /** 0–1, applies to the fill only. */
+  fillOpacity?: number;
+  /** 0–1, applies to the whole object. */
+  opacity?: number;
+  /** Dash length in world units; 0 or undefined = solid. */
+  dash?: number;
 }
 
 export type ObjectType = Geometry["kind"];
