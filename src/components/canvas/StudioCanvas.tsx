@@ -251,6 +251,19 @@ export function StudioCanvas() {
     setHandleDrag(null);
   };
 
+  /** Turn a traced chain of grid intersections into a real path object. */
+  const commitCells = (points: Point[], closed: boolean) => {
+    if (points.length >= 2) {
+      const id = addObject(
+        { kind: "path", points, closed },
+        closed ? "Create Cell" : "Create Chain",
+        closed ? { fill: CELL_FILL, fillOpacity: 0.35 } : undefined,
+      );
+      setSelection([id]);
+    }
+    setCellChain([]);
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
