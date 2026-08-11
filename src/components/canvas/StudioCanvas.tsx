@@ -395,9 +395,19 @@ export function StudioCanvas() {
     const { point: snapped, snap: s } = resolveCursor(world);
     const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
     const point = applyPrecision(anchor, snapped, e.shiftKey);
-    setSnap(s);
-    setHoverWorld(tool === "select" ? world : point);
-    setCursor(tool === "select" ? world : point);
+    const raw = tool === "select" || tool === "pen";
+    setSnap(tool === "pen" ? null : s);
+    setHoverWorld(raw ? world : point);
+    setCursor(raw ? world : point);
+    if (penActiveRef.current) {
+      setPen((prev) => {
+        const list = prev ?? [];
+        const last = list[list.length - 1];
+        if (last && dist(last, world) < PEN_SAMPLE_PIXELS / view.zoom) return list;
+        return [...list, world];
+      });
+      return;
+    }
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base) {
