@@ -1,6 +1,8 @@
 import {
   CircleDashed,
+  Grid2x2Check,
   Hand,
+  PenTool,
   Ruler,
   Minus,
   MousePointer2,
@@ -16,6 +18,8 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: typeof Hand }[] = [
   { id: "line", label: "Line", key: "L", icon: Minus },
   { id: "circle", label: "Circle", key: "C", icon: CircleDashed },
   { id: "arc", label: "Arc", key: "A", icon: Spline },
+  { id: "pen", label: "Pen", key: "P", icon: PenTool },
+  { id: "cell", label: "Cells", key: "B", icon: Grid2x2Check },
   { id: "measure", label: "Measure", key: "M", icon: Ruler },
   { id: "pan", label: "Pan", key: "H", icon: Hand },
 ];

@@ -6,6 +6,8 @@ const TOOL_KEYS: Record<string, ToolId> = {
   l: "line",
   c: "circle",
   a: "arc",
+  p: "pen",
+  b: "cell",
   m: "measure",
   h: "pan",
 };
