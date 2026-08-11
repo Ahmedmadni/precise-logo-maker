@@ -90,7 +90,7 @@ export interface StudioState {
   setCursor: (p: Point | null) => void;
 
   setArtboard: (patch: Partial<Artboard>) => void;
-  addObject: (geometry: Geometry, label: string) => string;
+  addObject: (geometry: Geometry, label: string, style?: Partial<Style>) => string;
   updateObject: (id: string, patch: Partial<VectorObject>, label: string) => void;
   deleteSelection: () => void;
 
