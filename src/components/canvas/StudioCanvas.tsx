@@ -433,6 +433,16 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (penActiveRef.current) {
+      penActiveRef.current = false;
+      const stroke = pen ?? [];
+      if (stroke.length >= 2) {
+        const id = addObject({ kind: "path", points: stroke, closed: false }, "Freehand stroke");
+        setSelection([id]);
+      }
+      setPen(null);
+      return;
+    }
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base && base.geometry !== handleDrag.geometry) {
