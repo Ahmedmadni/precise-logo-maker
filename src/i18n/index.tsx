@@ -31,8 +31,7 @@ export const AR: Record<string, string> = {
   "Open project file": "فتح ملف مشروع",
   "Undo (Ctrl+Z)": "تراجع (Ctrl+Z)",
   "Redo (Ctrl+Shift+Z)": "إعادة (Ctrl+Shift+Z)",
-  "Start a new document? Unsaved work is lost.":
-    "بدء مستند جديد؟ سيتم فقدان العمل غير المحفوظ.",
+  "Start a new document? Unsaved work is lost.": "بدء مستند جديد؟ سيتم فقدان العمل غير المحفوظ.",
   "This file is not a valid .logo project.": "هذا الملف ليس مشروع ‎.logo صالحًا.",
   "Fit artboard": "ملاءمة لوح الرسم",
   "Fit selection": "ملاءمة التحديد",
@@ -48,7 +47,9 @@ export const AR: Record<string, string> = {
   Circle: "دائرة",
   Arc: "قوس",
   Pen: "قلم حر",
-  Cells: "خلايا الشبكة",
+  Cells: "الخلايا",
+  "Paint cells": "تلوين الخلايا",
+  "Cell shape": "شكل من التقاطعات",
   Measure: "قياس",
   Pan: "تحريك",
   "Drawing tools": "أدوات الرسم",
@@ -78,8 +79,7 @@ export const AR: Record<string, string> = {
   Background: "الخلفية",
 
   // Object properties
-  "Select an object to edit its geometry numerically.":
-    "اختر عنصرًا لتحرير هندسته رقميًا.",
+  "Select an object to edit its geometry numerically.": "اختر عنصرًا لتحرير هندسته رقميًا.",
   Delete: "حذف",
   "Center X": "مركز X",
   "Center Y": "مركز Y",
@@ -100,9 +100,42 @@ export const AR: Record<string, string> = {
   Swatches: "ألوان جاهزة",
   "Select objects to paint them.": "اختر عناصر لتلوينها.",
   "Applies to every selected object.": "يُطبَّق على كل العناصر المحددة.",
-  "Pen (P) draws freehand. Cells (B) links grid intersections into a filled shape — double-click or right-click to finish.":
-    "قلم حر (P) للرسم اليدوي. خلايا الشبكة (B) توصّل نقاط تقاطع الشبكات لتكوين شكل معبّأ — انقر مرتين أو بالزر الأيمن للإنهاء.",
+  "Pen (P) draws freehand. Paint cells (B) fills grid cells. Cell shape (N) links grid intersections into one outline — double-click or right-click to finish.":
+    "قلم حر (P) للرسم اليدوي. تلوين الخلايا (B) يملأ خلايا الشبكة. شكل من التقاطعات (N) يوصّل نقاط تقاطع الشبكات في مخطط واحد — انقر مرتين أو بالزر الأيمن للإنهاء.",
 
+  // Cell painting
+  "Cell painting": "تلوين الخلايا",
+  "Pick the Paint cells tool (B), then click or drag over the squares the grid lines make. Each cell becomes a real vector shape, so the logo stays after the grid is hidden.":
+    "اختر أداة تلوين الخلايا (B)، ثم انقر أو اسحب فوق المربعات الناتجة من تقاطع خطوط الشبكة. كل خلية تتحول إلى شكل فيكتور حقيقي، فيبقى الشعار بعد إخفاء الشبكة.",
+  Eraser: "ممحاة",
+  "Eraser (X, or hold Alt)": "ممحاة (X أو مع الضغط على Alt)",
+  "Hide grids": "إخفاء الشبكات",
+  "Show grids": "إظهار الشبكات",
+  "Show or hide every grid (G)": "إظهار أو إخفاء كل الشبكات (G)",
+  "Cell color": "لون الخلية",
+  "Cell opacity": "شفافية الخلية",
+  "Grid to paint": "الشبكة المستهدفة",
+  "No paintable grid": "لا توجد شبكة قابلة للتلوين",
+  "Polar sectors": "القطاعات الدائرية",
+  "Painted cells": "الخلايا الملوّنة",
+  "Clear cells": "مسح الخلايا",
+  "Square, isometric, triangular, hexagonal and concentric grids have paintable cells.":
+    "الشبكات المربعة والأيزومترية والمثلثية والسداسية والمتحدة المركز تدعم تلوين الخلايا.",
+
+  // Reference image
+  "Reference image": "صورة مرجعية",
+  "Place a picture under the grid to trace over": "ضع صورة تحت الشبكة للرسم فوقها",
+  "Sits under the grids so you can draw on top of it. It is never part of the export.":
+    "توضع أسفل الشبكات لترسم فوقها، ولا تدخل أبدًا في ملف التصدير.",
+  "Insert image": "إدراج صورة",
+  "Fit to artboard": "ملاءمة لوح الرسم",
+  "Replace image": "استبدال الصورة",
+  Remove: "إزالة",
+  Visible: "ظاهرة",
+  "Stretch to artboard": "تمديد على لوح الرسم",
+  "Image opacity": "شفافية الصورة",
+  "Pick an image file (PNG, JPG, SVG, WebP).": "اختر ملف صورة (PNG أو JPG أو SVG أو WebP).",
+  "Could not load that image.": "تعذّر تحميل هذه الصورة.",
 
   // Transform
   Transform: "التحويل",
@@ -179,16 +212,14 @@ export const AR: Record<string, string> = {
 
   // Precision
   Constraints: "القيود",
-  "Angle lock (hold Shift for temporary lock)":
-    "قفل الزاوية (اضغط Shift للقفل المؤقت)",
+  "Angle lock (hold Shift for temporary lock)": "قفل الزاوية (اضغط Shift للقفل المؤقت)",
   "Length step": "خطوة الطول",
   "Live readout": "قراءة حية",
   "Ratio scaling": "التحجيم بالنسب",
   "Scales the selection around its own centre.": "يُحجّم التحديد حول مركزه.",
   Measurements: "القياسات",
   Angle: "الزاوية",
-  "Pick the Measure tool (M) and click two points.":
-    "اختر أداة القياس (M) وانقر نقطتين.",
+  "Pick the Measure tool (M) and click two points.": "اختر أداة القياس (M) وانقر نقطتين.",
 
   // History
   "Current state": "الحالة الحالية",

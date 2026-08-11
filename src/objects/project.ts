@@ -57,7 +57,13 @@ export const saveAutosave = (doc: DocumentState): void => {
   try {
     window.localStorage.setItem(AUTOSAVE_KEY, serializeProject(doc));
   } catch {
-    /* storage unavailable — autosave is best effort */
+    // A large reference picture can blow the storage quota. The drawing matters
+    // more than the tracing aid, so retry without it before giving up.
+    try {
+      window.localStorage.setItem(AUTOSAVE_KEY, serializeProject({ ...doc, reference: null }));
+    } catch {
+      /* storage unavailable — autosave is best effort */
+    }
   }
 };
 

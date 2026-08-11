@@ -3,11 +3,7 @@ import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
 import type { ViewTransform } from "../core/coordinates/view";
 import { pt } from "../core/geometry/math";
-import {
-  DEFAULT_SNAP_SETTINGS,
-  type SnapSettings,
-  type SnapType,
-} from "../core/snapping/snap";
+import { DEFAULT_SNAP_SETTINGS, type SnapSettings, type SnapType } from "../core/snapping/snap";
 import {
   DEFAULT_STYLE,
   IDENTITY_TRANSFORM,
@@ -16,16 +12,9 @@ import {
   type Style,
   type VectorObject,
 } from "../core/geometry/types";
-import {
-  DEFAULT_PRECISION,
-  type PrecisionSettings,
-} from "../core/precision/constraints";
+import { DEFAULT_PRECISION, type PrecisionSettings } from "../core/precision/constraints";
 import type { Measurement } from "../core/precision/measure";
-import {
-  mirrorGeometry,
-  rotateGeometry,
-  translateGeometry,
-} from "../objects/transform";
+import { mirrorGeometry, rotateGeometry, translateGeometry } from "../objects/transform";
 import {
   alignOffsets,
   distributeOffsets,
@@ -34,22 +23,12 @@ import {
 } from "../objects/align";
 
 import { geometryBounds, unionBounds } from "../core/geometry/math";
-import {
-  createConcentricGrid,
-  createGrid,
-  createSquareGrid,
-  type Grid,
-} from "../grids";
+import { createConcentricGrid, createGrid, createSquareGrid, type Grid } from "../grids";
+import type { GridCell } from "../grids/cells";
+import type { ReferenceImage } from "../objects/reference";
 
 export type ToolId =
-  | "select"
-  | "line"
-  | "circle"
-  | "arc"
-  | "pen"
-  | "cell"
-  | "measure"
-  | "pan";
+  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan";
 
 export interface Artboard {
   width: number;
@@ -62,7 +41,30 @@ export interface DocumentState {
   artboard: Artboard;
   grids: Grid[];
   objects: VectorObject[];
+  /** Optional raster picture pinned under the grids for tracing. Never exported. */
+  reference?: ReferenceImage | null;
 }
+
+/** Settings of the cell-painting tool. */
+export interface PaintSettings {
+  color: string;
+  /** 0–1 fill opacity applied to newly painted cells. */
+  opacity: number;
+  /** Paint removes cells instead of filling them. */
+  eraser: boolean;
+  /** Grid whose cells are painted; null follows the first paintable grid. */
+  gridId: string | null;
+  /** Angular divisions used when painting concentric (polar) grids. */
+  sectors: number;
+}
+
+export const DEFAULT_PAINT: PaintSettings = {
+  color: "#5b8cff",
+  opacity: 1,
+  eraser: false,
+  gridId: null,
+  sectors: 12,
+};
 
 export interface HistoryEntry {
   label: string;
@@ -84,6 +86,15 @@ export interface StudioState {
   viewport: { width: number; height: number };
   setViewport: (size: { width: number; height: number }) => void;
 
+  paint: PaintSettings;
+  setPaint: (patch: Partial<PaintSettings>) => void;
+  /** Master switch for grid rendering — turn it off to preview the bare logo. */
+  showGrids: boolean;
+  setShowGrids: (visible: boolean) => void;
+  paintCells: (cells: GridCell[], erase: boolean) => void;
+  clearPaintedCells: () => void;
+  setReference: (next: ReferenceImage | null) => void;
+  updateReference: (patch: Partial<ReferenceImage>) => void;
 
   setView: (view: ViewTransform) => void;
   setTool: (tool: ToolId) => void;
@@ -112,7 +123,6 @@ export interface StudioState {
   setGeometry: (id: string, geometry: Geometry, label: string) => void;
   alignSelection: (mode: AlignMode) => void;
   distributeSelection: (axis: DistributeAxis) => void;
-
 
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
@@ -144,11 +154,9 @@ const initialDoc = (): DocumentState => {
   const center = artboardCenter(artboard);
   return {
     artboard,
-    grids: [
-      createSquareGrid(center, artboard.width),
-      createConcentricGrid(center, artboard.width),
-    ],
+    grids: [createSquareGrid(center, artboard.width), createConcentricGrid(center, artboard.width)],
     objects: [],
+    reference: null,
   };
 };
 
@@ -206,7 +214,6 @@ export const useStudio = create<StudioState>()((set, get) => {
     viewport: { width: 1200, height: 800 },
     setViewport: (viewport) => set({ viewport }),
 
-
     setArtboard: (patch) =>
       commit("Change artboard", (doc) => ({
         ...doc,
@@ -250,6 +257,91 @@ export const useStudio = create<StudioState>()((set, get) => {
       }));
       set({ selection: [] });
     },
+
+    paint: DEFAULT_PAINT,
+    setPaint: (patch) => set((s) => ({ paint: { ...s.paint, ...patch } })),
+    showGrids: true,
+    setShowGrids: (showGrids) => set({ showGrids }),
+
+    paintCells: (cells, erase) => {
+      if (cells.length === 0) return;
+      const label = erase
+        ? `Erase ${cells.length} cell${cells.length > 1 ? "s" : ""}`
+        : `Paint ${cells.length} cell${cells.length > 1 ? "s" : ""}`;
+      const { color, opacity } = get().paint;
+      commit(label, (doc) => {
+        if (erase) {
+          const keys = new Set(cells.map((c) => c.key));
+          return {
+            ...doc,
+            objects: doc.objects.filter((o) => !(o.cellKey && keys.has(o.cellKey))),
+          };
+        }
+        const objects = [...doc.objects];
+        const indexByKey = new Map<string, number>();
+        objects.forEach((o, i) => {
+          if (o.cellKey) indexByKey.set(o.cellKey, i);
+        });
+        let painted = 0;
+        for (const c of cells) {
+          const geometry: Geometry = { kind: "path", points: c.points, closed: true };
+          // A same-coloured hairline stroke hides the antialiasing seam between
+          // neighbouring cells so a painted area reads as one solid shape.
+          const style: Style = {
+            ...DEFAULT_STYLE,
+            fill: color,
+            fillOpacity: opacity,
+            stroke: color,
+            strokeWidth: 1,
+          };
+          const existing = indexByKey.get(c.key);
+          if (existing !== undefined) {
+            // Repainting a cell recolours it; its geometry stays where the user
+            // may have nudged it.
+            const prev = objects[existing]!;
+            objects[existing] = { ...prev, style: { ...prev.style, ...style } };
+            continue;
+          }
+          painted += 1;
+          indexByKey.set(c.key, objects.length);
+          objects.push({
+            id: nextObjectId(),
+            name: `Cell ${doc.objects.length + painted}`,
+            type: "path",
+            geometry,
+            transform: IDENTITY_TRANSFORM,
+            style,
+            layerId: "cells",
+            visible: true,
+            locked: false,
+            cellKey: c.key,
+          });
+        }
+        return { ...doc, objects };
+      });
+    },
+
+    clearPaintedCells: () => {
+      const has = get().doc.objects.some((o) => o.cellKey);
+      if (!has) return;
+      commit("Clear painted cells", (doc) => ({
+        ...doc,
+        objects: doc.objects.filter((o) => !o.cellKey),
+      }));
+      set({ selection: [] });
+    },
+
+    setReference: (next) =>
+      commit(next === null ? "Remove reference image" : "Place reference image", (doc) => ({
+        ...doc,
+        reference: next,
+      })),
+
+    updateReference: (patch) =>
+      commit("Adjust reference image", (doc) => ({
+        ...doc,
+        reference: doc.reference ? { ...doc.reference, ...patch } : null,
+      })),
 
     addGrid: (kind) =>
       commit(`Add ${kind} grid`, (doc) => {
@@ -332,7 +424,14 @@ export const useStudio = create<StudioState>()((set, get) => {
           .map((o) => {
             const id = nextObjectId();
             newIds.push(id);
-            return { ...o, id, name: `${o.name} copy`, geometry: { ...o.geometry } };
+            // A copy is no longer tied to the grid cell it came from.
+            return {
+              ...o,
+              id,
+              name: `${o.name} copy`,
+              geometry: { ...o.geometry },
+              cellKey: undefined,
+            };
           });
         return { ...doc, objects: [...doc.objects, ...copies] };
       });
@@ -354,6 +453,7 @@ export const useStudio = create<StudioState>()((set, get) => {
               id: nextObjectId(),
               name: `${o.name} ${i + 1}`,
               geometry: rotateGeometry(o.geometry, angle, origin),
+              cellKey: undefined,
             });
           }
         }
@@ -392,9 +492,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         if (targets.length === 0) return doc;
         const boundsList = targets.map((o) => geometryBounds(o.geometry));
         const target =
-          targets.length > 1
-            ? unionBounds(boundsList)
-            : artboardWorldBounds(doc.artboard);
+          targets.length > 1 ? unionBounds(boundsList) : artboardWorldBounds(doc.artboard);
         const offsets = alignOffsets(boundsList, mode, target);
         const byId = new Map(targets.map((o, i) => [o.id, offsets[i]]));
         return {
@@ -428,10 +526,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       });
     },
 
-
-
-
-  setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
+    setPrecision: (patch) => set((s) => ({ precision: { ...s.precision, ...patch } })),
     setMeasurement: (measurement) => set({ measurement }),
 
     scaleSelection: (factor) => {
@@ -463,9 +558,7 @@ export const useStudio = create<StudioState>()((set, get) => {
               ...o,
               geometry: {
                 ...g,
-                points: g.points.map((p) =>
-                  pt(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor),
-                ),
+                points: g.points.map((p) => pt(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor)),
               },
             };
           }
@@ -484,7 +577,6 @@ export const useStudio = create<StudioState>()((set, get) => {
         ),
       }));
     },
-
 
     setSnapEnabled: (enabled) => set((s) => ({ snap: { ...s.snap, enabled } })),
     toggleSnapType: (type) =>
@@ -505,7 +597,6 @@ export const useStudio = create<StudioState>()((set, get) => {
     },
 
     newDocument: () => get().loadDocument(initialDoc(), "New document"),
-
 
     undo: () => {
       const { past, doc, future, historyLog } = get();

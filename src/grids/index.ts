@@ -2,13 +2,7 @@ import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry
 import type { Geometry, Point } from "../core/geometry/types";
 
 export type GridKind =
-  | "square"
-  | "concentric"
-  | "radial"
-  | "isometric"
-  | "triangular"
-  | "hexagonal"
-  | "golden";
+  "square" | "concentric" | "radial" | "isometric" | "triangular" | "hexagonal" | "golden";
 
 export interface GridBase {
   id: string;
@@ -209,10 +203,14 @@ const buildIsometric = (grid: IsometricGrid): GridGeometry => {
       major.push(angledLine(grid, angle, i * spacing, half * 2));
     }
   }
+  // Lines are placed by perpendicular offset, so the lattice edge that lands on
+  // their intersections is longer than the spacing itself.
+  const sin2a = Math.abs(Math.sin(2 * grid.axisAngle * RAD));
+  const edge = sin2a < 1e-6 ? spacing : spacing / sin2a;
   return {
     major,
     minor: [],
-    points: latticePoints(grid, grid.axisAngle, -grid.axisAngle, spacing, steps),
+    points: latticePoints(grid, grid.axisAngle, -grid.axisAngle, edge, steps),
   };
 };
 
@@ -226,7 +224,9 @@ const buildTriangular = (grid: TriangularGrid): GridGeometry => {
       major.push(angledLine(grid, angle, i * spacing, half * 2));
     }
   }
-  return { major, minor: [], points: latticePoints(grid, 0, 60, spacing, steps) };
+  // Rows sit `spacing` apart, which makes the triangle edge 2·spacing/√3.
+  const edge = (spacing * 2) / Math.sqrt(3);
+  return { major, minor: [], points: latticePoints(grid, 0, 60, edge, steps) };
 };
 
 const buildHexagonal = (grid: HexagonalGrid): GridGeometry => {
@@ -273,12 +273,9 @@ const buildGolden = (grid: GoldenGrid): GridGeometry => {
   let h = grid.height;
 
   const rect = (rx: number, ry: number, rw: number, rh: number, target: Geometry[]) => {
-    const c = [
-      pt(rx, ry),
-      pt(rx + rw, ry),
-      pt(rx + rw, ry + rh),
-      pt(rx, ry + rh),
-    ].map((p) => applyGrid(grid, p));
+    const c = [pt(rx, ry), pt(rx + rw, ry), pt(rx + rw, ry + rh), pt(rx, ry + rh)].map((p) =>
+      applyGrid(grid, p),
+    );
     for (let k = 0; k < 4; k += 1) {
       target.push(line(c[k]!, c[(k + 1) % 4]!));
       points.push(c[k]!);

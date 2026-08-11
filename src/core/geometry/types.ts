@@ -75,6 +75,12 @@ export interface VectorObject {
   layerId: string;
   visible: boolean;
   locked: boolean;
+  /**
+   * Identity of the grid cell this object was painted from. Present only on
+   * cell-painted shapes; it lets a second click recolour or erase the same cell
+   * instead of stacking duplicates.
+   */
+  cellKey?: string | undefined;
 }
 
 export const IDENTITY_TRANSFORM: Transform = {

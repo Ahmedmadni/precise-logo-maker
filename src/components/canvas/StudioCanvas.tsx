@@ -21,6 +21,7 @@ import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
 
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
+import { cellAt, paintableGrids, type GridCell } from "../../grids/cells";
 import { geometryToPathData } from "../../objects/render";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
@@ -33,7 +34,6 @@ const HANDLE_PIXELS = 9;
 const PEN_SAMPLE_PIXELS = 2.5;
 /** Default paint for cell polygons traced over grid intersections. */
 const CELL_FILL = "#5b8cff";
-
 
 interface Draft {
   kind: "line" | "circle" | "arc";
@@ -65,6 +65,9 @@ export function StudioCanvas() {
   const measurement = useStudio((s) => s.measurement);
   const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
+  const paint = useStudio((s) => s.paint);
+  const paintCells = useStudio((s) => s.paintCells);
+  const showGrids = useStudio((s) => s.showGrids);
   const setView = useStudio((s) => s.setView);
   const setCursor = useStudio((s) => s.setCursor);
   const addObject = useStudio((s) => s.addObject);
@@ -73,11 +76,14 @@ export function StudioCanvas() {
   const toggleSelection = useStudio((s) => s.toggleSelection);
   const setGeometry = useStudio((s) => s.setGeometry);
 
-
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
   const penActiveRef = useRef(false);
   const [cellChain, setCellChain] = useState<Point[]>([]);
+  const [hoverCell, setHoverCell] = useState<GridCell | null>(null);
+  const [paintPreview, setPaintPreview] = useState<GridCell[]>([]);
+  const paintStrokeRef = useRef<Map<string, GridCell> | null>(null);
+  const paintEraseRef = useRef(false);
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
   const [snap, setSnap] = useState<SnapResult | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
@@ -102,9 +108,23 @@ export function StudioCanvas() {
   } | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 800 });
 
+  /** Grid the cell brush paints on: the explicit choice, else the first paintable one. */
+  const paintGrid = useMemo(() => {
+    const candidates = paintableGrids(doc.grids);
+    const chosen = paint.gridId ? candidates.find((g) => g.id === paint.gridId) : undefined;
+    return chosen ?? candidates.find((g) => g.visible) ?? candidates[0] ?? null;
+  }, [doc.grids, paint.gridId]);
+
+  const cellUnder = useCallback(
+    (world: Point): GridCell | null =>
+      paintGrid ? cellAt(paintGrid, world, { sectors: paint.sectors }) : null,
+    [paintGrid, paint.sectors],
+  );
+
   const gridData = useMemo(() => {
     const points: Point[] = [];
     const geometry: Geometry[] = [];
+    if (!showGrids) return { points, geometry };
     for (const g of doc.grids) {
       if (!g.visible || g.locked) continue;
       const built = buildGridGeometry(g);
@@ -112,7 +132,7 @@ export function StudioCanvas() {
       geometry.push(...built.major);
     }
     return { points, geometry };
-  }, [doc.grids]);
+  }, [doc.grids, showGrids]);
 
   const objectGeometry = useMemo(
     () => doc.objects.filter((o) => o.visible).map((o) => o.geometry),
@@ -146,7 +166,6 @@ export function StudioCanvas() {
     autoFitView.current = next;
     setView(next);
   }, [size, doc.artboard, setView]);
-
 
   const toWorld = useCallback(
     (clientX: number, clientY: number): Point => {
@@ -279,6 +298,19 @@ export function StudioCanvas() {
     if (e.button !== 0) return;
 
     const world = toWorld(e.clientX, e.clientY);
+
+    // Cell brush: press and drag to fill every cell the cursor crosses.
+    if (tool === "cell") {
+      const erase = paint.eraser || e.altKey;
+      paintEraseRef.current = erase;
+      const stroke = new Map<string, GridCell>();
+      const hit = cellUnder(world);
+      if (hit) stroke.set(hit.key, hit);
+      paintStrokeRef.current = stroke;
+      setPaintPreview([...stroke.values()]);
+      return;
+    }
+
     const { point: snapped } = resolveCursor(world);
     const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
     const point = applyPrecision(anchor, snapped, e.shiftKey);
@@ -300,7 +332,7 @@ export function StudioCanvas() {
       return;
     }
 
-    if (tool === "cell") {
+    if (tool === "polygon") {
       const first = cellChain[0];
       const tol = HIT_PIXELS / view.zoom;
       if (first && cellChain.length >= 3 && dist(point, first) <= tol) {
@@ -312,7 +344,6 @@ export function StudioCanvas() {
       setCellChain([...cellChain, point]);
       return;
     }
-
 
     if (tool === "select") {
       // Handle editing takes priority over body dragging.
@@ -392,6 +423,22 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+
+    // The cell brush works off raw grid arithmetic — no snapping pass needed.
+    if (tool === "cell") {
+      setSnap(null);
+      setHoverWorld(world);
+      setCursor(world);
+      const hit = cellUnder(world);
+      setHoverCell(hit);
+      const stroke = paintStrokeRef.current;
+      if (stroke && hit && !stroke.has(hit.key)) {
+        stroke.set(hit.key, hit);
+        setPaintPreview([...stroke.values()]);
+      }
+      return;
+    }
+
     const { point: snapped, snap: s } = resolveCursor(world);
     const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
     const point = applyPrecision(anchor, snapped, e.shiftKey);
@@ -419,7 +466,6 @@ export function StudioCanvas() {
       return;
     }
     if (dragRef.current) {
-
       setDragOffset(pt(point.x - dragRef.current.start.x, point.y - dragRef.current.start.y));
       return;
     }
@@ -433,6 +479,13 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (paintStrokeRef.current) {
+      const cells = [...paintStrokeRef.current.values()];
+      paintStrokeRef.current = null;
+      setPaintPreview([]);
+      if (cells.length > 0) paintCells(cells, paintEraseRef.current);
+      return;
+    }
     if (penActiveRef.current) {
       penActiveRef.current = false;
       const stroke = pen ?? [];
@@ -452,7 +505,6 @@ export function StudioCanvas() {
       return;
     }
     if (dragRef.current) {
-
       const offset = dragOffset;
       dragRef.current = null;
       setDragOffset(null);
@@ -480,8 +532,7 @@ export function StudioCanvas() {
   };
 
   const preview = draft && hoverWorld ? draftGeometry(draft, hoverWorld) : null;
-  const liveMeasure =
-    measureStart && hoverWorld ? measure(measureStart, hoverWorld) : measurement;
+  const liveMeasure = measureStart && hoverWorld ? measure(measureStart, hoverWorld) : measurement;
   const measureLine = liveMeasure ? { a: liveMeasure.a, b: liveMeasure.b } : null;
   const unit = doc.artboard.unit;
   const readout = !precision.showReadout
@@ -503,7 +554,6 @@ export function StudioCanvas() {
       )
     : [];
   const selectionBounds =
-
     selection.length > 0
       ? unionBounds(
           doc.objects
@@ -532,6 +582,14 @@ export function StudioCanvas() {
         panRef.current = null;
         setSnap(null);
         setCursor(null);
+        setHoverCell(null);
+        // Don't lose a brush stroke when the pointer slips off the canvas.
+        if (paintStrokeRef.current) {
+          const cells = [...paintStrokeRef.current.values()];
+          paintStrokeRef.current = null;
+          setPaintPreview([]);
+          if (cells.length > 0) paintCells(cells, paintEraseRef.current);
+        }
       }}
       onDoubleClick={() => {
         setDraft(null);
@@ -559,17 +617,28 @@ export function StudioCanvas() {
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
+          {/* Reference picture: sits under the grids, tracing aid only */}
+          {doc.reference?.visible && (
+            <image
+              href={doc.reference.src}
+              x={doc.reference.x}
+              y={doc.reference.y}
+              width={doc.reference.width}
+              height={doc.reference.height}
+              opacity={doc.reference.opacity}
+              preserveAspectRatio="none"
+              pointerEvents="none"
+            />
+          )}
           {/* Grids: primary first, then secondary */}
-          {doc.grids
-            .filter((g) => g.weight === "primary")
-            .map((g) => (
-              <GridLayer key={g.id} grid={g} />
-            ))}
-          {doc.grids
-            .filter((g) => g.weight === "secondary")
-            .map((g) => (
-              <GridLayer key={g.id} grid={g} />
-            ))}
+          {showGrids &&
+            doc.grids
+              .filter((g) => g.weight === "primary")
+              .map((g) => <GridLayer key={g.id} grid={g} />)}
+          {showGrids &&
+            doc.grids
+              .filter((g) => g.weight === "secondary")
+              .map((g) => <GridLayer key={g.id} grid={g} />)}
           {/* Shapes */}
           <g>
             {doc.objects.map((o) =>
@@ -582,9 +651,7 @@ export function StudioCanvas() {
                       : undefined
                   }
                   d={geometryToPathData(
-                    handleDrag && handleDrag.objectId === o.id
-                      ? handleDrag.geometry
-                      : o.geometry,
+                    handleDrag && handleDrag.objectId === o.id ? handleDrag.geometry : o.geometry,
                   )}
 
                   fill={o.style.fill}
@@ -593,9 +660,7 @@ export function StudioCanvas() {
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
                   strokeDasharray={
-                    o.style.dash && o.style.dash > 0
-                      ? `${o.style.dash} ${o.style.dash}`
-                      : undefined
+                    o.style.dash && o.style.dash > 0 ? `${o.style.dash} ${o.style.dash}` : undefined
                   }
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -627,13 +692,39 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Cell brush: hovered cell + cells collected in the current stroke */}
+          {tool === "cell" && (
+            <g pointerEvents="none">
+              {paintPreview.map((c) => (
+                <path
+                  key={c.key}
+                  d={geometryToPathData({ kind: "path", points: c.points, closed: true })}
+                  fill={paintEraseRef.current ? "var(--color-destructive)" : paint.color}
+                  fillOpacity={paintEraseRef.current ? 0.25 : paint.opacity * 0.75}
+                  stroke={paintEraseRef.current ? "var(--color-destructive)" : paint.color}
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {hoverCell && !paintStrokeRef.current && (
+                <path
+                  d={geometryToPathData({ kind: "path", points: hoverCell.points, closed: true })}
+                  fill={paint.eraser ? "none" : paint.color}
+                  fillOpacity={paint.opacity * 0.35}
+                  stroke={paint.eraser ? "var(--color-destructive)" : "var(--color-primary)"}
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+            </g>
+          )}
           {/* Cell chain in progress */}
           {cellChain.length > 0 && (
             <g>
               <path
                 d={geometryToPathData({
                   kind: "path",
-                  points: hoverWorld && tool === "cell" ? [...cellChain, hoverWorld] : cellChain,
+                  points: hoverWorld && tool === "polygon" ? [...cellChain, hoverWorld] : cellChain,
                   closed: false,
                 })}
                 fill={CELL_FILL}
@@ -645,13 +736,7 @@ export function StudioCanvas() {
                 vectorEffect="non-scaling-stroke"
               />
               {cellChain.map((p, i) => (
-                <circle
-                  key={i}
-                  cx={p.x}
-                  cy={p.y}
-                  r={3.5 / view.zoom}
-                  fill="var(--color-primary)"
-                />
+                <circle key={i} cx={p.x} cy={p.y} r={3.5 / view.zoom} fill="var(--color-primary)" />
               ))}
             </g>
           )}
@@ -665,9 +750,7 @@ export function StudioCanvas() {
               height={8 / view.zoom}
               rx={h.role === "center" ? 4 / view.zoom : 1 / view.zoom}
               fill={
-                handleDrag?.handleId === h.id
-                  ? "var(--color-primary)"
-                  : "var(--color-background)"
+                handleDrag?.handleId === h.id ? "var(--color-primary)" : "var(--color-background)"
               }
               stroke="var(--color-primary)"
               strokeWidth={1.25}
