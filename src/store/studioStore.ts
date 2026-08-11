@@ -162,6 +162,7 @@ const geometryLabel: Record<Geometry["kind"], string> = {
   circle: "Circle",
   line: "Line",
   arc: "Arc",
+  path: "Path",
 };
 
 export const useStudio = create<StudioState>()((set, get) => {

@@ -95,5 +95,12 @@ export const pickHandle = (
   return best?.h ?? null;
 };
 
-export const handleCenter = (g: Geometry): Point =>
-  g.kind === "line" ? pt((g.a.x + g.b.x) / 2, (g.a.y + g.b.y) / 2) : g.center;
+export const handleCenter = (g: Geometry): Point => {
+  if (g.kind === "line") return pt((g.a.x + g.b.x) / 2, (g.a.y + g.b.y) / 2);
+  if (g.kind === "path") {
+    const n = g.points.length || 1;
+    const sum = g.points.reduce((acc, p) => pt(acc.x + p.x, acc.y + p.y), pt(0, 0));
+    return pt(sum.x / n, sum.y / n);
+  }
+  return g.center;
+};
