@@ -588,9 +588,17 @@ export function StudioCanvas() {
                   )}
 
                   fill={o.style.fill}
+                  fillOpacity={o.style.fillOpacity ?? 1}
+                  opacity={o.style.opacity ?? 1}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
+                  strokeDasharray={
+                    o.style.dash && o.style.dash > 0
+                      ? `${o.style.dash} ${o.style.dash}`
+                      : undefined
+                  }
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />
               ) : null,
@@ -606,6 +614,46 @@ export function StudioCanvas() {
               strokeDasharray="6 4"
               vectorEffect="non-scaling-stroke"
             />
+          )}
+          {/* Freehand pen stroke in progress */}
+          {pen && pen.length > 1 && (
+            <path
+              d={geometryToPathData({ kind: "path", points: pen, closed: false })}
+              fill="none"
+              stroke="var(--color-primary)"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {/* Cell chain in progress */}
+          {cellChain.length > 0 && (
+            <g>
+              <path
+                d={geometryToPathData({
+                  kind: "path",
+                  points: hoverWorld && tool === "cell" ? [...cellChain, hoverWorld] : cellChain,
+                  closed: false,
+                })}
+                fill={CELL_FILL}
+                fillOpacity={0.18}
+                stroke="var(--color-primary)"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              {cellChain.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3.5 / view.zoom}
+                  fill="var(--color-primary)"
+                />
+              ))}
+            </g>
           )}
           {/* Edit handles for a single selected object */}
           {editHandles.map((h) => (
