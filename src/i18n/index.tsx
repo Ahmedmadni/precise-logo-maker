@@ -18,6 +18,8 @@ export const AR: Record<string, string> = {
   Panels: "اللوحات",
   Tools: "الأدوات",
   Close: "إغلاق",
+  "Install app": "تثبيت التطبيق",
+  "Install the studio on this device": "تثبيت الاستوديو على هذا الجهاز",
 
   // Files & view
   New: "جديد",

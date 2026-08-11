@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import {
   Download,
+  DownloadCloud,
   Eye,
   EyeOff,
   FilePlus2,
@@ -18,6 +19,7 @@ import {
 import { downloadPng, downloadSvg } from "../../objects/export";
 import { downloadProject, readProjectFile } from "../../objects/project";
 import { readReferenceImage } from "../../objects/reference";
+import { useInstallPrompt } from "../../lib/pwa";
 import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
@@ -47,6 +49,7 @@ export function TopBar() {
   const t = useT();
   const lang = useLangStore((s) => s.lang);
   const setLang = useLangStore((s) => s.setLang);
+  const installPrompt = useInstallPrompt();
 
   const openProject = async (file: File | undefined) => {
     if (!file) return;
@@ -109,6 +112,17 @@ export function TopBar() {
       <span className="hidden text-[11px] text-muted-foreground sm:inline">
         {t("Phase 7 — Drawing & Paint")}
       </span>
+
+      {installPrompt.available && (
+        <button
+          type="button"
+          className={`${btn} flex-none`}
+          onClick={() => void installPrompt.install()}
+          title={t("Install the studio on this device")}
+        >
+          <DownloadCloud className="h-3.5 w-3.5" aria-hidden /> {t("Install app")}
+        </button>
+      )}
 
       <button
         type="button"
