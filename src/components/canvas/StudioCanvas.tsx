@@ -29,6 +29,10 @@ import { SnapIndicator } from "./SnapIndicator";
 const SNAP_PIXELS = 12;
 const HIT_PIXELS = 8;
 const HANDLE_PIXELS = 9;
+/** Minimum screen-space travel before the pen records another sample. */
+const PEN_SAMPLE_PIXELS = 2.5;
+/** Default paint for cell polygons traced over grid intersections. */
+const CELL_FILL = "#5b8cff";
 
 
 interface Draft {
