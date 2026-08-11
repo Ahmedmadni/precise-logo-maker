@@ -31,6 +31,14 @@ export const handlesOf = (g: Geometry): Handle[] => {
       },
     ];
   }
+  if (g.kind === "path") {
+    return g.points.map((p, i) => ({
+      id: `p${i}`,
+      point: p,
+      role: "anchor" as const,
+      label: `Point ${i + 1}`,
+    }));
+  }
   return [
     { id: "center", point: g.center, role: "center", label: "Center" },
     {
@@ -54,6 +62,11 @@ export const applyHandle = (g: Geometry, id: string, p: Point): Geometry => {
     if (id === "a") return { ...g, a: p };
     if (id === "b") return { ...g, b: p };
     return g;
+  }
+  if (g.kind === "path") {
+    const index = Number(id.slice(1));
+    if (!Number.isInteger(index) || index < 0 || index >= g.points.length) return g;
+    return { ...g, points: g.points.map((q, i) => (i === index ? p : q)) };
   }
   if (id === "center") {
     return translateGeometry(g, p.x - g.center.x, p.y - g.center.y);
