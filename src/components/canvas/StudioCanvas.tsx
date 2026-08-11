@@ -536,11 +536,14 @@ export function StudioCanvas() {
       onDoubleClick={() => {
         setDraft(null);
         setMeasureStart(null);
+        if (cellChain.length >= 2) commitCells(cellChain, cellChain.length >= 3);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
         setDraft(null);
         setMeasureStart(null);
+        if (cellChain.length >= 2) commitCells(cellChain, cellChain.length >= 3);
+        else setCellChain([]);
       }}
     >
       <svg className="h-full w-full" role="img" aria-label="Logo construction canvas">
