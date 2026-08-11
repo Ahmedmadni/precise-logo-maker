@@ -13,6 +13,7 @@ import {
   IDENTITY_TRANSFORM,
   type Geometry,
   type Point,
+  type Style,
   type VectorObject,
 } from "../core/geometry/types";
 import {
@@ -116,6 +117,7 @@ export interface StudioState {
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
   scaleSelection: (factor: number) => void;
+  setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
