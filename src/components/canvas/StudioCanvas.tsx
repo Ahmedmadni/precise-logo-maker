@@ -281,6 +281,26 @@ export function StudioCanvas() {
       return;
     }
 
+    if (tool === "pen") {
+      penActiveRef.current = true;
+      setPen([world]);
+      return;
+    }
+
+    if (tool === "cell") {
+      const first = cellChain[0];
+      const tol = HIT_PIXELS / view.zoom;
+      if (first && cellChain.length >= 3 && dist(point, first) <= tol) {
+        commitCells(cellChain, true);
+        return;
+      }
+      const last = cellChain[cellChain.length - 1];
+      if (last && dist(last, point) < 1e-6) return;
+      setCellChain([...cellChain, point]);
+      return;
+    }
+
+
     if (tool === "select") {
       // Handle editing takes priority over body dragging.
       if (selection.length === 1) {
