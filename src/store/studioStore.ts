@@ -213,7 +213,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         artboard: { ...doc.artboard, ...patch },
       })),
 
-    addObject: (geometry, label) => {
+    addObject: (geometry, label, style) => {
       const id = nextObjectId();
       commit(label, (doc) => ({
         ...doc,
@@ -225,7 +225,7 @@ export const useStudio = create<StudioState>()((set, get) => {
             type: geometry.kind,
             geometry,
             transform: IDENTITY_TRANSFORM,
-            style: { ...DEFAULT_STYLE },
+            style: { ...DEFAULT_STYLE, ...style },
             layerId: "shapes",
             visible: true,
             locked: false,
