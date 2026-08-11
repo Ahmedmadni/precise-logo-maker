@@ -8,6 +8,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
   a: "arc",
   p: "pen",
   b: "cell",
+  n: "polygon",
   m: "measure",
   h: "pan",
 };
@@ -56,6 +57,18 @@ export function useStudioShortcuts(): void {
         return;
       }
       if (mod) return;
+      // G hides every grid at once so the bare logo can be judged on its own.
+      if (e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        store.setShowGrids(!store.showGrids);
+        return;
+      }
+      // X flips the cell brush between painting and erasing.
+      if (e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        store.setPaint({ eraser: !store.paint.eraser });
+        return;
+      }
       const tool = TOOL_KEYS[e.key.toLowerCase()];
       if (tool) {
         e.preventDefault();

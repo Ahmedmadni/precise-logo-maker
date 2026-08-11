@@ -1,9 +1,13 @@
 import { useRef, useState } from "react";
 import {
   Download,
+  DownloadCloud,
+  Eye,
+  EyeOff,
   FilePlus2,
   FolderOpen,
   Image,
+  ImagePlus,
   Languages,
   Maximize2,
   Redo2,
@@ -14,6 +18,8 @@ import {
 } from "lucide-react";
 import { downloadPng, downloadSvg } from "../../objects/export";
 import { downloadProject, readProjectFile } from "../../objects/project";
+import { readReferenceImage } from "../../objects/reference";
+import { useInstallPrompt } from "../../lib/pwa";
 import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
@@ -33,18 +39,34 @@ export function TopBar() {
   const canRedo = useStudio((s) => s.future.length > 0);
   const loadDocument = useStudio((s) => s.loadDocument);
   const newDocument = useStudio((s) => s.newDocument);
+  const showGrids = useStudio((s) => s.showGrids);
+  const setShowGrids = useStudio((s) => s.setShowGrids);
+  const setReference = useStudio((s) => s.setReference);
   const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   const [pngSize, setPngSize] = useState(1024);
   const [busy, setBusy] = useState(false);
   const t = useT();
   const lang = useLangStore((s) => s.lang);
   const setLang = useLangStore((s) => s.setLang);
+  const installPrompt = useInstallPrompt();
 
   const openProject = async (file: File | undefined) => {
     if (!file) return;
     const parsed = await readProjectFile(file);
     if (parsed) loadDocument(parsed, `Open ${file.name}`);
     else window.alert(t("This file is not a valid .logo project."));
+  };
+
+  const openReference = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const reference = await readReferenceImage(file, doc.artboard);
+      if (reference) setReference(reference);
+      else window.alert(t("Pick an image file (PNG, JPG, SVG, WebP)."));
+    } catch {
+      window.alert(t("Could not load that image."));
+    }
   };
 
   const exportPng = async () => {
@@ -91,6 +113,17 @@ export function TopBar() {
         {t("Phase 7 — Drawing & Paint")}
       </span>
 
+      {installPrompt.available && (
+        <button
+          type="button"
+          className={`${btn} flex-none`}
+          onClick={() => void installPrompt.install()}
+          title={t("Install the studio on this device")}
+        >
+          <DownloadCloud className="h-3.5 w-3.5" aria-hidden /> {t("Install app")}
+        </button>
+      )}
+
       <button
         type="button"
         className={`${btn} flex-none`}
@@ -107,7 +140,10 @@ export function TopBar() {
           type="button"
           className={btn}
           onClick={() => {
-            if (doc.objects.length === 0 || window.confirm(t("Start a new document? Unsaved work is lost.")))
+            if (
+              doc.objects.length === 0 ||
+              window.confirm(t("Start a new document? Unsaved work is lost."))
+            )
               newDocument();
           }}
           title={t("New document")}
@@ -141,7 +177,13 @@ export function TopBar() {
         >
           <Save className="h-3.5 w-3.5" aria-hidden /> {t("Save")}
         </button>
-        <button type="button" className={btn} onClick={undo} disabled={!canUndo} title={t("Undo (Ctrl+Z)")}>
+        <button
+          type="button"
+          className={btn}
+          onClick={undo}
+          disabled={!canUndo}
+          title={t("Undo (Ctrl+Z)")}
+        >
           <Undo2 className="h-3.5 w-3.5" aria-hidden /> {t("Undo")}
         </button>
         <button
@@ -155,6 +197,41 @@ export function TopBar() {
         </button>
       </div>
 
+      <div className="flex flex-none items-center gap-1.5">
+        <button
+          type="button"
+          className={btn}
+          onClick={() => imageInput.current?.click()}
+          title={t("Place a picture under the grid to trace over")}
+        >
+          <ImagePlus className="h-3.5 w-3.5" aria-hidden /> {t("Reference image")}
+        </button>
+        <input
+          ref={imageInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-label={t("Reference image")}
+          onChange={(e) => {
+            void openReference(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className={btn}
+          aria-pressed={!showGrids}
+          onClick={() => setShowGrids(!showGrids)}
+          title={t("Show or hide every grid (G)")}
+        >
+          {showGrids ? (
+            <Eye className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5" aria-hidden />
+          )}
+          {showGrids ? t("Hide grids") : t("Show grids")}
+        </button>
+      </div>
 
       <div className="ms-auto flex flex-none items-center gap-1.5">
         <button type="button" className={btn} onClick={fitArtboard}>

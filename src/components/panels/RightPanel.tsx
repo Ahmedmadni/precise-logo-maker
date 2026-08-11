@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -9,9 +9,15 @@ import {
   ArrowDown,
   ArrowUp,
   Copy,
+  Eraser,
   FlipHorizontal,
   FlipVertical,
+  ImagePlus,
+  Magnet,
+  PaintBucket,
+  PenTool,
   RotateCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import type { AlignMode } from "../../objects/align";
@@ -23,11 +29,13 @@ import { SNAP_LABEL, type SnapType } from "../../core/snapping/snap";
 import { ANGLE_STEPS, RATIOS } from "../../core/precision/constraints";
 import { describeGeometry, formatAngle, formatLength } from "../../core/precision/measure";
 import type { Grid } from "../../grids";
+import { gridSupportsCells } from "../../grids/cells";
+import { fitToArtboard, readReferenceImage } from "../../objects/reference";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 
-const TABS = ["Properties", "Objects", "Grids", "Snap", "Precision", "History"] as const;
+const TABS = ["Properties", "Cells", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
 
 const fieldCls =
@@ -187,7 +195,9 @@ function PaintSection() {
           label={t("Stroke width")}
           value={style.strokeWidth}
           step={0.5}
-          onChange={(v) => setSelectionStyle({ strokeWidth: Math.max(0.1, v) }, "Change stroke width")}
+          onChange={(v) =>
+            setSelectionStyle({ strokeWidth: Math.max(0.1, v) }, "Change stroke width")
+          }
         />
         <NumberField
           label={t("Dash")}
@@ -242,7 +252,9 @@ function PaintSection() {
           max={1}
           step={0.05}
           value={style.fillOpacity ?? 1}
-          onChange={(e) => setSelectionStyle({ fillOpacity: Number(e.target.value) }, "Change fill opacity")}
+          onChange={(e) =>
+            setSelectionStyle({ fillOpacity: Number(e.target.value) }, "Change fill opacity")
+          }
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -262,7 +274,7 @@ function PaintSection() {
       <p className="text-[11px] text-muted-foreground">{t("Applies to every selected object.")}</p>
       <p className="text-[11px] text-muted-foreground">
         {t(
-          "Pen (P) draws freehand. Cells (B) links grid intersections into a filled shape — double-click or right-click to finish.",
+          "Pen (P) draws freehand. Paint cells (B) fills grid cells. Cell shape (N) links grid intersections into one outline — double-click or right-click to finish.",
         )}
       </p>
     </section>
@@ -305,27 +317,79 @@ function ObjectSection() {
       <div className="grid grid-cols-2 gap-2">
         {g.kind === "line" && (
           <>
-            <NumberField label={t("X1")} value={g.a.x} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, x: v } })} />
-            <NumberField label={t("Y1")} value={g.a.y} onChange={(v) => patchGeometry({ ...g, a: { ...g.a, y: v } })} />
-            <NumberField label={t("X2")} value={g.b.x} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, x: v } })} />
-            <NumberField label={t("Y2")} value={g.b.y} onChange={(v) => patchGeometry({ ...g, b: { ...g.b, y: v } })} />
+            <NumberField
+              label={t("X1")}
+              value={g.a.x}
+              onChange={(v) => patchGeometry({ ...g, a: { ...g.a, x: v } })}
+            />
+            <NumberField
+              label={t("Y1")}
+              value={g.a.y}
+              onChange={(v) => patchGeometry({ ...g, a: { ...g.a, y: v } })}
+            />
+            <NumberField
+              label={t("X2")}
+              value={g.b.x}
+              onChange={(v) => patchGeometry({ ...g, b: { ...g.b, x: v } })}
+            />
+            <NumberField
+              label={t("Y2")}
+              value={g.b.y}
+              onChange={(v) => patchGeometry({ ...g, b: { ...g.b, y: v } })}
+            />
           </>
         )}
         {g.kind === "circle" && (
           <>
-            <NumberField label={t("Center X")} value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
-            <NumberField label={t("Center Y")} value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
-            <NumberField label={t("Radius")} value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
-            <NumberField label={t("Diameter")} value={g.radius * 2} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v / 2) })} />
+            <NumberField
+              label={t("Center X")}
+              value={g.center.x}
+              onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })}
+            />
+            <NumberField
+              label={t("Center Y")}
+              value={g.center.y}
+              onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })}
+            />
+            <NumberField
+              label={t("Radius")}
+              value={g.radius}
+              onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })}
+            />
+            <NumberField
+              label={t("Diameter")}
+              value={g.radius * 2}
+              onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v / 2) })}
+            />
           </>
         )}
         {g.kind === "arc" && (
           <>
-            <NumberField label={t("Center X")} value={g.center.x} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })} />
-            <NumberField label={t("Center Y")} value={g.center.y} onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })} />
-            <NumberField label={t("Radius")} value={g.radius} onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })} />
-            <NumberField label={t("Start °")} value={g.startAngle} onChange={(v) => patchGeometry({ ...g, startAngle: v })} />
-            <NumberField label={t("End °")} value={g.endAngle} onChange={(v) => patchGeometry({ ...g, endAngle: v })} />
+            <NumberField
+              label={t("Center X")}
+              value={g.center.x}
+              onChange={(v) => patchGeometry({ ...g, center: { ...g.center, x: v } })}
+            />
+            <NumberField
+              label={t("Center Y")}
+              value={g.center.y}
+              onChange={(v) => patchGeometry({ ...g, center: { ...g.center, y: v } })}
+            />
+            <NumberField
+              label={t("Radius")}
+              value={g.radius}
+              onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v) })}
+            />
+            <NumberField
+              label={t("Start °")}
+              value={g.startAngle}
+              onChange={(v) => patchGeometry({ ...g, startAngle: v })}
+            />
+            <NumberField
+              label={t("End °")}
+              value={g.endAngle}
+              onChange={(v) => patchGeometry({ ...g, endAngle: v })}
+            />
           </>
         )}
       </div>
@@ -336,7 +400,11 @@ function ObjectSection() {
           value={selected.style.strokeWidth}
           step={0.5}
           onChange={(v) =>
-            updateObject(selected.id, { style: { ...selected.style, strokeWidth: Math.max(0.1, v) } }, "Change stroke width")
+            updateObject(
+              selected.id,
+              { style: { ...selected.style, strokeWidth: Math.max(0.1, v) } },
+              "Change stroke width",
+            )
           }
         />
         <label className="flex flex-col gap-1">
@@ -346,7 +414,11 @@ function ObjectSection() {
             className="h-[26px] w-full rounded-md border border-border bg-background"
             value={selected.style.stroke}
             onChange={(e) =>
-              updateObject(selected.id, { style: { ...selected.style, stroke: e.target.value } }, "Change stroke color")
+              updateObject(
+                selected.id,
+                { style: { ...selected.style, stroke: e.target.value } },
+                "Change stroke color",
+              )
             }
           />
         </label>
@@ -376,10 +448,20 @@ function TransformSection() {
         <button type="button" className={btn} disabled={disabled} onClick={duplicateSelection}>
           <Copy className="h-3 w-3" aria-hidden /> {t("Duplicate")}
         </button>
-        <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("x")}>
+        <button
+          type="button"
+          className={btn}
+          disabled={disabled}
+          onClick={() => mirrorSelection("x")}
+        >
           <FlipHorizontal className="h-3 w-3" aria-hidden /> {t("Mirror H")}
         </button>
-        <button type="button" className={btn} disabled={disabled} onClick={() => mirrorSelection("y")}>
+        <button
+          type="button"
+          className={btn}
+          disabled={disabled}
+          onClick={() => mirrorSelection("y")}
+        >
           <FlipVertical className="h-3 w-3" aria-hidden /> {t("Mirror V")}
         </button>
       </div>
@@ -387,35 +469,56 @@ function TransformSection() {
         <div className="flex-1">
           <NumberField label={t("Rotate °")} value={angle} onChange={setAngle} />
         </div>
-        <button type="button" className={btn} disabled={disabled} onClick={() => rotateSelection(angle)}>
+        <button
+          type="button"
+          className={btn}
+          disabled={disabled}
+          onClick={() => rotateSelection(angle)}
+        >
           <RotateCw className="h-3 w-3" aria-hidden /> {t("Apply")}
         </button>
       </div>
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <NumberField label={t("Radial repeat")} value={count} onChange={(v) => setCount(Math.max(2, Math.round(v)))} />
+          <NumberField
+            label={t("Radial repeat")}
+            value={count}
+            onChange={(v) => setCount(Math.max(2, Math.round(v)))}
+          />
         </div>
-        <button type="button" className={btn} disabled={disabled} onClick={() => radialRepeat(count)}>
+        <button
+          type="button"
+          className={btn}
+          disabled={disabled}
+          onClick={() => radialRepeat(count)}
+        >
           Repeat
         </button>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {([["← 10", -10, 0], ["→ 10", 10, 0], ["↑ 10", 0, -10], ["↓ 10", 0, 10]] as const).map(
-          ([label, dx, dy]) => (
-            <button
-              key={label}
-              type="button"
-              className={btn}
-              disabled={disabled}
-              onClick={() => translateSelection(dx, dy)}
-            >
-              {label}
-            </button>
-          ),
-        )}
+        {(
+          [
+            ["← 10", -10, 0],
+            ["→ 10", 10, 0],
+            ["↑ 10", 0, -10],
+            ["↓ 10", 0, 10],
+          ] as const
+        ).map(([label, dx, dy]) => (
+          <button
+            key={label}
+            type="button"
+            className={btn}
+            disabled={disabled}
+            onClick={() => translateSelection(dx, dy)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {t("Arrow keys nudge by 1 (Shift = 10). Ctrl/Cmd+D duplicates. Drag with the Select tool to move.")}
+        {t(
+          "Arrow keys nudge by 1 (Shift = 10). Ctrl/Cmd+D duplicates. Drag with the Select tool to move.",
+        )}
       </p>
     </section>
   );
@@ -475,12 +578,420 @@ function AlignSection() {
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {t("One object aligns to the artboard; several align to their shared bounds. Distribute needs 3+.")}
+        {t(
+          "One object aligns to the artboard; several align to their shared bounds. Distribute needs 3+.",
+        )}
       </p>
     </section>
   );
 }
 
+/** Cell brush: pick a colour, pick the grid, then drag across the canvas. */
+function CellPaintSection() {
+  const t = useT();
+  const paint = useStudio((s) => s.paint);
+  const setPaint = useStudio((s) => s.setPaint);
+  const setTool = useStudio((s) => s.setTool);
+  const tool = useStudio((s) => s.tool);
+  const grids = useStudio((s) => s.doc.grids);
+  const showGrids = useStudio((s) => s.showGrids);
+  const setShowGrids = useStudio((s) => s.setShowGrids);
+  const clearPaintedCells = useStudio((s) => s.clearPaintedCells);
+  const cellCount = useStudio((s) => s.doc.objects.filter((o) => o.cellKey).length);
+  const paintable = grids.filter((g) => gridSupportsCells(g.kind) && !g.locked);
+  const active = paint.gridId
+    ? paintable.find((g) => g.id === paint.gridId)
+    : (paintable.find((g) => g.visible) ?? paintable[0]);
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold text-foreground">{t("Cell painting")}</h2>
+      <p className="text-[11px] text-muted-foreground">
+        {t(
+          "Pick the Paint cells tool (B), then click or drag over the squares the grid lines make. Each cell becomes a real vector shape, so the logo stays after the grid is hidden.",
+        )}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={cn(btn, tool === "cell" && "bg-accent text-accent-foreground")}
+          onClick={() => setTool("cell")}
+        >
+          <PaintBucket className="h-3 w-3" aria-hidden /> {t("Paint cells")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={paint.eraser}
+          className={cn(btn, paint.eraser && "bg-accent text-accent-foreground")}
+          onClick={() => setPaint({ eraser: !paint.eraser })}
+          title={t("Eraser (X, or hold Alt)")}
+        >
+          <Eraser className="h-3 w-3" aria-hidden /> {t("Eraser")}
+        </button>
+        <button
+          type="button"
+          className={cn(btn, !showGrids && "bg-accent text-accent-foreground")}
+          onClick={() => setShowGrids(!showGrids)}
+        >
+          {showGrids ? t("Hide grids") : t("Show grids")}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className={labelCls}>{t("Cell color")}</span>
+          <input
+            type="color"
+            className="h-[26px] w-full rounded-md border border-border bg-background"
+            value={paint.color}
+            onChange={(e) => setPaint({ color: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={labelCls}>{t("Grid to paint")}</span>
+          <select
+            className={fieldCls}
+            value={active?.id ?? ""}
+            onChange={(e) => setPaint({ gridId: e.target.value || null })}
+          >
+            {paintable.length === 0 && <option value="">{t("No paintable grid")}</option>}
+            {paintable.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="space-y-1">
+        <span className={labelCls}>{t("Swatches")}</span>
+        <div className="flex flex-wrap gap-1.5">
+          {SWATCHES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`${t("Cell color")} ${c}`}
+              className={cn(
+                "h-6 w-6 rounded-md border",
+                paint.color.toLowerCase() === c.toLowerCase() ? "border-primary" : "border-border",
+              )}
+              style={{ background: c }}
+              onClick={() => setPaint({ color: c })}
+            />
+          ))}
+        </div>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Cell opacity")} — {Math.round(paint.opacity * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0.05}
+          max={1}
+          step={0.05}
+          value={paint.opacity}
+          onChange={(e) => setPaint({ opacity: Number(e.target.value) })}
+        />
+      </label>
+
+      {active?.kind === "concentric" && (
+        <NumberField
+          label={t("Polar sectors")}
+          value={paint.sectors}
+          onChange={(v) => setPaint({ sectors: Math.min(180, Math.max(1, Math.round(v))) })}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">
+          {t("Painted cells")}: {cellCount}
+        </span>
+        <button
+          type="button"
+          className={btn}
+          disabled={cellCount === 0}
+          onClick={clearPaintedCells}
+        >
+          <Trash2 className="h-3 w-3" aria-hidden /> {t("Clear cells")}
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {t("Square, isometric, triangular, hexagonal and concentric grids have paintable cells.")}
+      </p>
+    </section>
+  );
+}
+
+/** Raster picture pinned under the grids as a tracing guide (never exported). */
+function ReferenceImageSection() {
+  const t = useT();
+  const reference = useStudio((s) => s.doc.reference);
+  const artboard = useStudio((s) => s.doc.artboard);
+  const setReference = useStudio((s) => s.setReference);
+  const updateReference = useStudio((s) => s.updateReference);
+  const input = useRef<HTMLInputElement>(null);
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const next = await readReferenceImage(file, artboard);
+      if (next) setReference(next);
+      else window.alert(t("Pick an image file (PNG, JPG, SVG, WebP)."));
+    } catch {
+      window.alert(t("Could not load that image."));
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold text-foreground">{t("Reference image")}</h2>
+      <p className="text-[11px] text-muted-foreground">
+        {t("Sits under the grids so you can draw on top of it. It is never part of the export.")}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" className={btn} onClick={() => input.current?.click()}>
+          <ImagePlus className="h-3 w-3" aria-hidden />{" "}
+          {reference ? t("Replace image") : t("Insert image")}
+        </button>
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-label={t("Reference image")}
+          onChange={(e) => {
+            void pick(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        {reference && (
+          <button type="button" className={btn} onClick={() => setReference(null)}>
+            <Trash2 className="h-3 w-3" aria-hidden /> {t("Remove")}
+          </button>
+        )}
+      </div>
+
+      {reference && (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={reference.visible}
+                onChange={(e) => updateReference({ visible: e.target.checked })}
+              />
+              {t("Visible")}
+            </label>
+            <button
+              type="button"
+              className={btn}
+              onClick={() =>
+                updateReference(
+                  fitToArtboard(
+                    artboard,
+                    reference.width || artboard.width,
+                    reference.height || artboard.height,
+                  ),
+                )
+              }
+            >
+              {t("Fit to artboard")}
+            </button>
+            <button
+              type="button"
+              className={btn}
+              onClick={() =>
+                updateReference({
+                  x: 0,
+                  y: 0,
+                  width: artboard.width,
+                  height: artboard.height,
+                })
+              }
+            >
+              {t("Stretch to artboard")}
+            </button>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className={labelCls}>
+              {t("Image opacity")} — {Math.round(reference.opacity * 100)}%
+            </span>
+            <input
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={reference.opacity}
+              onChange={(e) => updateReference({ opacity: Number(e.target.value) })}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberField
+              label="X"
+              value={reference.x}
+              onChange={(v) => updateReference({ x: v })}
+            />
+            <NumberField
+              label="Y"
+              value={reference.y}
+              onChange={(v) => updateReference({ y: v })}
+            />
+            <NumberField
+              label={t("Width")}
+              value={reference.width}
+              onChange={(v) => updateReference({ width: Math.max(1, v) })}
+            />
+            <NumberField
+              label={t("Height")}
+              value={reference.height}
+              onChange={(v) => updateReference({ height: Math.max(1, v) })}
+            />
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Freehand assistance: de-wobble strokes and stick them to the picture's lines. */
+function TraceAssistSection() {
+  const t = useT();
+  const trace = useStudio((s) => s.trace);
+  const setTrace = useStudio((s) => s.setTrace);
+  const setTool = useStudio((s) => s.setTool);
+  const tool = useStudio((s) => s.tool);
+  const smoothSelection = useStudio((s) => s.smoothSelection);
+  const reference = useStudio((s) => s.doc.reference);
+  const selection = useStudio((s) => s.selection);
+  const objects = useStudio((s) => s.doc.objects);
+  const smoothable = objects.filter(
+    (o) => selection.includes(o.id) && o.geometry.kind === "path" && !o.locked,
+  ).length;
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold text-foreground">{t("Trace assist")}</h2>
+      <p className="text-[11px] text-muted-foreground">
+        {t(
+          "Draw with the Pen (P): the wobble is averaged out, and a stroke that is really a straight line or an arc becomes one.",
+        )}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={cn(btn, tool === "pen" && "bg-accent text-accent-foreground")}
+          onClick={() => setTool("pen")}
+        >
+          <PenTool className="h-3 w-3" aria-hidden /> {t("Pen")}
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={smoothable === 0}
+          onClick={smoothSelection}
+          title={t("Re-clean the selected freehand paths")}
+        >
+          <Sparkles className="h-3 w-3" aria-hidden /> {t("Smooth selection")}
+        </button>
+      </div>
+
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.smoothing}
+          onChange={(e) => setTrace({ smoothing: e.target.checked })}
+        />
+        {t("Smooth freehand strokes")}
+      </label>
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.fitShapes}
+          onChange={(e) => setTrace({ fitShapes: e.target.checked })}
+        />
+        {t("Recognise straight lines and arcs")}
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Smoothing strength")} — {trace.tolerance.toFixed(1)}
+        </span>
+        <input
+          type="range"
+          min={0.5}
+          max={20}
+          step={0.5}
+          value={trace.tolerance}
+          onChange={(e) => setTrace({ tolerance: Number(e.target.value) })}
+        />
+      </label>
+
+      <hr className="border-border" />
+
+      <label className="flex items-center gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          checked={trace.magnetic}
+          onChange={(e) => setTrace({ magnetic: e.target.checked })}
+        />
+        <Magnet className="h-3 w-3" aria-hidden /> {t("Snap strokes to the picture's lines")}
+      </label>
+      <p className="text-[11px] text-muted-foreground">
+        {reference?.visible
+          ? t("Strokes are pulled onto the edges detected in the reference image.")
+          : t("Insert a reference image to enable this.")}
+      </p>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Magnet radius")} — {Math.round(trace.magnetRadius)}
+        </span>
+        <input
+          type="range"
+          min={2}
+          max={60}
+          step={1}
+          value={trace.magnetRadius}
+          onChange={(e) => setTrace({ magnetRadius: Number(e.target.value) })}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Edge sensitivity")} — {Math.round((1 - trace.edgeThreshold) * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0.02}
+          max={0.6}
+          step={0.02}
+          value={trace.edgeThreshold}
+          onChange={(e) => setTrace({ edgeThreshold: Number(e.target.value) })}
+        />
+      </label>
+    </section>
+  );
+}
+
+function CellsTab() {
+  return (
+    <div className="space-y-4">
+      <CellPaintSection />
+      <hr className="border-border" />
+      <ReferenceImageSection />
+      <hr className="border-border" />
+      <TraceAssistSection />
+    </div>
+  );
+}
 
 function ObjectsTab() {
   const t = useT();
@@ -498,9 +1009,13 @@ function ObjectsTab() {
 
       <hr className="border-border" />
       <section className="space-y-1">
-        <h2 className="text-xs font-semibold text-foreground">{t("Objects")} ({objects.length})</h2>
+        <h2 className="text-xs font-semibold text-foreground">
+          {t("Objects")} ({objects.length})
+        </h2>
         {objects.length === 0 && (
-          <p className="text-[11px] text-muted-foreground">{t("Draw something to populate this list.")}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {t("Draw something to populate this list.")}
+          </p>
         )}
         {[...objects].reverse().map((o) => (
           <div
@@ -514,7 +1029,9 @@ function ObjectsTab() {
               type="checkbox"
               checked={o.visible}
               aria-label={`Toggle ${o.name} visibility`}
-              onChange={(e) => updateObject(o.id, { visible: e.target.checked }, "Toggle visibility")}
+              onChange={(e) =>
+                updateObject(o.id, { visible: e.target.checked }, "Toggle visibility")
+              }
             />
             <input
               className="min-w-0 flex-1 bg-transparent text-xs text-foreground focus-visible:outline-none"
@@ -586,50 +1103,143 @@ function GridRow({ grid }: { grid: Grid }) {
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <NumberField label={t("Rotation °")} value={grid.rotation} onChange={(v) => updateGrid(grid.id, { rotation: v })} />
-        <NumberField label={t("Scale")} value={grid.scale} step={0.1} onChange={(v) => updateGrid(grid.id, { scale: Math.max(0.01, v) })} />
-        <NumberField label={t("Origin X")} value={grid.origin.x} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, x: v } })} />
-        <NumberField label={t("Origin Y")} value={grid.origin.y} onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, y: v } })} />
-        <NumberField label={t("Opacity")} value={grid.opacity} step={0.05} onChange={(v) => updateGrid(grid.id, { opacity: Math.min(1, Math.max(0, v)) })} />
-        <NumberField label={t("Stroke")} value={grid.strokeWidth} step={0.25} onChange={(v) => updateGrid(grid.id, { strokeWidth: Math.max(0.1, v) })} />
+        <NumberField
+          label={t("Rotation °")}
+          value={grid.rotation}
+          onChange={(v) => updateGrid(grid.id, { rotation: v })}
+        />
+        <NumberField
+          label={t("Scale")}
+          value={grid.scale}
+          step={0.1}
+          onChange={(v) => updateGrid(grid.id, { scale: Math.max(0.01, v) })}
+        />
+        <NumberField
+          label={t("Origin X")}
+          value={grid.origin.x}
+          onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, x: v } })}
+        />
+        <NumberField
+          label={t("Origin Y")}
+          value={grid.origin.y}
+          onChange={(v) => updateGrid(grid.id, { origin: { ...grid.origin, y: v } })}
+        />
+        <NumberField
+          label={t("Opacity")}
+          value={grid.opacity}
+          step={0.05}
+          onChange={(v) => updateGrid(grid.id, { opacity: Math.min(1, Math.max(0, v)) })}
+        />
+        <NumberField
+          label={t("Stroke")}
+          value={grid.strokeWidth}
+          step={0.25}
+          onChange={(v) => updateGrid(grid.id, { strokeWidth: Math.max(0.1, v) })}
+        />
         {grid.kind === "square" && (
           <>
-            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label={t("Subdivisions")} value={grid.subdivisions} onChange={(v) => updateGrid(grid.id, { subdivisions: Math.max(1, Math.round(v)) })} />
-            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField
+              label={t("Spacing")}
+              value={grid.spacing}
+              onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })}
+            />
+            <NumberField
+              label={t("Subdivisions")}
+              value={grid.subdivisions}
+              onChange={(v) => updateGrid(grid.id, { subdivisions: Math.max(1, Math.round(v)) })}
+            />
+            <NumberField
+              label={t("Extent")}
+              value={grid.extent}
+              onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })}
+            />
           </>
         )}
         {grid.kind === "concentric" && (
           <>
-            <NumberField label={t("Start radius")} value={grid.startRadius} onChange={(v) => updateGrid(grid.id, { startRadius: Math.max(0, v) })} />
-            <NumberField label={t("Radius step")} value={grid.radiusStep} onChange={(v) => updateGrid(grid.id, { radiusStep: Math.max(1, v) })} />
-            <NumberField label={t("Count")} value={grid.count} onChange={(v) => updateGrid(grid.id, { count: Math.max(1, Math.round(v)) })} />
+            <NumberField
+              label={t("Start radius")}
+              value={grid.startRadius}
+              onChange={(v) => updateGrid(grid.id, { startRadius: Math.max(0, v) })}
+            />
+            <NumberField
+              label={t("Radius step")}
+              value={grid.radiusStep}
+              onChange={(v) => updateGrid(grid.id, { radiusStep: Math.max(1, v) })}
+            />
+            <NumberField
+              label={t("Count")}
+              value={grid.count}
+              onChange={(v) => updateGrid(grid.id, { count: Math.max(1, Math.round(v)) })}
+            />
           </>
         )}
         {grid.kind === "radial" && (
           <>
-            <NumberField label={t("Rays")} value={grid.rays} onChange={(v) => updateGrid(grid.id, { rays: Math.max(1, Math.round(v)) })} />
-            <NumberField label={t("Angle offset °")} value={grid.angleOffset} onChange={(v) => updateGrid(grid.id, { angleOffset: v })} />
-            <NumberField label={t("Length")} value={grid.length} onChange={(v) => updateGrid(grid.id, { length: Math.max(1, v) })} />
+            <NumberField
+              label={t("Rays")}
+              value={grid.rays}
+              onChange={(v) => updateGrid(grid.id, { rays: Math.max(1, Math.round(v)) })}
+            />
+            <NumberField
+              label={t("Angle offset °")}
+              value={grid.angleOffset}
+              onChange={(v) => updateGrid(grid.id, { angleOffset: v })}
+            />
+            <NumberField
+              label={t("Length")}
+              value={grid.length}
+              onChange={(v) => updateGrid(grid.id, { length: Math.max(1, v) })}
+            />
           </>
         )}
         {grid.kind === "isometric" && (
           <>
-            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
-            <NumberField label={t("Axis angle °")} value={grid.axisAngle} onChange={(v) => updateGrid(grid.id, { axisAngle: Math.min(89, Math.max(1, v)) })} />
+            <NumberField
+              label={t("Spacing")}
+              value={grid.spacing}
+              onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })}
+            />
+            <NumberField
+              label={t("Extent")}
+              value={grid.extent}
+              onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })}
+            />
+            <NumberField
+              label={t("Axis angle °")}
+              value={grid.axisAngle}
+              onChange={(v) => updateGrid(grid.id, { axisAngle: Math.min(89, Math.max(1, v)) })}
+            />
           </>
         )}
         {grid.kind === "triangular" && (
           <>
-            <NumberField label={t("Spacing")} value={grid.spacing} onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })} />
-            <NumberField label={t("Extent")} value={grid.extent} onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })} />
+            <NumberField
+              label={t("Spacing")}
+              value={grid.spacing}
+              onChange={(v) => updateGrid(grid.id, { spacing: Math.max(1, v) })}
+            />
+            <NumberField
+              label={t("Extent")}
+              value={grid.extent}
+              onChange={(v) => updateGrid(grid.id, { extent: Math.max(10, v) })}
+            />
           </>
         )}
         {grid.kind === "hexagonal" && (
           <>
-            <NumberField label={t("Hex size")} value={grid.size} onChange={(v) => updateGrid(grid.id, { size: Math.max(2, v) })} />
-            <NumberField label={t("Rings")} value={grid.rings} onChange={(v) => updateGrid(grid.id, { rings: Math.min(20, Math.max(0, Math.round(v))) })} />
+            <NumberField
+              label={t("Hex size")}
+              value={grid.size}
+              onChange={(v) => updateGrid(grid.id, { size: Math.max(2, v) })}
+            />
+            <NumberField
+              label={t("Rings")}
+              value={grid.rings}
+              onChange={(v) =>
+                updateGrid(grid.id, { rings: Math.min(20, Math.max(0, Math.round(v))) })
+              }
+            />
             <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
@@ -642,9 +1252,23 @@ function GridRow({ grid }: { grid: Grid }) {
         )}
         {grid.kind === "golden" && (
           <>
-            <NumberField label={t("Width")} value={grid.width} onChange={(v) => updateGrid(grid.id, { width: Math.max(10, v) })} />
-            <NumberField label={t("Height")} value={grid.height} onChange={(v) => updateGrid(grid.id, { height: Math.max(10, v) })} />
-            <NumberField label={t("Steps")} value={grid.steps} onChange={(v) => updateGrid(grid.id, { steps: Math.min(16, Math.max(1, Math.round(v))) })} />
+            <NumberField
+              label={t("Width")}
+              value={grid.width}
+              onChange={(v) => updateGrid(grid.id, { width: Math.max(10, v) })}
+            />
+            <NumberField
+              label={t("Height")}
+              value={grid.height}
+              onChange={(v) => updateGrid(grid.id, { height: Math.max(10, v) })}
+            />
+            <NumberField
+              label={t("Steps")}
+              value={grid.steps}
+              onChange={(v) =>
+                updateGrid(grid.id, { steps: Math.min(16, Math.max(1, Math.round(v))) })
+              }
+            />
             <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
@@ -805,7 +1429,10 @@ function PrecisionTab() {
         </p>
         <div className="flex flex-wrap gap-1.5">
           {RATIOS.map((r) => (
-            <span key={r.id} className="inline-flex overflow-hidden rounded-md border border-border">
+            <span
+              key={r.id}
+              className="inline-flex overflow-hidden rounded-md border border-border"
+            >
               <button
                 type="button"
                 disabled={selection.length === 0}
@@ -851,7 +1478,8 @@ function PrecisionTab() {
           <ul className="space-y-1 font-mono text-[11px] text-muted-foreground">
             {selected.map((o) => (
               <li key={o.id}>
-                <span className="text-foreground">{o.name}</span> — {describeGeometry(o.geometry, unit)}
+                <span className="text-foreground">{o.name}</span> —{" "}
+                {describeGeometry(o.geometry, unit)}
               </li>
             ))}
           </ul>
@@ -909,7 +1537,11 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
           </button>
         </div>
       )}
-      <div className="flex flex-wrap border-b border-border" role="tablist" aria-label={t("Studio panels")}>
+      <div
+        className="flex flex-wrap border-b border-border"
+        role="tablist"
+        aria-label={t("Studio panels")}
+      >
         {TABS.map((name) => (
           <button
             key={name}
@@ -936,6 +1568,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
             <PaintSection />
           </>
         )}
+        {tab === "Cells" && <CellsTab />}
         {tab === "Objects" && <ObjectsTab />}
         {tab === "Grids" && <GridsTab />}
         {tab === "Snap" && <SnapTab />}

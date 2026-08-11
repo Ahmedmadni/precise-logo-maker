@@ -8,6 +8,7 @@ import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { TopBar } from "../components/toolbar/TopBar";
 import { useAutosave } from "../hooks/useAutosave";
+import { useServiceWorker } from "../lib/pwa";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 import { useLanguageBootstrap, useT } from "../i18n";
 
@@ -102,5 +103,6 @@ function LanguageSync() {
 function CanvasWithShortcuts() {
   useStudioShortcuts();
   useAutosave();
+  useServiceWorker();
   return <StudioCanvas />;
 }

@@ -1,12 +1,13 @@
 import {
   CircleDashed,
-  Grid2x2Check,
   Hand,
+  PaintBucket,
   PenTool,
   Ruler,
   Minus,
   MousePointer2,
   Spline,
+  Waypoints,
 } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
@@ -19,7 +20,8 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: typeof Hand }[] = [
   { id: "circle", label: "Circle", key: "C", icon: CircleDashed },
   { id: "arc", label: "Arc", key: "A", icon: Spline },
   { id: "pen", label: "Pen", key: "P", icon: PenTool },
-  { id: "cell", label: "Cells", key: "B", icon: Grid2x2Check },
+  { id: "cell", label: "Paint cells", key: "B", icon: PaintBucket },
+  { id: "polygon", label: "Cell shape", key: "N", icon: Waypoints },
   { id: "measure", label: "Measure", key: "M", icon: Ruler },
   { id: "pan", label: "Pan", key: "H", icon: Hand },
 ];
