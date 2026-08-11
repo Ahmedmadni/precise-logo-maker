@@ -75,6 +75,9 @@ export function StudioCanvas() {
 
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [pen, setPen] = useState<Point[] | null>(null);
+  const penActiveRef = useRef(false);
+  const [cellChain, setCellChain] = useState<Point[]>([]);
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
   const [snap, setSnap] = useState<SnapResult | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
