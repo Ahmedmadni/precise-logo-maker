@@ -13,6 +13,7 @@ import {
   IDENTITY_TRANSFORM,
   type Geometry,
   type Point,
+  type Style,
   type VectorObject,
 } from "../core/geometry/types";
 import {
@@ -40,7 +41,15 @@ import {
   type Grid,
 } from "../grids";
 
-export type ToolId = "select" | "line" | "circle" | "arc" | "measure" | "pan";
+export type ToolId =
+  | "select"
+  | "line"
+  | "circle"
+  | "arc"
+  | "pen"
+  | "cell"
+  | "measure"
+  | "pan";
 
 export interface Artboard {
   width: number;
@@ -81,7 +90,7 @@ export interface StudioState {
   setCursor: (p: Point | null) => void;
 
   setArtboard: (patch: Partial<Artboard>) => void;
-  addObject: (geometry: Geometry, label: string) => string;
+  addObject: (geometry: Geometry, label: string, style?: Partial<Style>) => string;
   updateObject: (id: string, patch: Partial<VectorObject>, label: string) => void;
   deleteSelection: () => void;
 
@@ -108,6 +117,7 @@ export interface StudioState {
   setPrecision: (patch: Partial<PrecisionSettings>) => void;
   setMeasurement: (m: Measurement | null) => void;
   scaleSelection: (factor: number) => void;
+  setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
@@ -162,6 +172,7 @@ const geometryLabel: Record<Geometry["kind"], string> = {
   circle: "Circle",
   line: "Line",
   arc: "Arc",
+  path: "Path",
 };
 
 export const useStudio = create<StudioState>()((set, get) => {
@@ -202,7 +213,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         artboard: { ...doc.artboard, ...patch },
       })),
 
-    addObject: (geometry, label) => {
+    addObject: (geometry, label, style) => {
       const id = nextObjectId();
       commit(label, (doc) => ({
         ...doc,
@@ -214,7 +225,7 @@ export const useStudio = create<StudioState>()((set, get) => {
             type: geometry.kind,
             geometry,
             transform: IDENTITY_TRANSFORM,
-            style: { ...DEFAULT_STYLE },
+            style: { ...DEFAULT_STYLE, ...style },
             layerId: "shapes",
             visible: true,
             locked: false,
@@ -443,10 +454,37 @@ export const useStudio = create<StudioState>()((set, get) => {
               },
             };
           }
+          if (g.kind === "path") {
+            const c = g.points.reduce((acc, p) => pt(acc.x + p.x, acc.y + p.y), pt(0, 0));
+            const n = g.points.length || 1;
+            const cx = c.x / n;
+            const cy = c.y / n;
+            return {
+              ...o,
+              geometry: {
+                ...g,
+                points: g.points.map((p) =>
+                  pt(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor),
+                ),
+              },
+            };
+          }
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
         }),
       }));
     },
+
+    setSelectionStyle: (patch, label = "Change style") => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      commit(label, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id) ? { ...o, style: { ...o.style, ...patch } } : o,
+        ),
+      }));
+    },
+
 
     setSnapEnabled: (enabled) => set((s) => ({ snap: { ...s.snap, enabled } })),
     toggleSnapType: (type) =>

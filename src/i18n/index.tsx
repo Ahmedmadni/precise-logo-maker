@@ -11,7 +11,7 @@ export type Lang = "en" | "ar";
 export const AR: Record<string, string> = {
   // App / shell
   "Logo Grid Studio": "استوديو شبكات الشعارات",
-  "Phase 6 — Arabic UI & Mobile": "المرحلة 6 — واجهة عربية وجوال",
+  "Phase 7 — Drawing & Paint": "المرحلة 7 — الرسم والتلوين",
   Language: "اللغة",
   English: "English",
   Arabic: "العربية",
@@ -47,6 +47,8 @@ export const AR: Record<string, string> = {
   Line: "خط",
   Circle: "دائرة",
   Arc: "قوس",
+  Pen: "قلم حر",
+  Cells: "خلايا الشبكة",
   Measure: "قياس",
   Pan: "تحريك",
   "Drawing tools": "أدوات الرسم",
@@ -88,6 +90,19 @@ export const AR: Record<string, string> = {
   "Stroke width": "سمك الخط",
   Stroke: "لون الخط",
   Color: "اللون",
+
+  // Paint / styling
+  Paint: "التلوين",
+  Fill: "لون التعبئة",
+  "Fill opacity": "شفافية التعبئة",
+  Dash: "تقطيع الخط",
+  "No fill": "بدون تعبئة",
+  Swatches: "ألوان جاهزة",
+  "Select objects to paint them.": "اختر عناصر لتلوينها.",
+  "Applies to every selected object.": "يُطبَّق على كل العناصر المحددة.",
+  "Pen (P) draws freehand. Cells (B) links grid intersections into a filled shape — double-click or right-click to finish.":
+    "قلم حر (P) للرسم اليدوي. خلايا الشبكة (B) توصّل نقاط تقاطع الشبكات لتكوين شكل معبّأ — انقر مرتين أو بالزر الأيمن للإنهاء.",
+
 
   // Transform
   Transform: "التحويل",

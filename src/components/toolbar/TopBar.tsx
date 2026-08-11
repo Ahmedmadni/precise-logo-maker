@@ -88,7 +88,7 @@ export function TopBar() {
         {t("Logo Grid Studio")}
       </h1>
       <span className="hidden text-[11px] text-muted-foreground sm:inline">
-        {t("Phase 6 — Arabic UI & Mobile")}
+        {t("Phase 7 — Drawing & Paint")}
       </span>
 
       <button

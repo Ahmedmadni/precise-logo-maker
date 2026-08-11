@@ -129,6 +129,146 @@ function ArtboardSection() {
   );
 }
 
+const SWATCHES = [
+  "#e8eaf0",
+  "#0f1115",
+  "#5b8cff",
+  "#f4b942",
+  "#ef5f6b",
+  "#3ec9a7",
+  "#a97bff",
+  "#8c93a5",
+];
+
+/** Colour and paint controls applied to every selected object. */
+function PaintSection() {
+  const t = useT();
+  const selection = useStudio((s) => s.selection);
+  const objects = useStudio((s) => s.doc.objects);
+  const setSelectionStyle = useStudio((s) => s.setSelectionStyle);
+  const first = objects.find((o) => selection.includes(o.id));
+
+  if (!first) {
+    return (
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold text-foreground">{t("Paint")}</h2>
+        <p className="text-xs text-muted-foreground">{t("Select objects to paint them.")}</p>
+      </section>
+    );
+  }
+
+  const style = first.style;
+  const filled = style.fill !== "none";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xs font-semibold text-foreground">{t("Paint")}</h2>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className={labelCls}>{t("Stroke")}</span>
+          <input
+            type="color"
+            className="h-[26px] w-full rounded-md border border-border bg-background"
+            value={style.stroke}
+            onChange={(e) => setSelectionStyle({ stroke: e.target.value }, "Change stroke color")}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={labelCls}>{t("Fill")}</span>
+          <input
+            type="color"
+            className="h-[26px] w-full rounded-md border border-border bg-background"
+            value={filled ? style.fill : "#5b8cff"}
+            onChange={(e) => setSelectionStyle({ fill: e.target.value }, "Change fill color")}
+          />
+        </label>
+        <NumberField
+          label={t("Stroke width")}
+          value={style.strokeWidth}
+          step={0.5}
+          onChange={(v) => setSelectionStyle({ strokeWidth: Math.max(0.1, v) }, "Change stroke width")}
+        />
+        <NumberField
+          label={t("Dash")}
+          value={style.dash ?? 0}
+          step={1}
+          onChange={(v) => setSelectionStyle({ dash: Math.max(0, v) }, "Change dash")}
+        />
+      </div>
+
+      <button
+        type="button"
+        className={cn(
+          "rounded-md border border-border px-2 py-1 text-[11px]",
+          filled ? "text-muted-foreground hover:bg-accent" : "bg-accent text-accent-foreground",
+        )}
+        onClick={() => setSelectionStyle({ fill: filled ? "none" : "#5b8cff" }, "Toggle fill")}
+      >
+        {t("No fill")}
+      </button>
+
+      <div className="space-y-1">
+        <span className={labelCls}>{t("Swatches")}</span>
+        <div className="flex flex-wrap gap-1.5">
+          {SWATCHES.map((c) => (
+            <div key={c} className="flex flex-col gap-1">
+              <button
+                type="button"
+                aria-label={`Stroke ${c}`}
+                className="h-5 w-5 rounded-full border border-border"
+                style={{ background: c }}
+                onClick={() => setSelectionStyle({ stroke: c }, "Change stroke color")}
+              />
+              <button
+                type="button"
+                aria-label={`Fill ${c}`}
+                className="h-2.5 w-5 rounded-sm border border-border"
+                style={{ background: c }}
+                onClick={() => setSelectionStyle({ fill: c }, "Change fill color")}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Fill opacity")} — {Math.round((style.fillOpacity ?? 1) * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={style.fillOpacity ?? 1}
+          onChange={(e) => setSelectionStyle({ fillOpacity: Number(e.target.value) }, "Change fill opacity")}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Opacity")} — {Math.round((style.opacity ?? 1) * 100)}%
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={style.opacity ?? 1}
+          onChange={(e) => setSelectionStyle({ opacity: Number(e.target.value) }, "Change opacity")}
+        />
+      </label>
+
+      <p className="text-[11px] text-muted-foreground">{t("Applies to every selected object.")}</p>
+      <p className="text-[11px] text-muted-foreground">
+        {t(
+          "Pen (P) draws freehand. Cells (B) links grid intersections into a filled shape — double-click or right-click to finish.",
+        )}
+      </p>
+    </section>
+  );
+}
+
 function ObjectSection() {
   const t = useT();
   const selection = useStudio((s) => s.selection);
@@ -792,6 +932,8 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
             <ArtboardSection />
             <hr className="border-border" />
             <ObjectSection />
+            <hr className="border-border" />
+            <PaintSection />
           </>
         )}
         {tab === "Objects" && <ObjectsTab />}

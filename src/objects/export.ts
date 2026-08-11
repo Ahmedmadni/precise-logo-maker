@@ -5,10 +5,17 @@ import type { VectorObject } from "../core/geometry/types";
 const escapeXml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-const objectToSvg = (o: VectorObject): string =>
-  `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
+const objectToSvg = (o: VectorObject): string => {
+  const s = o.style;
+  const extras = [
+    s.fillOpacity !== undefined && s.fillOpacity !== 1 ? ` fill-opacity="${s.fillOpacity}"` : "",
+    s.opacity !== undefined && s.opacity !== 1 ? ` opacity="${s.opacity}"` : "",
+    s.dash ? ` stroke-dasharray="${s.dash} ${s.dash}"` : "",
+  ].join("");
+  return `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
     o.geometry,
-  )}" fill="${o.style.fill}" stroke="${o.style.stroke}" stroke-width="${o.style.strokeWidth}" stroke-linecap="round" />`;
+  )}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"${extras} />`;
+};
 
 export interface ExportOptions {
   /** Include the artboard background rectangle. */

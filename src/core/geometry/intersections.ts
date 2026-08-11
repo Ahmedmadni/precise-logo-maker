@@ -4,6 +4,7 @@ import {
   arcContainsAngle,
   dist,
   normalize,
+  pathSegments,
   pt,
   scale,
   sub,
@@ -83,6 +84,17 @@ const keepOnArc = (g: Geometry, points: Point[]): Point[] => {
 
 /** Intersections between any two supported primitives, filtered to real spans. */
 export const intersectGeometry = (g1: Geometry, g2: Geometry): Point[] => {
+  // Poly-paths are expanded into their segments.
+  if (g1.kind === "path" || g2.kind === "path") {
+    const expand = (g: Geometry): Geometry[] =>
+      g.kind === "path"
+        ? pathSegments(g.points, g.closed).map(([a, b]) => ({ kind: "line", a, b }) as Geometry)
+        : [g];
+    const out: Point[] = [];
+    for (const a of expand(g1)) for (const b of expand(g2)) out.push(...intersectGeometry(a, b));
+    return out;
+  }
+
   const raw = ((): Point[] => {
     if (g1.kind === "line" && g2.kind === "line") return lineLineIntersection(g1, g2);
     if (g1.kind === "line" && g2.kind !== "line") return lineCircleIntersection(g1, asCircle(g2));

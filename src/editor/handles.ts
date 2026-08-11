@@ -31,6 +31,14 @@ export const handlesOf = (g: Geometry): Handle[] => {
       },
     ];
   }
+  if (g.kind === "path") {
+    return g.points.map((p, i) => ({
+      id: `p${i}`,
+      point: p,
+      role: "anchor" as const,
+      label: `Point ${i + 1}`,
+    }));
+  }
   return [
     { id: "center", point: g.center, role: "center", label: "Center" },
     {
@@ -54,6 +62,11 @@ export const applyHandle = (g: Geometry, id: string, p: Point): Geometry => {
     if (id === "a") return { ...g, a: p };
     if (id === "b") return { ...g, b: p };
     return g;
+  }
+  if (g.kind === "path") {
+    const index = Number(id.slice(1));
+    if (!Number.isInteger(index) || index < 0 || index >= g.points.length) return g;
+    return { ...g, points: g.points.map((q, i) => (i === index ? p : q)) };
   }
   if (id === "center") {
     return translateGeometry(g, p.x - g.center.x, p.y - g.center.y);
@@ -82,5 +95,12 @@ export const pickHandle = (
   return best?.h ?? null;
 };
 
-export const handleCenter = (g: Geometry): Point =>
-  g.kind === "line" ? pt((g.a.x + g.b.x) / 2, (g.a.y + g.b.y) / 2) : g.center;
+export const handleCenter = (g: Geometry): Point => {
+  if (g.kind === "line") return pt((g.a.x + g.b.x) / 2, (g.a.y + g.b.y) / 2);
+  if (g.kind === "path") {
+    const n = g.points.length || 1;
+    const sum = g.points.reduce((acc, p) => pt(acc.x + p.x, acc.y + p.y), pt(0, 0));
+    return pt(sum.x / n, sum.y / n);
+  }
+  return g.center;
+};

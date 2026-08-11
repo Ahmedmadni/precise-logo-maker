@@ -29,6 +29,10 @@ import { SnapIndicator } from "./SnapIndicator";
 const SNAP_PIXELS = 12;
 const HIT_PIXELS = 8;
 const HANDLE_PIXELS = 9;
+/** Minimum screen-space travel before the pen records another sample. */
+const PEN_SAMPLE_PIXELS = 2.5;
+/** Default paint for cell polygons traced over grid intersections. */
+const CELL_FILL = "#5b8cff";
 
 
 interface Draft {
@@ -71,6 +75,9 @@ export function StudioCanvas() {
 
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [pen, setPen] = useState<Point[] | null>(null);
+  const penActiveRef = useRef(false);
+  const [cellChain, setCellChain] = useState<Point[]>([]);
   const [hoverWorld, setHoverWorld] = useState<Point | null>(null);
   const [snap, setSnap] = useState<SnapResult | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
@@ -244,6 +251,19 @@ export function StudioCanvas() {
     setHandleDrag(null);
   };
 
+  /** Turn a traced chain of grid intersections into a real path object. */
+  const commitCells = (points: Point[], closed: boolean) => {
+    if (points.length >= 2) {
+      const id = addObject(
+        { kind: "path", points, closed },
+        closed ? "Create Cell" : "Create Chain",
+        closed ? { fill: CELL_FILL, fillOpacity: 0.35 } : undefined,
+      );
+      setSelection([id]);
+    }
+    setCellChain([]);
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -273,6 +293,26 @@ export function StudioCanvas() {
       }
       return;
     }
+
+    if (tool === "pen") {
+      penActiveRef.current = true;
+      setPen([world]);
+      return;
+    }
+
+    if (tool === "cell") {
+      const first = cellChain[0];
+      const tol = HIT_PIXELS / view.zoom;
+      if (first && cellChain.length >= 3 && dist(point, first) <= tol) {
+        commitCells(cellChain, true);
+        return;
+      }
+      const last = cellChain[cellChain.length - 1];
+      if (last && dist(last, point) < 1e-6) return;
+      setCellChain([...cellChain, point]);
+      return;
+    }
+
 
     if (tool === "select") {
       // Handle editing takes priority over body dragging.
@@ -355,9 +395,19 @@ export function StudioCanvas() {
     const { point: snapped, snap: s } = resolveCursor(world);
     const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
     const point = applyPrecision(anchor, snapped, e.shiftKey);
-    setSnap(s);
-    setHoverWorld(tool === "select" ? world : point);
-    setCursor(tool === "select" ? world : point);
+    const raw = tool === "select" || tool === "pen";
+    setSnap(tool === "pen" ? null : s);
+    setHoverWorld(raw ? world : point);
+    setCursor(raw ? world : point);
+    if (penActiveRef.current) {
+      setPen((prev) => {
+        const list = prev ?? [];
+        const last = list[list.length - 1];
+        if (last && dist(last, world) < PEN_SAMPLE_PIXELS / view.zoom) return list;
+        return [...list, world];
+      });
+      return;
+    }
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base) {
@@ -383,6 +433,16 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (penActiveRef.current) {
+      penActiveRef.current = false;
+      const stroke = pen ?? [];
+      if (stroke.length >= 2) {
+        const id = addObject({ kind: "path", points: stroke, closed: false }, "Freehand stroke");
+        setSelection([id]);
+      }
+      setPen(null);
+      return;
+    }
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base && base.geometry !== handleDrag.geometry) {
@@ -476,11 +536,14 @@ export function StudioCanvas() {
       onDoubleClick={() => {
         setDraft(null);
         setMeasureStart(null);
+        if (cellChain.length >= 2) commitCells(cellChain, cellChain.length >= 3);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
         setDraft(null);
         setMeasureStart(null);
+        if (cellChain.length >= 2) commitCells(cellChain, cellChain.length >= 3);
+        else setCellChain([]);
       }}
     >
       <svg className="h-full w-full" role="img" aria-label="Logo construction canvas">
@@ -525,9 +588,17 @@ export function StudioCanvas() {
                   )}
 
                   fill={o.style.fill}
+                  fillOpacity={o.style.fillOpacity ?? 1}
+                  opacity={o.style.opacity ?? 1}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
+                  strokeDasharray={
+                    o.style.dash && o.style.dash > 0
+                      ? `${o.style.dash} ${o.style.dash}`
+                      : undefined
+                  }
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />
               ) : null,
@@ -543,6 +614,46 @@ export function StudioCanvas() {
               strokeDasharray="6 4"
               vectorEffect="non-scaling-stroke"
             />
+          )}
+          {/* Freehand pen stroke in progress */}
+          {pen && pen.length > 1 && (
+            <path
+              d={geometryToPathData({ kind: "path", points: pen, closed: false })}
+              fill="none"
+              stroke="var(--color-primary)"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {/* Cell chain in progress */}
+          {cellChain.length > 0 && (
+            <g>
+              <path
+                d={geometryToPathData({
+                  kind: "path",
+                  points: hoverWorld && tool === "cell" ? [...cellChain, hoverWorld] : cellChain,
+                  closed: false,
+                })}
+                fill={CELL_FILL}
+                fillOpacity={0.18}
+                stroke="var(--color-primary)"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              {cellChain.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3.5 / view.zoom}
+                  fill="var(--color-primary)"
+                />
+              ))}
+            </g>
           )}
           {/* Edit handles for a single selected object */}
           {editHandles.map((h) => (

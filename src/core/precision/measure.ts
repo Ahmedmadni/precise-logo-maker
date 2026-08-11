@@ -34,6 +34,15 @@ export const describeGeometry = (g: Geometry, unit: Unit): string => {
   if (g.kind === "circle") {
     return `R ${formatLength(g.radius, unit)} · Ø ${formatLength(g.radius * 2, unit)}`;
   }
+  if (g.kind === "path") {
+    let total = 0;
+    for (let i = 1; i < g.points.length; i += 1) {
+      const a = g.points[i - 1];
+      const b = g.points[i];
+      if (a && b) total += dist(a, b);
+    }
+    return `${g.points.length} pts · ${formatLength(total, unit)}${g.closed ? " · closed" : ""}`;
+  }
   return `R ${formatLength(g.radius, unit)} · ${formatAngle(arcSweep(g))} sweep`;
 };
 
