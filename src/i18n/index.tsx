@@ -47,6 +47,8 @@ export const AR: Record<string, string> = {
   Line: "خط",
   Circle: "دائرة",
   Arc: "قوس",
+  Pen: "قلم حر",
+  Cells: "خلايا الشبكة",
   Measure: "قياس",
   Pan: "تحريك",
   "Drawing tools": "أدوات الرسم",
@@ -88,6 +90,20 @@ export const AR: Record<string, string> = {
   "Stroke width": "سمك الخط",
   Stroke: "لون الخط",
   Color: "اللون",
+
+  // Paint / styling
+  Paint: "التلوين",
+  Fill: "لون التعبئة",
+  "Fill opacity": "شفافية التعبئة",
+  Opacity: "الشفافية",
+  Dash: "تقطيع الخط",
+  "No fill": "بدون تعبئة",
+  Swatches: "ألوان جاهزة",
+  "Select objects to paint them.": "اختر عناصر لتلوينها.",
+  "Applies to every selected object.": "يُطبَّق على كل العناصر المحددة.",
+  "Pen (P) draws freehand. Cells (B) links grid intersections into a filled shape — double-click or right-click to finish.":
+    "قلم حر (P) للرسم اليدوي. خلايا الشبكة (B) توصّل نقاط تقاطع الشبكات لتكوين شكل معبّأ — انقر مرتين أو بالزر الأيمن للإنهاء.",
+
 
   // Transform
   Transform: "التحويل",
