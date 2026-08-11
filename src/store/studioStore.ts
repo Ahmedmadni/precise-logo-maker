@@ -40,7 +40,15 @@ import {
   type Grid,
 } from "../grids";
 
-export type ToolId = "select" | "line" | "circle" | "arc" | "measure" | "pan";
+export type ToolId =
+  | "select"
+  | "line"
+  | "circle"
+  | "arc"
+  | "pen"
+  | "cell"
+  | "measure"
+  | "pan";
 
 export interface Artboard {
   width: number;
@@ -444,10 +452,37 @@ export const useStudio = create<StudioState>()((set, get) => {
               },
             };
           }
+          if (g.kind === "path") {
+            const c = g.points.reduce((acc, p) => pt(acc.x + p.x, acc.y + p.y), pt(0, 0));
+            const n = g.points.length || 1;
+            const cx = c.x / n;
+            const cy = c.y / n;
+            return {
+              ...o,
+              geometry: {
+                ...g,
+                points: g.points.map((p) =>
+                  pt(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor),
+                ),
+              },
+            };
+          }
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
         }),
       }));
     },
+
+    setSelectionStyle: (patch, label = "Change style") => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      commit(label, (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id) ? { ...o, style: { ...o.style, ...patch } } : o,
+        ),
+      }));
+    },
+
 
     setSnapEnabled: (enabled) => set((s) => ({ snap: { ...s.snap, enabled } })),
     toggleSnapType: (type) =>
