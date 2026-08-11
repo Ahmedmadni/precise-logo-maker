@@ -140,6 +140,8 @@ export const geometryBounds = (g: Geometry): Bounds => {
   switch (g.kind) {
     case "line":
       return expandBounds(expandBounds(emptyBounds(), g.a), g.b);
+    case "path":
+      return g.points.reduce<Bounds>(expandBounds, emptyBounds());
     case "circle":
       return {
         minX: g.center.x - g.radius,
