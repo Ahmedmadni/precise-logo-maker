@@ -640,6 +640,21 @@ function CellPaintSection() {
         </button>
       </div>
 
+      <label className="flex items-start gap-2 text-xs text-foreground">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={paint.combine}
+          onChange={(e) => setPaint({ combine: e.target.checked })}
+        />
+        <span>
+          {t("Cut pieces with all grids")}
+          <span className="block text-[11px] text-muted-foreground">
+            {t("Paints the piece formed where every visible grid overlaps, not one grid's cell.")}
+          </span>
+        </span>
+      </label>
+
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className={labelCls}>{t("Cell color")}</span>
@@ -654,6 +669,7 @@ function CellPaintSection() {
           <span className={labelCls}>{t("Grid to paint")}</span>
           <select
             className={fieldCls}
+            disabled={paint.combine}
             value={active?.id ?? ""}
             onChange={(e) => setPaint({ gridId: e.target.value || null })}
           >
@@ -933,6 +949,32 @@ function TraceAssistSection() {
           step={0.5}
           value={trace.tolerance}
           onChange={(e) => setTrace({ tolerance: Number(e.target.value) })}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Smoothing passes")} — {trace.passes}
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={8}
+          step={1}
+          value={trace.passes}
+          onChange={(e) => setTrace({ passes: Number(e.target.value) })}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelCls}>
+          {t("Keep corners sharper than")} — {Math.round(trace.cornerAngle)}°
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={120}
+          step={5}
+          value={trace.cornerAngle}
+          onChange={(e) => setTrace({ cornerAngle: Number(e.target.value) })}
         />
       </label>
 
