@@ -21,7 +21,7 @@ import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
 
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
-import { cellAt, paintableGrids, type GridCell } from "../../grids/cells";
+import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../grids/cells";
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
@@ -118,10 +118,19 @@ export function StudioCanvas() {
     return chosen ?? candidates.find((g) => g.visible) ?? candidates[0] ?? null;
   }, [doc.grids, paint.gridId]);
 
+  /** Every visible grid taking part when pieces are cut by all grids at once. */
+  const combinedGrids = useMemo(
+    () => paintableGrids(doc.grids).filter((g) => g.visible),
+    [doc.grids],
+  );
+
   const cellUnder = useCallback(
-    (world: Point): GridCell | null =>
-      paintGrid ? cellAt(paintGrid, world, { sectors: paint.sectors }) : null,
-    [paintGrid, paint.sectors],
+    (world: Point): GridCell | null => {
+      if (paint.combine && combinedGrids.length > 0)
+        return compoundCellAt(combinedGrids, world, { sectors: paint.sectors });
+      return paintGrid ? cellAt(paintGrid, world, { sectors: paint.sectors }) : null;
+    },
+    [paint.combine, combinedGrids, paintGrid, paint.sectors],
   );
 
   // Edge map of the reference picture, rebuilt only when the picture or its
@@ -547,8 +556,9 @@ export function StudioCanvas() {
         const cleaned = trace.smoothing
           ? cleanStroke(stroke, {
               tolerance: trace.tolerance,
-              smoothing: 2,
+              smoothing: trace.passes,
               fitShapes: trace.fitShapes,
+              cornerAngle: trace.cornerAngle,
             })
           : null;
         const geometry = cleaned ?? { kind: "path" as const, points: stroke, closed: false };
@@ -602,11 +612,12 @@ export function StudioCanvas() {
       pen && pen.length >= 2 && trace.smoothing
         ? cleanStroke(pen, {
             tolerance: trace.tolerance,
-            smoothing: 2,
+            smoothing: trace.passes,
             fitShapes: trace.fitShapes,
+            cornerAngle: trace.cornerAngle,
           })
         : null,
-    [pen, trace.smoothing, trace.tolerance, trace.fitShapes],
+    [pen, trace.smoothing, trace.tolerance, trace.fitShapes, trace.passes, trace.cornerAngle],
   );
 
   const preview = draft && hoverWorld ? draftGeometry(draft, hoverWorld) : null;
