@@ -13,16 +13,29 @@ export interface CleanOptions {
   smoothing: number;
   /** Recognise straight lines and circular arcs instead of keeping a polyline. */
   fitShapes: boolean;
+  /** Turns sharper than this (degrees) are treated as corners and never rounded off. */
+  cornerAngle?: number;
 }
 
 export const DEFAULT_CLEAN: CleanOptions = {
   tolerance: 2.5,
   smoothing: 2,
   fitShapes: true,
+  cornerAngle: 40,
+};
+
+/** Interior turn angle at each sample, in degrees (0 = straight ahead). */
+const turnAt = (a: Point, b: Point, c: Point): number => {
+  const d1 = normalizeAngle(angleOf(a, b));
+  const d2 = normalizeAngle(angleOf(b, c));
+  let delta = d2 - d1;
+  while (delta > 180) delta -= 360;
+  while (delta < -180) delta += 360;
+  return Math.abs(delta);
 };
 
 /** Moving average over each interior sample; endpoints stay pinned. */
-export const smoothPolyline = (points: Point[], passes: number): Point[] => {
+export const smoothPolyline = (points: Point[], passes: number, cornerAngle = 0): Point[] => {
   if (points.length < 3 || passes <= 0) return points;
   let current = points;
   for (let p = 0; p < passes; p += 1) {
@@ -31,6 +44,11 @@ export const smoothPolyline = (points: Point[], passes: number): Point[] => {
       const a = current[i - 1]!;
       const b = current[i]!;
       const c = current[i + 1]!;
+      // Deliberate corners stay razor sharp; only wobble gets averaged away.
+      if (cornerAngle > 0 && turnAt(a, b, c) >= cornerAngle) {
+        next.push(b);
+        continue;
+      }
       next.push(pt((a.x + 2 * b.x + c.x) / 4, (a.y + 2 * b.y + c.y) / 4));
     }
     next.push(current[current.length - 1]!);
@@ -163,7 +181,7 @@ export const cleanStroke = (
   closed = false,
 ): Geometry | null => {
   if (raw.length < 2) return null;
-  const smoothed = smoothPolyline(raw, options.smoothing);
+  const smoothed = smoothPolyline(raw, options.smoothing, options.cornerAngle ?? 0);
   const points = simplifyPath(smoothed, options.tolerance);
   const first = points[0]!;
   const last = points[points.length - 1]!;
