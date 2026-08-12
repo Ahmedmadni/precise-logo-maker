@@ -117,6 +117,9 @@ export const AR: Record<string, string> = {
   "Cell color": "لون الخلية",
   "Cell opacity": "شفافية الخلية",
   "Grid to paint": "الشبكة المستهدفة",
+  "Cut pieces with all grids": "تقطيع بكل الشبكات",
+  "Paints the piece formed where every visible grid overlaps, not one grid's cell.":
+    "يلوّن القطعة الناتجة عن تقاطع كل الشبكات الظاهرة، وليس خلية شبكة واحدة.",
   "No paintable grid": "لا توجد شبكة قابلة للتلوين",
   "Polar sectors": "القطاعات الدائرية",
   "Painted cells": "الخلايا الملوّنة",
@@ -148,6 +151,8 @@ export const AR: Record<string, string> = {
   "Smooth freehand strokes": "تسوية الخطوط الحرة",
   "Recognise straight lines and arcs": "التعرّف على الخطوط المستقيمة والأقواس",
   "Smoothing strength": "قوة التسوية",
+  "Smoothing passes": "مرّات التنعيم",
+  "Keep corners sharper than": "حافظ على الزوايا الأحدّ من",
   "Snap strokes to the picture's lines": "مطابقة الخطوط لحواف الصورة",
   "Strokes are pulled onto the edges detected in the reference image.":
     "تُسحب الخطوط إلى الحواف المكتشفة في الصورة المرجعية.",

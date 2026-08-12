@@ -1,3 +1,4 @@
+import { intersection } from "polygon-clipping";
 import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry/math";
 import type { Point } from "../core/geometry/types";
 import type {
@@ -258,3 +259,69 @@ export const cellAt = (grid: Grid, world: Point, options: CellOptions = {}): Gri
 /** The grid cells painting should target: visible, unlocked and cell-capable. */
 export const paintableGrids = (grids: Grid[]): Grid[] =>
   grids.filter((g) => gridSupportsCells(g.kind) && !g.locked);
+
+/**
+ * Cells produced by *several* overlapping grids at once: the piece under the
+ * cursor is the boolean intersection of every grid cell containing it. This is
+ * what lets a square grid crossed by a concentric or isometric grid be painted
+ * piece by piece instead of cell by cell.
+ */
+export const compoundCellAt = (
+  grids: Grid[],
+  world: Point,
+  options: CellOptions = {},
+): GridCell | null => {
+  const hits = grids
+    .map((g) => cellAt(g, world, options))
+    .filter((c): c is GridCell => c !== null);
+  if (hits.length === 0) return null;
+  if (hits.length === 1) return hits[0]!;
+
+  const ring = (c: GridCell): Ring => c.points.map((p) => [p.x, p.y] as Pair);
+  let acc: Pair[][][] = [[ring(hits[0]!)]];
+  for (let i = 1; i < hits.length; i += 1) {
+    const next = intersection(acc as never, [[ring(hits[i]!)]] as never) as unknown as Pair[][][];
+    if (!next || next.length === 0) return null;
+    acc = next;
+  }
+
+  // Keep the piece the cursor actually sits in.
+  const pieces = acc.map((poly) => poly[0]!).filter((r) => r && r.length >= 3);
+  const chosen = pieces.find((r) => ringContains(r, world)) ?? pieces[0];
+  if (!chosen) return null;
+  const points = dedupe(chosen.map(([x, y]) => pt(x, y)));
+  if (points.length < 3) return null;
+  const key = hits
+    .map((c) => c.key)
+    .sort()
+    .join("+");
+  return { key, points, center: centroid(points) };
+};
+
+type Pair = [number, number];
+type Ring = Pair[];
+
+const ringContains = (ring: Ring, p: Point): boolean => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+
+/** Drops the repeated closing vertex and any duplicate samples. */
+const dedupe = (points: Point[]): Point[] => {
+  const out: Point[] = [];
+  for (const p of points) {
+    const prev = out[out.length - 1];
+    if (prev && Math.abs(prev.x - p.x) < 1e-7 && Math.abs(prev.y - p.y) < 1e-7) continue;
+    out.push(p);
+  }
+  const first = out[0];
+  const last = out[out.length - 1];
+  if (first && last && out.length > 1 && Math.abs(first.x - last.x) < 1e-7 && Math.abs(first.y - last.y) < 1e-7)
+    out.pop();
+  return out;
+};

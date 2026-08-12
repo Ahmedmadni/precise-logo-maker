@@ -57,6 +57,8 @@ export interface PaintSettings {
   gridId: string | null;
   /** Angular divisions used when painting concentric (polar) grids. */
   sectors: number;
+  /** Paint the piece cut by ALL overlapping grids instead of one grid's cell. */
+  combine: boolean;
 }
 
 export const DEFAULT_PAINT: PaintSettings = {
@@ -65,6 +67,7 @@ export const DEFAULT_PAINT: PaintSettings = {
   eraser: false,
   gridId: null,
   sectors: 12,
+  combine: true,
 };
 
 /** Assistance applied to freehand strokes drawn over the reference picture. */
@@ -81,6 +84,10 @@ export interface TraceSettings {
   magnetRadius: number;
   /** Minimum edge strength (0–1) worth snapping to. */
   edgeThreshold: number;
+  /** Averaging passes applied to a stroke before simplifying. */
+  passes: number;
+  /** Turns sharper than this angle (degrees) stay sharp while smoothing. */
+  cornerAngle: number;
 }
 
 export const DEFAULT_TRACE: TraceSettings = {
@@ -90,6 +97,8 @@ export const DEFAULT_TRACE: TraceSettings = {
   magnetic: true,
   magnetRadius: 14,
   edgeThreshold: 0.18,
+  passes: 2,
+  cornerAngle: 40,
 };
 
 export interface HistoryEntry {
@@ -367,7 +376,7 @@ export const useStudio = create<StudioState>()((set, get) => {
 
     smoothSelection: () => {
       const ids = get().selection;
-      const { tolerance, fitShapes } = get().trace;
+      const { tolerance, fitShapes, passes, cornerAngle } = get().trace;
       if (ids.length === 0) return;
       const targets = get().doc.objects.filter(
         (o) => ids.includes(o.id) && !o.locked && o.geometry.kind === "path",
@@ -379,7 +388,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           if (!targets.some((t) => t.id === o.id) || o.geometry.kind !== "path") return o;
           const cleaned = cleanStroke(
             o.geometry.points,
-            { tolerance, smoothing: 2, fitShapes },
+            { tolerance, smoothing: passes, fitShapes, cornerAngle },
             o.geometry.closed,
           );
           return cleaned ? { ...o, geometry: cleaned, type: cleaned.kind } : o;
