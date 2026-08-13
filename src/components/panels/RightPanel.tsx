@@ -1321,6 +1321,70 @@ function GridRow({ grid }: { grid: Grid }) {
             </label>
           </>
         )}
+        {grid.kind === "shape" && (
+          <>
+            <label className="col-span-2 flex flex-col gap-1">
+              <span className={labelCls}>{t("Guide shape")}</span>
+              <select
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                value={grid.shape}
+                onChange={(e) =>
+                  updateGrid(grid.id, { shape: e.target.value as GuideShapeKind })
+                }
+              >
+                {(
+                  ["circle", "ellipse", "square", "rectangle", "diamond", "polygon"] as const
+                ).map((s) => (
+                  <option key={s} value={s}>
+                    {t(s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <NumberField
+              label={t("Width")}
+              value={grid.width}
+              onChange={(v) => updateGrid(grid.id, { width: Math.max(4, v) })}
+            />
+            <NumberField
+              label={t("Height")}
+              value={grid.height}
+              onChange={(v) => updateGrid(grid.id, { height: Math.max(4, v) })}
+            />
+            {grid.shape === "polygon" && (
+              <NumberField
+                label={t("Sides")}
+                value={grid.sides}
+                onChange={(v) =>
+                  updateGrid(grid.id, { sides: Math.min(24, Math.max(3, Math.round(v))) })
+                }
+              />
+            )}
+            <NumberField
+              label={t("Copies")}
+              value={grid.count}
+              onChange={(v) =>
+                updateGrid(grid.id, { count: Math.min(24, Math.max(1, Math.round(v))) })
+              }
+            />
+            <NumberField
+              label={t("Step ratio")}
+              value={grid.stepRatio}
+              step={0.05}
+              onChange={(v) =>
+                updateGrid(grid.id, { stepRatio: Math.min(0.99, Math.max(0.05, v)) })
+              }
+            />
+            <label className="col-span-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={grid.guides}
+                onChange={(e) => updateGrid(grid.id, { guides: e.target.checked })}
+              />
+              {t("Center axes & diagonals")}
+            </label>
+          </>
+        )}
         <label className="flex flex-col gap-1">
           <span className={labelCls}>{t("Color")}</span>
           <input
