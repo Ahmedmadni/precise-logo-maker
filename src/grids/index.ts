@@ -2,7 +2,17 @@ import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry
 import type { Geometry, Point } from "../core/geometry/types";
 
 export type GridKind =
-  "square" | "concentric" | "radial" | "isometric" | "triangular" | "hexagonal" | "golden";
+  | "square"
+  | "concentric"
+  | "radial"
+  | "isometric"
+  | "triangular"
+  | "hexagonal"
+  | "golden"
+  | "shape";
+
+/** Construction-shape kinds available to the guide-shape grid. */
+export type GuideShapeKind = "circle" | "ellipse" | "square" | "rectangle" | "diamond" | "polygon";
 
 export interface GridBase {
   id: string;
