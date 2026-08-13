@@ -359,6 +359,87 @@ const buildGolden = (grid: GoldenGrid): GridGeometry => {
   return { major, minor, points };
 };
 
+/** Outline of one guide shape at half-extents (rx, ry) in grid-local space. */
+const shapeOutline = (grid: ShapeGrid, rx: number, ry: number): Geometry[] => {
+  const out: Geometry[] = [];
+  const poly = (corners: Point[]) => {
+    const mapped = corners.map((p) => applyGrid(grid, p));
+    for (let k = 0; k < mapped.length; k += 1) {
+      out.push(line(mapped[k]!, mapped[(k + 1) % mapped.length]!));
+    }
+  };
+  switch (grid.shape) {
+    case "circle":
+    case "ellipse": {
+      const steps = 96;
+      const corners: Point[] = [];
+      for (let k = 0; k < steps; k += 1) {
+        const a = (360 / steps) * k * RAD;
+        corners.push(pt(Math.cos(a) * rx, Math.sin(a) * ry));
+      }
+      poly(corners);
+      break;
+    }
+    case "diamond":
+      poly([pt(0, -ry), pt(rx, 0), pt(0, ry), pt(-rx, 0)]);
+      break;
+    case "polygon": {
+      const n = Math.max(3, Math.round(grid.sides));
+      const corners: Point[] = [];
+      for (let k = 0; k < n; k += 1) {
+        const a = (-90 + (360 / n) * k) * RAD;
+        corners.push(pt(Math.cos(a) * rx, Math.sin(a) * ry));
+      }
+      poly(corners);
+      break;
+    }
+    default:
+      poly([pt(-rx, -ry), pt(rx, -ry), pt(rx, ry), pt(-rx, ry)]);
+      break;
+  }
+  return out;
+};
+
+const buildShape = (grid: ShapeGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const minor: Geometry[] = [];
+  const points: Point[] = [];
+  const square = grid.shape === "circle" || grid.shape === "square" || grid.shape === "polygon";
+  const baseX = Math.max(1, grid.width) / 2;
+  const baseY = square ? baseX : Math.max(1, grid.height) / 2;
+  const count = Math.max(1, Math.round(grid.count));
+  const ratio = Math.min(0.99, Math.max(0.05, grid.stepRatio));
+
+  for (let i = 0; i < count; i += 1) {
+    const f = Math.pow(ratio, i);
+    const rx = baseX * f;
+    const ry = baseY * f;
+    if (rx < 0.5 || ry < 0.5) break;
+    const segments = shapeOutline(grid, rx, ry);
+    (i === 0 ? major : minor).push(...segments);
+    for (const s of segments) if (s.kind === "line") points.push(s.a);
+    points.push(
+      applyGrid(grid, pt(rx, 0)),
+      applyGrid(grid, pt(-rx, 0)),
+      applyGrid(grid, pt(0, ry)),
+      applyGrid(grid, pt(0, -ry)),
+    );
+  }
+
+  if (grid.guides) {
+    major.push(
+      line(applyGrid(grid, pt(-baseX, 0)), applyGrid(grid, pt(baseX, 0))),
+      line(applyGrid(grid, pt(0, -baseY)), applyGrid(grid, pt(0, baseY))),
+    );
+    minor.push(
+      line(applyGrid(grid, pt(-baseX, -baseY)), applyGrid(grid, pt(baseX, baseY))),
+      line(applyGrid(grid, pt(-baseX, baseY)), applyGrid(grid, pt(baseX, -baseY))),
+    );
+  }
+  points.push(applyGrid(grid, pt(0, 0)));
+  return { major, minor, points };
+};
+
 export const buildGridGeometry = (grid: Grid): GridGeometry => {
   switch (grid.kind) {
     case "square":
