@@ -1416,6 +1416,7 @@ function GridsTab() {
             "triangular",
             "hexagonal",
             "golden",
+            "shape",
           ] as const
         ).map((k) => (
           <button
