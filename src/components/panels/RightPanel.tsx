@@ -28,7 +28,7 @@ import type { Geometry } from "../../core/geometry/types";
 import { SNAP_LABEL, type SnapType } from "../../core/snapping/snap";
 import { ANGLE_STEPS, RATIOS } from "../../core/precision/constraints";
 import { describeGeometry, formatAngle, formatLength } from "../../core/precision/measure";
-import type { Grid } from "../../grids";
+import type { Grid, GuideShapeKind } from "../../grids";
 import { gridSupportsCells } from "../../grids/cells";
 import { fitToArtboard, readReferenceImage } from "../../objects/reference";
 import { cn } from "../../lib/utils";
