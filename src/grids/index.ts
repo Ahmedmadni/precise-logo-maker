@@ -543,6 +543,19 @@ export const createGoldenGrid = (center: Point, size: number): GoldenGrid => ({
   color: "#d4a24c",
 });
 
+export const createShapeGrid = (center: Point, size: number): ShapeGrid => ({
+  ...base("shape", "Guide Shape", center, "primary"),
+  kind: "shape",
+  shape: "circle",
+  width: size * 0.75,
+  height: size * 0.75,
+  sides: 6,
+  count: 3,
+  stepRatio: 0.75,
+  guides: true,
+  color: "#c96f8f",
+});
+
 export const createGrid = (kind: GridKind, center: Point, size: number): Grid => {
   switch (kind) {
     case "square":
