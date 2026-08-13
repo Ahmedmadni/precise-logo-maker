@@ -2,7 +2,17 @@ import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry
 import type { Geometry, Point } from "../core/geometry/types";
 
 export type GridKind =
-  "square" | "concentric" | "radial" | "isometric" | "triangular" | "hexagonal" | "golden";
+  | "square"
+  | "concentric"
+  | "radial"
+  | "isometric"
+  | "triangular"
+  | "hexagonal"
+  | "golden"
+  | "shape";
+
+/** Construction-shape kinds available to the guide-shape grid. */
+export type GuideShapeKind = "circle" | "ellipse" | "square" | "rectangle" | "diamond" | "polygon";
 
 export interface GridBase {
   id: string;
@@ -77,6 +87,27 @@ export interface GoldenGrid extends GridBase {
   spiral: boolean;
 }
 
+/**
+ * A construction shape (circle, square, diamond…) that behaves like a grid:
+ * it guides and snaps but never becomes part of the exported logo.
+ */
+export interface ShapeGrid extends GridBase {
+  kind: "shape";
+  shape: GuideShapeKind;
+  /** Full width (or diameter) of the outermost copy. */
+  width: number;
+  /** Full height (or diameter) of the outermost copy. */
+  height: number;
+  /** Sides used by the polygon shape. */
+  sides: number;
+  /** Number of nested copies, each scaled down by `stepRatio`. */
+  count: number;
+  /** Scale factor between one nested copy and the next (0–1). */
+  stepRatio: number;
+  /** Draw the centre cross-hair / diagonals. */
+  guides: boolean;
+}
+
 export type Grid =
   | SquareGrid
   | ConcentricGrid
@@ -84,7 +115,8 @@ export type Grid =
   | IsometricGrid
   | TriangularGrid
   | HexagonalGrid
-  | GoldenGrid;
+  | GoldenGrid
+  | ShapeGrid;
 
 export interface GridGeometry {
   /** Full-strength lines/circles (major divisions). */
@@ -327,6 +359,87 @@ const buildGolden = (grid: GoldenGrid): GridGeometry => {
   return { major, minor, points };
 };
 
+/** Outline of one guide shape at half-extents (rx, ry) in grid-local space. */
+const shapeOutline = (grid: ShapeGrid, rx: number, ry: number): Geometry[] => {
+  const out: Geometry[] = [];
+  const poly = (corners: Point[]) => {
+    const mapped = corners.map((p) => applyGrid(grid, p));
+    for (let k = 0; k < mapped.length; k += 1) {
+      out.push(line(mapped[k]!, mapped[(k + 1) % mapped.length]!));
+    }
+  };
+  switch (grid.shape) {
+    case "circle":
+    case "ellipse": {
+      const steps = 96;
+      const corners: Point[] = [];
+      for (let k = 0; k < steps; k += 1) {
+        const a = (360 / steps) * k * RAD;
+        corners.push(pt(Math.cos(a) * rx, Math.sin(a) * ry));
+      }
+      poly(corners);
+      break;
+    }
+    case "diamond":
+      poly([pt(0, -ry), pt(rx, 0), pt(0, ry), pt(-rx, 0)]);
+      break;
+    case "polygon": {
+      const n = Math.max(3, Math.round(grid.sides));
+      const corners: Point[] = [];
+      for (let k = 0; k < n; k += 1) {
+        const a = (-90 + (360 / n) * k) * RAD;
+        corners.push(pt(Math.cos(a) * rx, Math.sin(a) * ry));
+      }
+      poly(corners);
+      break;
+    }
+    default:
+      poly([pt(-rx, -ry), pt(rx, -ry), pt(rx, ry), pt(-rx, ry)]);
+      break;
+  }
+  return out;
+};
+
+const buildShape = (grid: ShapeGrid): GridGeometry => {
+  const major: Geometry[] = [];
+  const minor: Geometry[] = [];
+  const points: Point[] = [];
+  const square = grid.shape === "circle" || grid.shape === "square" || grid.shape === "polygon";
+  const baseX = Math.max(1, grid.width) / 2;
+  const baseY = square ? baseX : Math.max(1, grid.height) / 2;
+  const count = Math.max(1, Math.round(grid.count));
+  const ratio = Math.min(0.99, Math.max(0.05, grid.stepRatio));
+
+  for (let i = 0; i < count; i += 1) {
+    const f = Math.pow(ratio, i);
+    const rx = baseX * f;
+    const ry = baseY * f;
+    if (rx < 0.5 || ry < 0.5) break;
+    const segments = shapeOutline(grid, rx, ry);
+    (i === 0 ? major : minor).push(...segments);
+    for (const s of segments) if (s.kind === "line") points.push(s.a);
+    points.push(
+      applyGrid(grid, pt(rx, 0)),
+      applyGrid(grid, pt(-rx, 0)),
+      applyGrid(grid, pt(0, ry)),
+      applyGrid(grid, pt(0, -ry)),
+    );
+  }
+
+  if (grid.guides) {
+    major.push(
+      line(applyGrid(grid, pt(-baseX, 0)), applyGrid(grid, pt(baseX, 0))),
+      line(applyGrid(grid, pt(0, -baseY)), applyGrid(grid, pt(0, baseY))),
+    );
+    minor.push(
+      line(applyGrid(grid, pt(-baseX, -baseY)), applyGrid(grid, pt(baseX, baseY))),
+      line(applyGrid(grid, pt(-baseX, baseY)), applyGrid(grid, pt(baseX, -baseY))),
+    );
+  }
+  points.push(applyGrid(grid, pt(0, 0)));
+  return { major, minor, points };
+};
+
 export const buildGridGeometry = (grid: Grid): GridGeometry => {
   switch (grid.kind) {
     case "square":
@@ -343,6 +456,8 @@ export const buildGridGeometry = (grid: Grid): GridGeometry => {
       return buildHexagonal(grid);
     case "golden":
       return buildGolden(grid);
+    case "shape":
+      return buildShape(grid);
   }
 };
 
@@ -428,6 +543,19 @@ export const createGoldenGrid = (center: Point, size: number): GoldenGrid => ({
   color: "#d4a24c",
 });
 
+export const createShapeGrid = (center: Point, size: number): ShapeGrid => ({
+  ...base("shape", "Guide Shape", center, "primary"),
+  kind: "shape",
+  shape: "circle",
+  width: size * 0.75,
+  height: size * 0.75,
+  sides: 6,
+  count: 3,
+  stepRatio: 0.75,
+  guides: true,
+  color: "#c96f8f",
+});
+
 export const createGrid = (kind: GridKind, center: Point, size: number): Grid => {
   switch (kind) {
     case "square":
@@ -444,5 +572,7 @@ export const createGrid = (kind: GridKind, center: Point, size: number): Grid =>
       return createHexagonalGrid(center, size);
     case "golden":
       return createGoldenGrid(center, size);
+    case "shape":
+      return createShapeGrid(center, size);
   }
 };

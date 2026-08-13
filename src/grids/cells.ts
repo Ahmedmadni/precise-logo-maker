@@ -280,8 +280,15 @@ export const compoundCellAt = (
   const ring = (c: GridCell): Ring => c.points.map((p) => [p.x, p.y] as Pair);
   let acc: Pair[][][] = [[ring(hits[0]!)]];
   for (let i = 1; i < hits.length; i += 1) {
-    const next = intersection(acc as never, [[ring(hits[i]!)]] as never) as unknown as Pair[][][];
-    if (!next || next.length === 0) return null;
+    let next: Pair[][][] | null = null;
+    try {
+      next = intersection(acc as never, [[ring(hits[i]!)]] as never) as unknown as Pair[][][];
+    } catch {
+      // Degenerate/near-tangent rings can break the boolean solver; keep the
+      // best piece resolved so far instead of crashing the canvas.
+      next = null;
+    }
+    if (!next || next.length === 0) break;
     acc = next;
   }
 
