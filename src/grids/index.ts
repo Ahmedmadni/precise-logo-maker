@@ -87,6 +87,27 @@ export interface GoldenGrid extends GridBase {
   spiral: boolean;
 }
 
+/**
+ * A construction shape (circle, square, diamond…) that behaves like a grid:
+ * it guides and snaps but never becomes part of the exported logo.
+ */
+export interface ShapeGrid extends GridBase {
+  kind: "shape";
+  shape: GuideShapeKind;
+  /** Full width (or diameter) of the outermost copy. */
+  width: number;
+  /** Full height (or diameter) of the outermost copy. */
+  height: number;
+  /** Sides used by the polygon shape. */
+  sides: number;
+  /** Number of nested copies, each scaled down by `stepRatio`. */
+  count: number;
+  /** Scale factor between one nested copy and the next (0–1). */
+  stepRatio: number;
+  /** Draw the centre cross-hair / diagonals. */
+  guides: boolean;
+}
+
 export type Grid =
   | SquareGrid
   | ConcentricGrid
@@ -94,7 +115,8 @@ export type Grid =
   | IsometricGrid
   | TriangularGrid
   | HexagonalGrid
-  | GoldenGrid;
+  | GoldenGrid
+  | ShapeGrid;
 
 export interface GridGeometry {
   /** Full-strength lines/circles (major divisions). */
