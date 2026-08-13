@@ -572,5 +572,7 @@ export const createGrid = (kind: GridKind, center: Point, size: number): Grid =>
       return createHexagonalGrid(center, size);
     case "golden":
       return createGoldenGrid(center, size);
+    case "shape":
+      return createShapeGrid(center, size);
   }
 };
