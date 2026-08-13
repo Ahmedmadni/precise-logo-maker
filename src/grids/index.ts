@@ -456,6 +456,8 @@ export const buildGridGeometry = (grid: Grid): GridGeometry => {
       return buildHexagonal(grid);
     case "golden":
       return buildGolden(grid);
+    case "shape":
+      return buildShape(grid);
   }
 };
 
