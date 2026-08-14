@@ -61,6 +61,25 @@ export interface PaintSettings {
   combine: boolean;
 }
 
+/** Layer-wide behaviour of hand-drawn construction guides. */
+export interface GuideLayerSettings {
+  /** Guides cannot be picked, dragged or handle-edited. */
+  locked: boolean;
+  /** Guides are not drawn at all. */
+  hidden: boolean;
+  /**
+   * Guide editing mode: guides stay visible even with grids off and are the
+   * only objects the select tool can grab, so artwork never moves by mistake.
+   */
+  edit: boolean;
+}
+
+export const DEFAULT_GUIDE_LAYER: GuideLayerSettings = {
+  locked: false,
+  hidden: false,
+  edit: false,
+};
+
 export const DEFAULT_PAINT: PaintSettings = {
   color: "#5b8cff",
   opacity: 1,
