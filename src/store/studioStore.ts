@@ -61,6 +61,25 @@ export interface PaintSettings {
   combine: boolean;
 }
 
+/** Layer-wide behaviour of hand-drawn construction guides. */
+export interface GuideLayerSettings {
+  /** Guides cannot be picked, dragged or handle-edited. */
+  locked: boolean;
+  /** Guides are not drawn at all. */
+  hidden: boolean;
+  /**
+   * Guide editing mode: guides stay visible even with grids off and are the
+   * only objects the select tool can grab, so artwork never moves by mistake.
+   */
+  edit: boolean;
+}
+
+export const DEFAULT_GUIDE_LAYER: GuideLayerSettings = {
+  locked: false,
+  hidden: false,
+  edit: false,
+};
+
 export const DEFAULT_PAINT: PaintSettings = {
   color: "#5b8cff",
   opacity: 1,
@@ -129,6 +148,11 @@ export interface StudioState {
   /** Draw construction guides instead of logo artwork. */
   guideDraw: boolean;
   setGuideDraw: (on: boolean) => void;
+  /** Layer-level controls for every hand-drawn guide. */
+  guideLayer: GuideLayerSettings;
+  setGuideLayer: (patch: Partial<GuideLayerSettings>) => void;
+  /** Select every guide object (ignored while guides are locked or hidden). */
+  selectAllGuides: () => void;
   /** Flip the selected objects between artwork and construction guide. */
   toggleSelectionGuide: (guide?: boolean) => void;
   paintCells: (cells: GridCell[], erase: boolean) => void;
