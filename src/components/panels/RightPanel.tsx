@@ -435,6 +435,12 @@ function TransformSection() {
   const duplicateSelection = useStudio((s) => s.duplicateSelection);
   const radialRepeat = useStudio((s) => s.radialRepeat);
   const translateSelection = useStudio((s) => s.translateSelection);
+  const toggleSelectionGuide = useStudio((s) => s.toggleSelectionGuide);
+  const allGuides = useStudio(
+    (s) =>
+      s.selection.length > 0 &&
+      s.doc.objects.filter((o) => s.selection.includes(o.id)).every((o) => o.guide),
+  );
   const [angle, setAngle] = useState(15);
   const [count, setCount] = useState(6);
   const disabled = selection.length === 0;
@@ -463,6 +469,15 @@ function TransformSection() {
           onClick={() => mirrorSelection("y")}
         >
           <FlipVertical className="h-3 w-3" aria-hidden /> {t("Mirror V")}
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={disabled}
+          onClick={() => toggleSelectionGuide()}
+        >
+          <Compass className="h-3 w-3" aria-hidden />{" "}
+          {allGuides ? t("Convert to artwork") : t("Convert to guide")}
         </button>
       </div>
       <div className="flex items-end gap-2">
