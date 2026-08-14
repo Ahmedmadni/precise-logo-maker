@@ -28,7 +28,7 @@ export const buildSvgDocument = (
 ): string => {
   const a: Artboard = doc.artboard;
   const body = doc.objects
-    .filter((o) => o.visible)
+    .filter((o) => o.visible && !o.guide)
     .map(objectToSvg)
     .join("\n");
   const bg = options.background

@@ -126,6 +126,11 @@ export interface StudioState {
   /** Master switch for grid rendering — turn it off to preview the bare logo. */
   showGrids: boolean;
   setShowGrids: (visible: boolean) => void;
+  /** Draw construction guides instead of logo artwork. */
+  guideDraw: boolean;
+  setGuideDraw: (on: boolean) => void;
+  /** Flip the selected objects between artwork and construction guide. */
+  toggleSelectionGuide: (guide?: boolean) => void;
   paintCells: (cells: GridCell[], erase: boolean) => void;
   clearPaintedCells: () => void;
   setReference: (next: ReferenceImage | null) => void;
@@ -208,6 +213,9 @@ const nextObjectId = (): string => {
 
 const HISTORY_LIMIT = 100;
 
+/** Stroke colour shared by hand-drawn construction guides. */
+export const GUIDE_COLOR = "#5b7bb5";
+
 const selectionCenter = (doc: DocumentState, ids: string[]): Point | null => {
   const list = doc.objects.filter((o) => ids.includes(o.id));
   if (list.length === 0) return null;
@@ -262,20 +270,24 @@ export const useStudio = create<StudioState>()((set, get) => {
 
     addObject: (geometry, label, style) => {
       const id = nextObjectId();
+      const guide = get().guideDraw;
       commit(label, (doc) => ({
         ...doc,
         objects: [
           ...doc.objects,
           {
             id,
-            name: `${geometryLabel[geometry.kind]} ${doc.objects.length + 1}`,
+            name: `${guide ? "Guide " : ""}${geometryLabel[geometry.kind]} ${doc.objects.length + 1}`,
             type: geometry.kind,
             geometry,
             transform: IDENTITY_TRANSFORM,
-            style: { ...DEFAULT_STYLE, ...style },
+            style: guide
+              ? { ...DEFAULT_STYLE, stroke: GUIDE_COLOR, fill: "none", strokeWidth: 1 }
+              : { ...DEFAULT_STYLE, ...style },
             layerId: "shapes",
             visible: true,
             locked: false,
+            guide,
           },
         ],
       }));
@@ -302,6 +314,28 @@ export const useStudio = create<StudioState>()((set, get) => {
     setPaint: (patch) => set((s) => ({ paint: { ...s.paint, ...patch } })),
     showGrids: true,
     setShowGrids: (showGrids) => set({ showGrids }),
+    guideDraw: false,
+    setGuideDraw: (guideDraw) => set({ guideDraw }),
+    toggleSelectionGuide: (guide) => {
+      const ids = get().selection;
+      if (ids.length === 0) return;
+      const objects = get().doc.objects;
+      const next = guide ?? !objects.filter((o) => ids.includes(o.id)).every((o) => o.guide);
+      commit(next ? "Convert to guide" : "Convert to artwork", (doc) => ({
+        ...doc,
+        objects: doc.objects.map((o) =>
+          ids.includes(o.id)
+            ? {
+                ...o,
+                guide: next,
+                style: next
+                  ? { ...o.style, stroke: GUIDE_COLOR, fill: "none", strokeWidth: 1 }
+                  : { ...o.style, stroke: DEFAULT_STYLE.stroke, strokeWidth: DEFAULT_STYLE.strokeWidth },
+              }
+            : o,
+        ),
+      }));
+    },
 
     paintCells: (cells, erase) => {
       if (cells.length === 0) return;
