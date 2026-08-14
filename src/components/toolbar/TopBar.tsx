@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {
+  Compass,
   Download,
   DownloadCloud,
   Eye,
@@ -24,6 +25,7 @@ import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 import { useLangStore, useT } from "../../i18n";
+import { cn } from "../../lib/utils";
 
 const ZOOM_LEVELS = [1, 2, 4, 8];
 
