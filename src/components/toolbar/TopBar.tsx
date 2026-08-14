@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {
+  Compass,
   Download,
   DownloadCloud,
   Eye,
@@ -24,6 +25,7 @@ import { fitBounds } from "../../core/coordinates/view";
 import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 import { useLangStore, useT } from "../../i18n";
+import { cn } from "../../lib/utils";
 
 const ZOOM_LEVELS = [1, 2, 4, 8];
 
@@ -40,6 +42,8 @@ export function TopBar() {
   const loadDocument = useStudio((s) => s.loadDocument);
   const newDocument = useStudio((s) => s.newDocument);
   const showGrids = useStudio((s) => s.showGrids);
+  const guideDraw = useStudio((s) => s.guideDraw);
+  const setGuideDraw = useStudio((s) => s.setGuideDraw);
   const setShowGrids = useStudio((s) => s.setShowGrids);
   const setReference = useStudio((s) => s.setReference);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -230,6 +234,15 @@ export function TopBar() {
             <EyeOff className="h-3.5 w-3.5" aria-hidden />
           )}
           {showGrids ? t("Hide grids") : t("Show grids")}
+        </button>
+        <button
+          type="button"
+          className={cn(btn, guideDraw && "bg-accent text-accent-foreground")}
+          aria-pressed={guideDraw}
+          onClick={() => setGuideDraw(!guideDraw)}
+          title={t("Draw construction guides that never appear in the exported logo")}
+        >
+          <Compass className="h-3.5 w-3.5" aria-hidden /> {t("Guide drawing")}
         </button>
       </div>
 

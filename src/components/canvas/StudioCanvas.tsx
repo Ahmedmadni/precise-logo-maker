@@ -731,7 +731,7 @@ export function StudioCanvas() {
           {/* Shapes */}
           <g>
             {doc.objects.map((o) =>
-              o.visible ? (
+              o.visible && (!o.guide || showGrids) ? (
                 <path
                   key={o.id}
                   transform={
@@ -743,13 +743,17 @@ export function StudioCanvas() {
                     handleDrag && handleDrag.objectId === o.id ? handleDrag.geometry : o.geometry,
                   )}
 
-                  fill={o.style.fill}
+                  fill={o.guide ? "none" : o.style.fill}
                   fillOpacity={o.style.fillOpacity ?? 1}
-                  opacity={o.style.opacity ?? 1}
+                  opacity={o.guide ? 0.6 : (o.style.opacity ?? 1)}
                   stroke={selection.includes(o.id) ? "var(--color-primary)" : o.style.stroke}
                   strokeWidth={o.style.strokeWidth}
                   strokeDasharray={
-                    o.style.dash && o.style.dash > 0 ? `${o.style.dash} ${o.style.dash}` : undefined
+                    o.guide
+                      ? "5 4"
+                      : o.style.dash && o.style.dash > 0
+                        ? `${o.style.dash} ${o.style.dash}`
+                        : undefined
                   }
                   strokeLinecap="round"
                   strokeLinejoin="round"

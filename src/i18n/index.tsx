@@ -35,6 +35,12 @@ export const AR: Record<string, string> = {
   "Redo (Ctrl+Shift+Z)": "إعادة (Ctrl+Shift+Z)",
   "Start a new document? Unsaved work is lost.": "بدء مستند جديد؟ سيتم فقدان العمل غير المحفوظ.",
   "This file is not a valid .logo project.": "هذا الملف ليس مشروع ‎.logo صالحًا.",
+  "Guide drawing": "رسم إرشادي",
+  "Draw construction guides that never appear in the exported logo":
+    "ارسم خطوطًا إرشادية لا تظهر في الشعار المصدَّر",
+  "Convert to guide": "تحويل إلى إرشادي",
+  "Convert to artwork": "تحويل إلى شعار",
+  "Guide (not exported)": "إرشادي (غير مُصدَّر)",
   "Fit artboard": "ملاءمة لوح الرسم",
   "Fit selection": "ملاءمة التحديد",
   Reset: "إعادة ضبط",

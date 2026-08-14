@@ -81,6 +81,11 @@ export interface VectorObject {
    * instead of stacking duplicates.
    */
   cellKey?: string | undefined;
+  /**
+   * Construction guide: drawn by hand but treated like a grid — it renders in
+   * guide styling, snaps like a grid and is excluded from every export.
+   */
+  guide?: boolean | undefined;
 }
 
 export const IDENTITY_TRANSFORM: Transform = {
