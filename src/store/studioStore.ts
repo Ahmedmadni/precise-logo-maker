@@ -129,6 +129,11 @@ export interface StudioState {
   /** Draw construction guides instead of logo artwork. */
   guideDraw: boolean;
   setGuideDraw: (on: boolean) => void;
+  /** Layer-level controls for every hand-drawn guide. */
+  guideLayer: GuideLayerSettings;
+  setGuideLayer: (patch: Partial<GuideLayerSettings>) => void;
+  /** Select every guide object (ignored while guides are locked or hidden). */
+  selectAllGuides: () => void;
   /** Flip the selected objects between artwork and construction guide. */
   toggleSelectionGuide: (guide?: boolean) => void;
   paintCells: (cells: GridCell[], erase: boolean) => void;
