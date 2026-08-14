@@ -8,6 +8,7 @@ import {
   AlignStartVertical,
   ArrowDown,
   ArrowUp,
+  Compass,
   Copy,
   Eraser,
   FlipHorizontal,
