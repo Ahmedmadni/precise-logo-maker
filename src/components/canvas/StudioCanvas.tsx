@@ -17,7 +17,7 @@ import {
 import type { Geometry, Point } from "../../core/geometry/types";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
 import { constrainPoint } from "../../core/precision/constraints";
-import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
+import { applyHandle, constrainHandle, handlesOf, pickHandle } from "../../editor/handles";
 
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
