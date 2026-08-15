@@ -340,6 +340,26 @@ export const useStudio = create<StudioState>()((set, get) => {
     setShowGrids: (showGrids) => set({ showGrids }),
     guideDraw: false,
     setGuideDraw: (guideDraw) => set({ guideDraw }),
+    guideLayer: DEFAULT_GUIDE_LAYER,
+    setGuideLayer: (patch) =>
+      set((s) => {
+        const guideLayer = { ...s.guideLayer, ...patch };
+        // Editing guides implies they are reachable: unhide and unlock them.
+        if (patch.edit) {
+          guideLayer.hidden = false;
+          guideLayer.locked = false;
+        }
+        const blocked = guideLayer.hidden || guideLayer.locked;
+        const selection = blocked
+          ? s.selection.filter((id) => !s.doc.objects.find((o) => o.id === id)?.guide)
+          : s.selection;
+        return { guideLayer, selection };
+      }),
+    selectAllGuides: () => {
+      const { guideLayer, doc } = get();
+      if (guideLayer.hidden || guideLayer.locked) return;
+      set({ selection: doc.objects.filter((o) => o.guide).map((o) => o.id) });
+    },
     toggleSelectionGuide: (guide) => {
       const ids = get().selection;
       if (ids.length === 0) return;

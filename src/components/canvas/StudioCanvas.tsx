@@ -25,7 +25,7 @@ import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../gri
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
-import { artboardWorldBounds, useStudio } from "../../store/studioStore";
+import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
 
@@ -71,6 +71,7 @@ export function StudioCanvas() {
   const trace = useStudio((s) => s.trace);
   const paintCells = useStudio((s) => s.paintCells);
   const showGrids = useStudio((s) => s.showGrids);
+  const guideLayer = useStudio((s) => s.guideLayer);
   const setView = useStudio((s) => s.setView);
   const setCursor = useStudio((s) => s.setCursor);
   const addObject = useStudio((s) => s.addObject);
@@ -304,12 +305,15 @@ export function StudioCanvas() {
       let best: { id: string; d: number } | null = null;
       for (const o of doc.objects) {
         if (!o.visible || o.locked) continue;
+        if (o.guide && (guideLayer.locked || guideLayer.hidden)) continue;
+        // Guide editing mode grabs guides only, so artwork can't shift by accident.
+        if (guideLayer.edit && !o.guide) continue;
         const d = dist(closestPointOnGeometry(o.geometry, world), world);
         if (d <= tol && (!best || d < best.d)) best = { id: o.id, d };
       }
       return best?.id ?? null;
     },
-    [doc.objects, view.zoom],
+    [doc.objects, view.zoom, guideLayer],
   );
 
   const beginPinch = () => {
@@ -410,7 +414,9 @@ export function StudioCanvas() {
       // Handle editing takes priority over body dragging.
       if (selection.length === 1) {
         const target = doc.objects.find((o) => o.id === selection[0]);
-        if (target && !target.locked && target.visible) {
+        const guideBlocked =
+          !!target?.guide && (guideLayer.locked || guideLayer.hidden);
+        if (target && !target.locked && target.visible && !guideBlocked) {
           const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
           if (h) {
             setHandleDrag({
@@ -596,6 +602,9 @@ export function StudioCanvas() {
       if (Math.abs(maxX - minX) > 2 || Math.abs(maxY - minY) > 2) {
         const ids = doc.objects
           .filter((o) => {
+            if (!o.visible || o.locked) return false;
+            if (o.guide && (guideLayer.locked || guideLayer.hidden)) return false;
+            if (guideLayer.edit && !o.guide) return false;
             const b = geometryBounds(o.geometry);
             return b.minX >= minX && b.maxX <= maxX && b.minY >= minY && b.maxY <= maxY;
           })
@@ -633,7 +642,13 @@ export function StudioCanvas() {
         : null;
   const editTarget =
     tool === "select" && selection.length === 1
-      ? doc.objects.find((o) => o.id === selection[0] && o.visible && !o.locked)
+      ? doc.objects.find(
+          (o) =>
+            o.id === selection[0] &&
+            o.visible &&
+            !o.locked &&
+            !(o.guide && (guideLayer.locked || guideLayer.hidden)),
+        )
       : undefined;
   const editHandles = editTarget
     ? handlesOf(
@@ -731,7 +746,8 @@ export function StudioCanvas() {
           {/* Shapes */}
           <g>
             {doc.objects.map((o) =>
-              o.visible && (!o.guide || showGrids) ? (
+              o.visible &&
+              (!o.guide || (!guideLayer.hidden && (showGrids || guideLayer.edit))) ? (
                 <path
                   key={o.id}
                   transform={
@@ -846,24 +862,28 @@ export function StudioCanvas() {
             </g>
           )}
           {/* Edit handles for a single selected object */}
-          {editHandles.map((h) => (
+          {editHandles.map((h) => {
+            // Guide handles are drawn larger (touch-friendly) and in guide blue.
+            const guideHandle = !!editTarget?.guide;
+            const half = (guideHandle ? 5.5 : 4) / view.zoom;
+            const accent = guideHandle ? GUIDE_COLOR : "var(--color-primary)";
+            return (
             <rect
               key={h.id}
-              x={h.point.x - 4 / view.zoom}
-              y={h.point.y - 4 / view.zoom}
-              width={8 / view.zoom}
-              height={8 / view.zoom}
-              rx={h.role === "center" ? 4 / view.zoom : 1 / view.zoom}
-              fill={
-                handleDrag?.handleId === h.id ? "var(--color-primary)" : "var(--color-background)"
-              }
-              stroke="var(--color-primary)"
+              x={h.point.x - half}
+              y={h.point.y - half}
+              width={half * 2}
+              height={half * 2}
+              rx={h.role === "center" ? half : 1 / view.zoom}
+              fill={handleDrag?.handleId === h.id ? accent : "var(--color-background)"}
+              stroke={accent}
               strokeWidth={1.25}
               vectorEffect="non-scaling-stroke"
             >
               <title>{h.label}</title>
             </rect>
-          ))}
+            );
+          })}
           {/* Selection bounds */}
 
           {selectionBounds && Number.isFinite(selectionBounds.minX) && (

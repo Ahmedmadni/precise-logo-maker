@@ -41,6 +41,13 @@ export const AR: Record<string, string> = {
   "Convert to guide": "تحويل إلى إرشادي",
   "Convert to artwork": "تحويل إلى شعار",
   "Guide (not exported)": "إرشادي (غير مُصدَّر)",
+  "Guide layer": "طبقة الإرشادات",
+  "Edit guides": "تعديل الإرشادات",
+  "Lock guides": "قفل الإرشادات",
+  "Hide guides": "إخفاء الإرشادات",
+  "Select all guides": "تحديد كل الإرشادات",
+  "Edit mode keeps guides visible and makes them the only thing the Select tool can grab — drag their handles to change radius, angles and lengths. Lock keeps them fixed while you draw; Hide takes them off the canvas.":
+    "وضع التعديل يُبقي الإرشادات ظاهرة ويجعلها العنصر الوحيد الذي تلتقطه أداة التحديد — اسحب مقابضها لتغيير نصف القطر والزوايا والأطوال. القفل يمنع تحريكها أثناء الرسم، والإخفاء يزيلها من لوح الرسم.",
   "Fit artboard": "ملاءمة لوح الرسم",
   "Fit selection": "ملاءمة التحديد",
   Reset: "إعادة ضبط",
