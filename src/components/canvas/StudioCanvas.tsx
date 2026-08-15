@@ -71,6 +71,7 @@ export function StudioCanvas() {
   const trace = useStudio((s) => s.trace);
   const paintCells = useStudio((s) => s.paintCells);
   const showGrids = useStudio((s) => s.showGrids);
+  const guideLayer = useStudio((s) => s.guideLayer);
   const setView = useStudio((s) => s.setView);
   const setCursor = useStudio((s) => s.setCursor);
   const addObject = useStudio((s) => s.addObject);
@@ -304,12 +305,15 @@ export function StudioCanvas() {
       let best: { id: string; d: number } | null = null;
       for (const o of doc.objects) {
         if (!o.visible || o.locked) continue;
+        if (o.guide && (guideLayer.locked || guideLayer.hidden)) continue;
+        // Guide editing mode grabs guides only, so artwork can't shift by accident.
+        if (guideLayer.edit && !o.guide) continue;
         const d = dist(closestPointOnGeometry(o.geometry, world), world);
         if (d <= tol && (!best || d < best.d)) best = { id: o.id, d };
       }
       return best?.id ?? null;
     },
-    [doc.objects, view.zoom],
+    [doc.objects, view.zoom, guideLayer],
   );
 
   const beginPinch = () => {
@@ -410,7 +414,9 @@ export function StudioCanvas() {
       // Handle editing takes priority over body dragging.
       if (selection.length === 1) {
         const target = doc.objects.find((o) => o.id === selection[0]);
-        if (target && !target.locked && target.visible) {
+        const guideBlocked =
+          !!target?.guide && (guideLayer.locked || guideLayer.hidden);
+        if (target && !target.locked && target.visible && !guideBlocked) {
           const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
           if (h) {
             setHandleDrag({
@@ -633,7 +639,13 @@ export function StudioCanvas() {
         : null;
   const editTarget =
     tool === "select" && selection.length === 1
-      ? doc.objects.find((o) => o.id === selection[0] && o.visible && !o.locked)
+      ? doc.objects.find(
+          (o) =>
+            o.id === selection[0] &&
+            o.visible &&
+            !o.locked &&
+            !(o.guide && (guideLayer.locked || guideLayer.hidden)),
+        )
       : undefined;
   const editHandles = editTarget
     ? handlesOf(
@@ -731,7 +743,8 @@ export function StudioCanvas() {
           {/* Shapes */}
           <g>
             {doc.objects.map((o) =>
-              o.visible && (!o.guide || showGrids) ? (
+              o.visible &&
+              (!o.guide || (!guideLayer.hidden && (showGrids || guideLayer.edit))) ? (
                 <path
                   key={o.id}
                   transform={
