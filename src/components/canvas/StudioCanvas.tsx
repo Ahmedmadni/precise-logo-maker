@@ -17,7 +17,7 @@ import {
 import type { Geometry, Point } from "../../core/geometry/types";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
 import { constrainPoint } from "../../core/precision/constraints";
-import { applyHandle, handlesOf, pickHandle } from "../../editor/handles";
+import { applyHandle, constrainHandle, handlesOf, pickHandle } from "../../editor/handles";
 
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
@@ -525,9 +525,18 @@ export function StudioCanvas() {
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base) {
+        // Handles ride the smart-snap result; Shift (or a permanent angle lock)
+        // additionally pins the angle / radius to the precision steps.
+        const locked = e.shiftKey || precision.angleLock;
+        const target = locked
+          ? constrainHandle(base.geometry, handleDrag.handleId, snapped, {
+              angleStep: precision.angleStep,
+              lengthStep: precision.lengthStep,
+            })
+          : snapped;
         setHandleDrag({
           ...handleDrag,
-          geometry: applyHandle(base.geometry, handleDrag.handleId, point),
+          geometry: applyHandle(base.geometry, handleDrag.handleId, target),
         });
       }
       return;

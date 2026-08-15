@@ -56,6 +56,59 @@ export const handlesOf = (g: Geometry): Handle[] => {
   ];
 };
 
+export interface HandleConstraint {
+  /** Angular increment in degrees used when the angle is locked. */
+  angleStep: number;
+  /** Distance quantisation step in world units (0 = off). */
+  lengthStep: number;
+}
+
+const quantize = (v: number, step: number): number =>
+  step > 0 ? Math.round(v / step) * step : v;
+
+/**
+ * Shift-style constraint for a handle drag.
+ * - circle radius: keeps the handle on its axis and quantises the radius
+ * - arc start/end: locks the angle to `angleStep` and keeps the radius fixed
+ * - line / path points: locks the direction from the neighbouring point
+ * - center handles: quantises the translation to `lengthStep`
+ */
+export const constrainHandle = (
+  g: Geometry,
+  id: string,
+  p: Point,
+  c: HandleConstraint,
+): Point => {
+  const lockFrom = (anchor: Point, keepRadius?: number): Point => {
+    const radius = keepRadius ?? Math.max(quantize(dist(anchor, p), c.lengthStep), 1e-6);
+    const angle = c.angleStep > 0 ? quantize(angleOf(anchor, p), c.angleStep) : angleOf(anchor, p);
+    return pointOnCircle(anchor, radius, angle);
+  };
+
+  if (g.kind === "line") {
+    if (id === "a") return lockFrom(g.b);
+    if (id === "b") return lockFrom(g.a);
+    return p;
+  }
+  if (g.kind === "path") {
+    const index = Number(id.slice(1));
+    const anchor = g.points[index - 1] ?? g.points[index + 1];
+    return anchor ? lockFrom(anchor) : p;
+  }
+  if (id === "center") {
+    return pt(
+      g.center.x + quantize(p.x - g.center.x, c.lengthStep),
+      g.center.y + quantize(p.y - g.center.y, c.lengthStep),
+    );
+  }
+  if (g.kind === "circle") {
+    // Radius handle stays on the 0° axis; only the radius changes.
+    return pointOnCircle(g.center, Math.max(quantize(dist(g.center, p), c.lengthStep), 1e-6), 0);
+  }
+  // Arc start/end: lock the angle, keep the existing radius.
+  return lockFrom(g.center, g.radius);
+};
+
 /** Move one handle to `p`, returning the resulting geometry (pure). */
 export const applyHandle = (g: Geometry, id: string, p: Point): Geometry => {
   if (g.kind === "line") {
