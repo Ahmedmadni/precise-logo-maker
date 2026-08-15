@@ -602,6 +602,9 @@ export function StudioCanvas() {
       if (Math.abs(maxX - minX) > 2 || Math.abs(maxY - minY) > 2) {
         const ids = doc.objects
           .filter((o) => {
+            if (!o.visible || o.locked) return false;
+            if (o.guide && (guideLayer.locked || guideLayer.hidden)) return false;
+            if (guideLayer.edit && !o.guide) return false;
             const b = geometryBounds(o.geometry);
             return b.minX >= minX && b.maxX <= maxX && b.minY >= minY && b.maxY <= maxY;
           })
