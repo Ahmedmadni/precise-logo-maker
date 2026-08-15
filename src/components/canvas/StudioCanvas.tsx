@@ -25,7 +25,7 @@ import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../gri
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
-import { artboardWorldBounds, useStudio } from "../../store/studioStore";
+import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
 
@@ -862,24 +862,28 @@ export function StudioCanvas() {
             </g>
           )}
           {/* Edit handles for a single selected object */}
-          {editHandles.map((h) => (
+          {editHandles.map((h) => {
+            // Guide handles are drawn larger (touch-friendly) and in guide blue.
+            const guideHandle = !!editTarget?.guide;
+            const half = (guideHandle ? 5.5 : 4) / view.zoom;
+            const accent = guideHandle ? GUIDE_COLOR : "var(--color-primary)";
+            return (
             <rect
               key={h.id}
-              x={h.point.x - 4 / view.zoom}
-              y={h.point.y - 4 / view.zoom}
-              width={8 / view.zoom}
-              height={8 / view.zoom}
-              rx={h.role === "center" ? 4 / view.zoom : 1 / view.zoom}
-              fill={
-                handleDrag?.handleId === h.id ? "var(--color-primary)" : "var(--color-background)"
-              }
-              stroke="var(--color-primary)"
+              x={h.point.x - half}
+              y={h.point.y - half}
+              width={half * 2}
+              height={half * 2}
+              rx={h.role === "center" ? half : 1 / view.zoom}
+              fill={handleDrag?.handleId === h.id ? accent : "var(--color-background)"}
+              stroke={accent}
               strokeWidth={1.25}
               vectorEffect="non-scaling-stroke"
             >
               <title>{h.label}</title>
             </rect>
-          ))}
+            );
+          })}
           {/* Selection bounds */}
 
           {selectionBounds && Number.isFinite(selectionBounds.minX) && (
