@@ -13,7 +13,11 @@ import {
   Eraser,
   FlipHorizontal,
   FlipVertical,
+  Eye,
+  EyeOff,
   ImagePlus,
+  Lock,
+  LockOpen,
   Magnet,
   PaintBucket,
   PenTool,
@@ -424,6 +428,75 @@ function ObjectSection() {
           />
         </label>
       </div>
+    </section>
+  );
+}
+
+function GuideLayerSection() {
+  const t = useT();
+  const guideLayer = useStudio((s) => s.guideLayer);
+  const setGuideLayer = useStudio((s) => s.setGuideLayer);
+  const selectAllGuides = useStudio((s) => s.selectAllGuides);
+  const count = useStudio((s) => s.doc.objects.filter((o) => o.guide).length);
+  const btn =
+    "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
+  const active = "bg-accent text-accent-foreground";
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold text-foreground">{t("Guide layer")}</h2>
+        <span className="text-[11px] text-muted-foreground">{count}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          aria-pressed={guideLayer.edit}
+          className={cn(btn, guideLayer.edit && active)}
+          onClick={() => setGuideLayer({ edit: !guideLayer.edit })}
+        >
+          <Compass className="h-3 w-3" aria-hidden /> {t("Edit guides")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={guideLayer.locked}
+          className={cn(btn, guideLayer.locked && active)}
+          onClick={() => setGuideLayer({ locked: !guideLayer.locked, edit: false })}
+        >
+          {guideLayer.locked ? (
+            <Lock className="h-3 w-3" aria-hidden />
+          ) : (
+            <LockOpen className="h-3 w-3" aria-hidden />
+          )}{" "}
+          {t("Lock guides")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={guideLayer.hidden}
+          className={cn(btn, guideLayer.hidden && active)}
+          onClick={() => setGuideLayer({ hidden: !guideLayer.hidden, edit: false })}
+        >
+          {guideLayer.hidden ? (
+            <EyeOff className="h-3 w-3" aria-hidden />
+          ) : (
+            <Eye className="h-3 w-3" aria-hidden />
+          )}{" "}
+          {t("Hide guides")}
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={count === 0 || guideLayer.locked || guideLayer.hidden}
+          onClick={selectAllGuides}
+        >
+          {t("Select all guides")}
+        </button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {t(
+          "Edit mode keeps guides visible and makes them the only thing the Select tool can grab \u2014 drag their handles to change radius, angles and lengths. Lock keeps them fixed while you draw; Hide takes them off the canvas.",
+        )}
+      </p>
     </section>
   );
 }
@@ -1687,6 +1760,8 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
             <ArtboardSection />
             <hr className="border-border" />
             <ObjectSection />
+            <hr className="border-border" />
+            <GuideLayerSection />
             <hr className="border-border" />
             <PaintSection />
           </>
