@@ -399,6 +399,71 @@ function ObjectSection() {
         )}
       </div>
 
+      {/* Derived dimensions — type a value to reshape the object instantly. */}
+      <div className="grid grid-cols-2 gap-2">
+        {g.kind === "line" && (
+          <>
+            <NumberField
+              label={t("Length")}
+              value={dist(g.a, g.b)}
+              onChange={(v) =>
+                patchGeometry({
+                  ...g,
+                  b: pointOnCircle(g.a, Math.max(v, 1e-6), angleOf(g.a, g.b)),
+                })
+              }
+            />
+            <NumberField
+              label={t("Angle °")}
+              value={normalizeAngle(angleOf(g.a, g.b))}
+              onChange={(v) => patchGeometry({ ...g, b: pointOnCircle(g.a, dist(g.a, g.b), v) })}
+            />
+          </>
+        )}
+        {g.kind === "arc" && (
+          <>
+            <NumberField
+              label={t("Diameter")}
+              value={g.radius * 2}
+              onChange={(v) => patchGeometry({ ...g, radius: Math.max(0, v / 2) })}
+            />
+            <NumberField
+              label={t("Sweep °")}
+              value={normalizeAngle(g.endAngle - g.startAngle)}
+              onChange={(v) =>
+                patchGeometry({ ...g, endAngle: normalizeAngle(g.startAngle + v) })
+              }
+            />
+          </>
+        )}
+        {g.kind === "path" && (
+          <>
+            <NumberField
+              label={t("Center X")}
+              value={handleCenter(g).x}
+              onChange={(v) =>
+                patchGeometry(translateGeometry(g, v - handleCenter(g).x, 0))
+              }
+            />
+            <NumberField
+              label={t("Center Y")}
+              value={handleCenter(g).y}
+              onChange={(v) =>
+                patchGeometry(translateGeometry(g, 0, v - handleCenter(g).y))
+              }
+            />
+            <NumberField
+              label={t("Scale %")}
+              value={100}
+              step={5}
+              onChange={(v) =>
+                v > 0 && patchGeometry(scaleGeometry(g, v / 100, handleCenter(g)))
+              }
+            />
+          </>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <NumberField
           label={t("Stroke width")}
