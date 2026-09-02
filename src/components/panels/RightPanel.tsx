@@ -157,6 +157,42 @@ const SWATCHES = [
 ];
 
 /** Colour and paint controls applied to every selected object. */
+function PathfinderSection() {
+  const t = useT();
+  const selection = useStudio((s) => s.selection);
+  const booleanSelection = useStudio((s) => s.booleanSelection);
+  const enabled = selection.length >= 2;
+
+  const ops = [
+    { op: "union", label: t("Merge") },
+    { op: "subtract", label: t("Subtract") },
+    { op: "intersect", label: t("Intersect") },
+    { op: "exclude", label: t("Exclude") },
+  ] as const;
+
+  return (
+    <div className="space-y-1">
+      <span className={labelCls}>{t("Pathfinder")}</span>
+      <div className="grid grid-cols-4 gap-1">
+        {ops.map(({ op, label }) => (
+          <button
+            key={op}
+            type="button"
+            disabled={!enabled}
+            className="rounded-md border border-border px-1 py-1 text-[10px] text-muted-foreground hover:bg-accent disabled:opacity-40"
+            onClick={() => booleanSelection(op)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {t("Select two or more shapes, then combine them into one outline.")}
+      </p>
+    </div>
+  );
+}
+
 function PaintSection() {
   const t = useT();
   const selection = useStudio((s) => s.selection);
