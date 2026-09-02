@@ -9,6 +9,26 @@ export type Lang = "en" | "ar";
  * with no key bookkeeping while still giving full Arabic coverage.
  */
 export const AR: Record<string, string> = {
+  // Pathfinder & stroke styling
+  Pathfinder: "دمج المسارات",
+  Merge: "دمج",
+  Subtract: "طرح",
+  Intersect: "تقاطع",
+  Exclude: "استبعاد",
+  "Select two or more shapes, then combine them into one outline.":
+    "حدّد شكلين أو أكثر ثم ادمجهما في مسار واحد.",
+  "Stroke cap": "نهاية الخط",
+  "Stroke join": "زاوية الخط",
+  Flat: "مسطّح",
+  Round: "دائري",
+  Square: "مربّع",
+  Sharp: "حاد",
+  Bevel: "مشطوف",
+  Length: "الطول",
+  "Angle °": "الزاوية °",
+  "Sweep °": "زاوية القوس °",
+  "Scale %": "التحجيم %",
+
   // App / shell
   "Logo Grid Studio": "استوديو شبكات الشعارات",
   "Phase 7 — Drawing & Paint": "المرحلة 7 — الرسم والتلوين",
