@@ -780,8 +780,8 @@ export function StudioCanvas() {
                         ? `${o.style.dash} ${o.style.dash}`
                         : undefined
                   }
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  strokeLinecap={o.style.cap ?? "round"}
+                  strokeLinejoin={o.style.join ?? "round"}
                   vectorEffect="non-scaling-stroke"
                 />
               ) : null,
