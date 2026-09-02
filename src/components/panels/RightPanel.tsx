@@ -157,6 +157,42 @@ const SWATCHES = [
 ];
 
 /** Colour and paint controls applied to every selected object. */
+function PathfinderSection() {
+  const t = useT();
+  const selection = useStudio((s) => s.selection);
+  const booleanSelection = useStudio((s) => s.booleanSelection);
+  const enabled = selection.length >= 2;
+
+  const ops = [
+    { op: "union", label: t("Merge") },
+    { op: "subtract", label: t("Subtract") },
+    { op: "intersect", label: t("Intersect") },
+    { op: "exclude", label: t("Exclude") },
+  ] as const;
+
+  return (
+    <div className="space-y-1">
+      <span className={labelCls}>{t("Pathfinder")}</span>
+      <div className="grid grid-cols-4 gap-1">
+        {ops.map(({ op, label }) => (
+          <button
+            key={op}
+            type="button"
+            disabled={!enabled}
+            className="rounded-md border border-border px-1 py-1 text-[10px] text-muted-foreground hover:bg-accent disabled:opacity-40"
+            onClick={() => booleanSelection(op)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {t("Select two or more shapes, then combine them into one outline.")}
+      </p>
+    </div>
+  );
+}
+
 function PaintSection() {
   const t = useT();
   const selection = useStudio((s) => s.selection);
@@ -214,6 +250,52 @@ function PaintSection() {
           onChange={(v) => setSelectionStyle({ dash: Math.max(0, v) }, "Change dash")}
         />
       </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <span className={labelCls}>{t("Stroke cap")}</span>
+          <div className="flex gap-1">
+            {(["butt", "round", "square"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md border border-border px-1 py-1 text-[10px] capitalize",
+                  (style.cap ?? "round") === c
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => setSelectionStyle({ cap: c }, "Change stroke cap")}
+              >
+                {t(c === "butt" ? "Flat" : c === "round" ? "Round" : "Square")}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <span className={labelCls}>{t("Stroke join")}</span>
+          <div className="flex gap-1">
+            {(["miter", "round", "bevel"] as const).map((j) => (
+              <button
+                key={j}
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md border border-border px-1 py-1 text-[10px] capitalize",
+                  (style.join ?? "round") === j
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => setSelectionStyle({ join: j }, "Change stroke join")}
+              >
+                {t(j === "miter" ? "Sharp" : j === "round" ? "Round" : "Bevel")}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <PathfinderSection />
+
 
       <button
         type="button"
