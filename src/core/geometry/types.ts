@@ -61,6 +61,10 @@ export interface Style {
   opacity?: number;
   /** Dash length in world units; 0 or undefined = solid. */
   dash?: number;
+  /** Stroke ending: butt, round (default) or square. */
+  cap?: "butt" | "round" | "square";
+  /** Corner treatment: miter, round (default) or bevel. */
+  join?: "miter" | "round" | "bevel";
 }
 
 export type ObjectType = Geometry["kind"];
