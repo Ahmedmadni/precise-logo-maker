@@ -256,7 +256,6 @@ export const AR: Record<string, string> = {
   "Radius step": "خطوة نصف القطر",
   Rays: "الأشعة",
   "Angle offset °": "إزاحة الزاوية °",
-  Length: "الطول",
   "Axis angle °": "زاوية المحور °",
   "Hex size": "حجم السداسي",
   Rings: "الحلقات",
