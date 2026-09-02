@@ -27,6 +27,7 @@ import { createConcentricGrid, createGrid, createSquareGrid, type Grid } from ".
 import { cleanStroke } from "../core/tracing/simplify";
 import type { GridCell } from "../grids/cells";
 import type { ReferenceImage } from "../objects/reference";
+import { booleanGeometry, type BooleanOp } from "../objects/boolean";
 
 export type ToolId =
   "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan";
@@ -197,6 +198,8 @@ export interface StudioState {
   setMeasurement: (m: Measurement | null) => void;
   scaleSelection: (factor: number) => void;
   setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
+  /** Pathfinder: combine the selected shapes into one outline. */
+  booleanSelection: (op: BooleanOp) => void;
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
@@ -708,6 +711,42 @@ export const useStudio = create<StudioState>()((set, get) => {
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
         }),
       }));
+    },
+
+    booleanSelection: (op) => {
+      const ids = get().selection;
+      const doc = get().doc;
+      const sources = doc.objects.filter((o) => ids.includes(o.id) && !o.locked);
+      if (sources.length < 2) return;
+      const parts = booleanGeometry(
+        sources.map((o) => o.geometry),
+        op,
+      );
+      if (parts.length === 0) return;
+      const base = sources[0]!;
+      const newIds: string[] = [];
+      const labels: Record<BooleanOp, string> = {
+        union: "Merge shapes",
+        subtract: "Subtract shapes",
+        intersect: "Intersect shapes",
+        exclude: "Exclude shapes",
+      };
+      commit(labels[op], (d) => {
+        const made = parts.map((geometry, i) => {
+          const id = nextObjectId();
+          newIds.push(id);
+          return {
+            ...base,
+            id,
+            name: `${labels[op]} ${i + 1}`,
+            type: "path" as const,
+            geometry,
+            cellKey: undefined,
+          };
+        });
+        return { ...d, objects: [...d.objects.filter((o) => !ids.includes(o.id)), ...made] };
+      });
+      set({ selection: newIds });
     },
 
     setSelectionStyle: (patch, label = "Change style") => {
