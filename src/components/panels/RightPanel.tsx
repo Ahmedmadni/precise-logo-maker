@@ -215,6 +215,52 @@ function PaintSection() {
         />
       </div>
 
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <span className={labelCls}>{t("Stroke cap")}</span>
+          <div className="flex gap-1">
+            {(["butt", "round", "square"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md border border-border px-1 py-1 text-[10px] capitalize",
+                  (style.cap ?? "round") === c
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => setSelectionStyle({ cap: c }, "Change stroke cap")}
+              >
+                {t(c === "butt" ? "Flat" : c === "round" ? "Round" : "Square")}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <span className={labelCls}>{t("Stroke join")}</span>
+          <div className="flex gap-1">
+            {(["miter", "round", "bevel"] as const).map((j) => (
+              <button
+                key={j}
+                type="button"
+                className={cn(
+                  "flex-1 rounded-md border border-border px-1 py-1 text-[10px] capitalize",
+                  (style.join ?? "round") === j
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => setSelectionStyle({ join: j }, "Change stroke join")}
+              >
+                {t(j === "miter" ? "Sharp" : j === "round" ? "Round" : "Bevel")}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <PathfinderSection />
+
+
       <button
         type="button"
         className={cn(
