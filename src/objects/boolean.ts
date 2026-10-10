@@ -1,4 +1,5 @@
-import { union, difference, intersection, xor, type Geom } from "polygon-clipping";
+import polygonClipping, { type Geom } from "polygon-clipping";
+const { union, difference, intersection, xor } = polygonClipping;
 import { arcSweep, pointOnCircle } from "../core/geometry/math";
 import type { Geometry, PathGeometry, Point } from "../core/geometry/types";
 
