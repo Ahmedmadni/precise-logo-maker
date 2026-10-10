@@ -1,4 +1,5 @@
-import { intersection } from "polygon-clipping";
+import polygonClipping from "polygon-clipping";
+const { intersection } = polygonClipping;
 import { normalizeAngle, pointOnCircle, pt, rotatePoint } from "../core/geometry/math";
 import type { Point } from "../core/geometry/types";
 import type {
