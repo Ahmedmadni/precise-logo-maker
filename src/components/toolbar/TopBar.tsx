@@ -26,6 +26,7 @@ import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 import { useLangStore, useT } from "../../i18n";
 import { cn } from "../../lib/utils";
+import { AiConstructionDialog } from "../ai/AiConstructionDialog";
 
 const ZOOM_LEVELS = [1, 2, 4, 8];
 
@@ -244,6 +245,7 @@ export function TopBar() {
         >
           <Compass className="h-3.5 w-3.5" aria-hidden /> {t("Guide drawing")}
         </button>
+        <AiConstructionDialog className={btn} />
       </div>
 
       <div className="ms-auto flex flex-none items-center gap-1.5">
