@@ -85,7 +85,7 @@ export const suggestConstruction = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }): Promise<{ spec?: ConstructionSpec; error?: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = process.env["LOVABLE_API_KEY"];
     if (!key) return { error: "AI is not configured." };
 
     const instructions = `You are a senior geometric logo designer. From a brand brief, propose a precise construction for a logo on a ${data.width}x${data.height} px artboard (origin top-left, y down, centre ${data.width / 2},${data.height / 2}).

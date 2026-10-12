@@ -23,8 +23,8 @@ function buildGrids(spec: ConstructionSpec, w: number, h: number): Grid[] {
   return spec.grids.slice(0, 4).flatMap((g) => {
     const kinds = ["square", "concentric", "radial", "isometric", "triangular", "hexagonal", "golden"];
     if (!kinds.includes(g.kind)) return [];
-    const base = createGrid(g.kind as Grid["kind"], center, size) as Grid & Record<string, unknown>;
-    const patch: Record<string, unknown> = { rotation: n(g.rotation, base.rotation) };
+    const base = createGrid(g.kind as Grid["kind"], center, size) as unknown as Record<string, unknown>;
+    const patch: Record<string, unknown> = { rotation: n(g.rotation, base["rotation"] as number) };
     if (g.spacing && g.spacing > 2) {
       if ("spacing" in base) patch.spacing = g.spacing;
       if ("radiusStep" in base) patch.radiusStep = g.spacing;
@@ -33,7 +33,7 @@ function buildGrids(spec: ConstructionSpec, w: number, h: number): Grid[] {
     if (g.count && "count" in base) patch.count = Math.min(40, Math.round(g.count));
     if (g.count && "rings" in base) patch.rings = Math.min(12, Math.round(g.count));
     if (g.rays && "rays" in base) patch.rays = Math.min(72, Math.round(g.rays));
-    return [{ ...base, ...patch } as Grid];
+    return [{ ...base, ...patch } as unknown as Grid];
   });
 }
 

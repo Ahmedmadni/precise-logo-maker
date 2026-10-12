@@ -179,7 +179,7 @@ export interface StudioState {
   /** Inserts a suggested construction (grids + shapes) as one undoable step. */
   applyConstruction: (
     grids: Grid[],
-    shapes: { geometry: Geometry; guide: boolean; style?: Partial<Style> }[],
+    shapes: { geometry: Geometry; guide: boolean; style?: Partial<Style> | undefined }[],
     replace: boolean,
   ) => void;
   updateGrid: (id: string, patch: Partial<Grid>) => void;
