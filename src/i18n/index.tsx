@@ -29,6 +29,20 @@ export const AR: Record<string, string> = {
   "Sweep °": "زاوية القوس °",
   "Scale %": "التحجيم %",
 
+  // AI construction
+  "AI construction": "بناء بالذكاء الاصطناعي",
+  "Suggest a geometric construction from a brand brief": "اقتراح بناء هندسي من وصف العلامة التجارية",
+  "Describe the brand. You get grids, guides and shapes you can edit like anything you drew.":
+    "صف العلامة التجارية، وستحصل على شبكات وخطوط إرشادية وأشكال قابلة للتعديل مثل أي شيء ترسمه.",
+  "e.g. A coffee roastery called Noor: warm, modern, a sunrise over a cup":
+    "مثال: محمصة قهوة اسمها نور، دافئة وعصرية، شروق شمس فوق فنجان",
+  "Designing…": "جارٍ التصميم…",
+  "Suggest construction": "اقترح البناء",
+  Guides: "الإرشادات",
+  Shapes: "الأشكال",
+  "Replace current drawing and grids": "استبدال الرسم والشبكات الحالية",
+  "Insert on artboard": "إدراج في لوح الرسم",
+
   // App / shell
   "Logo Grid Studio": "استوديو شبكات الشعارات",
   "Phase 7 — Drawing & Paint": "المرحلة 7 — الرسم والتلوين",

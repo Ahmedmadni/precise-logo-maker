@@ -176,6 +176,12 @@ export interface StudioState {
   deleteSelection: () => void;
 
   addGrid: (kind: Grid["kind"]) => void;
+  /** Inserts a suggested construction (grids + shapes) as one undoable step. */
+  applyConstruction: (
+    grids: Grid[],
+    shapes: { geometry: Geometry; guide: boolean; style?: Partial<Style> | undefined }[],
+    replace: boolean,
+  ) => void;
   updateGrid: (id: string, patch: Partial<Grid>) => void;
   removeGrid: (id: string) => void;
 
@@ -495,6 +501,36 @@ export const useStudio = create<StudioState>()((set, get) => {
         const size = Math.max(doc.artboard.width, doc.artboard.height);
         return { ...doc, grids: [...doc.grids, createGrid(kind, center, size)] };
       }),
+
+    applyConstruction: (grids, shapes, replace) => {
+      const ids: string[] = [];
+      commit("AI construction", (doc) => {
+        const made: VectorObject[] = shapes.map((s, i) => {
+          const id = nextObjectId();
+          ids.push(id);
+          return {
+            id,
+            name: `${s.guide ? "Guide " : "AI "}${geometryLabel[s.geometry.kind]} ${doc.objects.length + i + 1}`,
+            type: s.geometry.kind,
+            geometry: s.geometry,
+            transform: IDENTITY_TRANSFORM,
+            style: s.guide
+              ? { ...DEFAULT_STYLE, stroke: GUIDE_COLOR, fill: "none", strokeWidth: 1 }
+              : { ...DEFAULT_STYLE, ...s.style },
+            layerId: "shapes",
+            visible: true,
+            locked: false,
+            guide: s.guide,
+          };
+        });
+        return {
+          ...doc,
+          grids: replace ? grids : [...doc.grids, ...grids],
+          objects: replace ? made : [...doc.objects, ...made],
+        };
+      });
+      set({ selection: ids });
+    },
 
     updateGrid: (id, patch) =>
       commit("Update grid", (doc) => ({
