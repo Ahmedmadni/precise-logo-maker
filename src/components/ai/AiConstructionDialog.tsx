@@ -26,13 +26,13 @@ function buildGrids(spec: ConstructionSpec, w: number, h: number): Grid[] {
     const base = createGrid(g.kind as Grid["kind"], center, size) as unknown as Record<string, unknown>;
     const patch: Record<string, unknown> = { rotation: n(g.rotation, base["rotation"] as number) };
     if (g.spacing && g.spacing > 2) {
-      if ("spacing" in base) patch.spacing = g.spacing;
-      if ("radiusStep" in base) patch.radiusStep = g.spacing;
-      if ("size" in base) patch.size = g.spacing;
+      if ("spacing" in base) patch["spacing"] = g.spacing;
+      if ("radiusStep" in base) patch["radiusStep"] = g.spacing;
+      if ("size" in base) patch["size"] = g.spacing;
     }
-    if (g.count && "count" in base) patch.count = Math.min(40, Math.round(g.count));
-    if (g.count && "rings" in base) patch.rings = Math.min(12, Math.round(g.count));
-    if (g.rays && "rays" in base) patch.rays = Math.min(72, Math.round(g.rays));
+    if (g.count && "count" in base) patch["count"] = Math.min(40, Math.round(g.count));
+    if (g.count && "rings" in base) patch["rings"] = Math.min(12, Math.round(g.count));
+    if (g.rays && "rays" in base) patch["rays"] = Math.min(72, Math.round(g.rays));
     return [{ ...base, ...patch } as unknown as Grid];
   });
 }
