@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -24,7 +27,7 @@ jobs:
       # Ubuntu hosted runners include the Android SDK and command-line tools.
       # setup-android@v3 currently tries installing the removed 'tools' package.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: bun install --no-save
       - name: Test and typecheck
         run: |
           npm run typecheck
