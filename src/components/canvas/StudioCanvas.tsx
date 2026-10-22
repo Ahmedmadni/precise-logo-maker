@@ -105,6 +105,7 @@ export function StudioCanvas() {
   const panRef = useRef<{ x: number; y: number } | null>(null);
   // Multi-touch (Android/tablet): two fingers pinch-zoom and pan together.
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchCancelledRef = useRef(false);
   const pinchRef = useRef<{
     dist: number;
     mid: { x: number; y: number };
@@ -300,8 +301,8 @@ export function StudioCanvas() {
   );
 
   const hitTest = useCallback(
-    (world: Point): string | null => {
-      const tol = HIT_PIXELS / view.zoom;
+    (world: Point, tolerancePixels = HIT_PIXELS): string | null => {
+      const tol = tolerancePixels / view.zoom;
       let best: { id: string; d: number } | null = null;
       for (const o of doc.objects) {
         if (!o.visible || o.locked) continue;
@@ -327,7 +328,15 @@ export function StudioCanvas() {
       mid: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
       view: viewRef.current,
     };
-    // Cancel any in-progress single-finger interaction.
+    // A second finger cancels the single-pointer gesture, including paint/pen.
+    // Nothing should be committed when a pinch ends with one finger still down.
+    pinchCancelledRef.current = true;
+    paintStrokeRef.current = null;
+    setPaintPreview([]);
+    penActiveRef.current = false;
+    setPen(null);
+    setDraft(null);
+    setMeasureStart(null);
     panRef.current = null;
     dragRef.current = null;
     setDragOffset(null);
@@ -355,6 +364,7 @@ export function StudioCanvas() {
       beginPinch();
       return;
     }
+    if (pinchCancelledRef.current) return;
     const isPan = spaceDown || e.button === 1 || tool === "pan";
     if (isPan) {
       panRef.current = { x: e.clientX, y: e.clientY };
@@ -417,7 +427,7 @@ export function StudioCanvas() {
         const guideBlocked =
           !!target?.guide && (guideLayer.locked || guideLayer.hidden);
         if (target && !target.locked && target.visible && !guideBlocked) {
-          const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
+          const h = pickHandle(target.geometry, world, (e.pointerType === "touch" ? 18 : HANDLE_PIXELS) / view.zoom);
           if (h) {
             setHandleDrag({
               objectId: target.id,
@@ -428,7 +438,7 @@ export function StudioCanvas() {
           }
         }
       }
-      const hit = hitTest(world);
+      const hit = hitTest(world, e.pointerType === "touch" ? 18 : HIT_PIXELS);
 
       if (hit) {
         if (e.shiftKey) toggleSelection(hit);
@@ -482,6 +492,7 @@ export function StudioCanvas() {
       });
       return;
     }
+    if (pinchCancelledRef.current) return;
     if (panRef.current) {
       const dx = e.clientX - panRef.current.x;
       const dy = e.clientY - panRef.current.y;
@@ -550,6 +561,13 @@ export function StudioCanvas() {
 
   const onPointerUp = (e?: React.PointerEvent<HTMLDivElement>) => {
     if (e) pointersRef.current.delete(e.pointerId);
+    if (pinchCancelledRef.current) {
+      if (pointersRef.current.size === 0) {
+        pinchCancelledRef.current = false;
+        pinchRef.current = null;
+      }
+      return;
+    }
     if (pinchRef.current) {
       if (pointersRef.current.size < 2) pinchRef.current = null;
       return;
@@ -675,6 +693,7 @@ export function StudioCanvas() {
         )
       : null;
 
+  const coarsePointer = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
   const transform = `translate(${view.pan.x} ${view.pan.y}) rotate(${view.rotation}) scale(${view.zoom})`;
   const cursorStyle =
     spaceDown || tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair";
@@ -874,7 +893,7 @@ export function StudioCanvas() {
           {editHandles.map((h) => {
             // Guide handles are drawn larger (touch-friendly) and in guide blue.
             const guideHandle = !!editTarget?.guide;
-            const half = (guideHandle ? 5.5 : 4) / view.zoom;
+            const half = (coarsePointer ? (guideHandle ? 9 : 8) : (guideHandle ? 5.5 : 4)) / view.zoom;
             const accent = guideHandle ? GUIDE_COLOR : "var(--color-primary)";
             return (
             <rect
