@@ -21,7 +21,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      # Ubuntu hosted runners include the Android SDK and command-line tools.
+      # setup-android@v3 currently tries installing the removed 'tools' package.
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Test and typecheck
