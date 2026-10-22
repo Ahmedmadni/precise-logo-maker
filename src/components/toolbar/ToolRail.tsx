@@ -34,7 +34,7 @@ export function ToolRail() {
   return (
     <nav
       aria-label={t("Drawing tools")}
-      className="flex h-full w-12 flex-col items-center gap-1 border-e border-border bg-card py-2 sm:w-14 sm:py-3"
+      className="order-2 flex h-[calc(3.5rem+env(safe-area-inset-bottom))] w-full shrink-0 flex-row items-center gap-1 overflow-x-auto overscroll-x-contain border-t border-border bg-card px-2 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] lg:order-none lg:h-full lg:w-14 lg:flex-col lg:overflow-y-auto lg:border-t-0 lg:border-e lg:px-0 lg:py-3"
     >
       {TOOLS.map(({ id, label, key, icon: Icon }) => (
         <button
@@ -45,7 +45,7 @@ export function ToolRail() {
           aria-label={`${t(label)} ${t("tool")}`}
           aria-pressed={tool === id}
           className={cn(
-            "flex h-11 w-11 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors",
             "hover:bg-accent hover:text-accent-foreground",
             tool === id && "border-border bg-accent text-accent-foreground",
           )}

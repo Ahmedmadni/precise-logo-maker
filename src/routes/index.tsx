@@ -7,6 +7,7 @@ import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { TopBar } from "../components/toolbar/TopBar";
+import { MobileTopBar } from "../components/toolbar/MobileTopBar";
 import { useAutosave } from "../hooks/useAutosave";
 import { useServiceWorker } from "../lib/pwa";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
@@ -42,10 +43,11 @@ function StudioPage() {
       <ClientOnly fallback={null}>
         <LanguageSync />
       </ClientOnly>
-      <TopBar />
-      <div className="flex min-h-0 flex-1">
+      <div className="hidden lg:block"><TopBar /></div>
+      <div className="lg:hidden"><MobileTopBar onOpenPanel={() => setPanelOpen(true)} /></div>
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <ToolRail />
-        <main className="relative min-w-0 flex-1">
+        <main className="order-1 relative min-h-0 min-w-0 flex-1 lg:order-none">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
           </ClientOnly>
@@ -66,7 +68,7 @@ function StudioPage() {
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div className="absolute inset-y-0 end-0 w-[min(20rem,90vw)] shadow-2xl">
+            <div className="studio-safe-panel absolute inset-y-0 end-0 w-[min(23rem,92vw)] shadow-2xl">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>

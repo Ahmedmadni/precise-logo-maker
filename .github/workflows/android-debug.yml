@@ -1,0 +1,49 @@
+name: Android debug build
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # Ubuntu hosted runners include the Android SDK and command-line tools.
+      # setup-android@v3 currently tries installing the removed 'tools' package.
+      - name: Install dependencies
+        run: bun install --no-save
+      - name: Test and typecheck
+        run: |
+          npm run typecheck
+          npm run test
+      - name: Build offline SPA
+        run: npm run build:mobile
+      - name: Generate native Android project and sync
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Build debug APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: logo-grid-studio-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
