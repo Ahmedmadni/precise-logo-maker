@@ -19,7 +19,7 @@ export function StatusBar() {
   const toolLabel = TOOL_LABEL[tool] ?? tool.charAt(0).toUpperCase() + tool.slice(1);
 
   return (
-    <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+    <footer className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
       <span>
         {t("Zoom")} {(view.zoom * 100).toFixed(0)}%
       </span>

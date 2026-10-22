@@ -144,3 +144,22 @@
     color: var(--color-foreground);
   }
 }
+
+/* Mobile studio: avoid browser rubber-banding and respect display cutouts. */
+html, body {
+  width: 100%;
+  height: 100%;
+  overscroll-behavior: none;
+}
+.studio-safe-top { padding-top: env(safe-area-inset-top); }
+.studio-safe-panel { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+@media (pointer: coarse) {
+  input, select, textarea { font-size: max(16px, 1em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
