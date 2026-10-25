@@ -29,6 +29,15 @@ export const AR: Record<string, string> = {
   "Sweep °": "زاوية القوس °",
   "Scale %": "التحجيم %",
 
+  "Path nodes": "نقاط المسار",
+  "Node": "النقطة",
+  "Add node": "إضافة نقطة",
+  "Delete node": "حذف نقطة",
+  "Closed path": "مسار مغلق",
+  "Regenerate construction": "اقتراح جديد",
+  "Construction preview": "معاينة البناء",
+  "Preview guides": "إظهار الإرشادات في المعاينة",
+
   // AI construction
   "AI construction": "بناء بالذكاء الاصطناعي",
   "Suggest a geometric construction from a brand brief": "اقتراح بناء هندسي من وصف العلامة التجارية",
