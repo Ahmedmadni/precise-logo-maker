@@ -22,8 +22,19 @@ export function useAutosave(): void {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => saveAutosave(useStudio.getState().doc), DEBOUNCE_MS);
     });
-    return () => {
+    const flush = () => {
       if (timer) clearTimeout(timer);
+      saveAutosave(useStudio.getState().doc);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
       unsubscribe();
     };
   }, []);

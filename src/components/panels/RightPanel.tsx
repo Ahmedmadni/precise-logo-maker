@@ -42,6 +42,7 @@ import { fitToArtboard, readReferenceImage } from "../../objects/reference";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
+import { PathNodesSection } from "./PathNodesSection";
 
 const TABS = ["Properties", "Cells", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -377,6 +378,7 @@ function ObjectSection() {
   const objects = useStudio((s) => s.doc.objects);
   const updateObject = useStudio((s) => s.updateObject);
   const deleteSelection = useStudio((s) => s.deleteSelection);
+  const guideLayer = useStudio((s) => s.guideLayer);
   const selected = objects.find((o) => o.id === selection[0]);
 
   if (!selected) {
@@ -483,6 +485,10 @@ function ObjectSection() {
           </>
         )}
       </div>
+
+      {g.kind === "path" && selection.length === 1 && (
+        <PathNodesSection key={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
+      )}
 
       {/* Derived dimensions — type a value to reshape the object instantly. */}
       <div className="grid grid-cols-2 gap-2">
