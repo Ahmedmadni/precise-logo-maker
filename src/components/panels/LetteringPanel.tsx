@@ -17,6 +17,8 @@ type Mode = "words" | "marks" | "layers";
 export function LetteringPanel() {
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
+  const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
+  const setEditGlyphNodes = useStudio((s) => s.setEditGlyphNodes);
   const select = useStudio((s) => s.selectLettering);
   const insert = useStudio((s) => s.addLettering);
   const insertBatch = useStudio((s) => s.addLetteringBatch);
@@ -284,6 +286,12 @@ export function LetteringPanel() {
               </label>
             ))}
           </div>
+          {selected.kind === "outline" && (
+            <button type="button" className={`${button} w-full ${editGlyphNodes ? "border-primary text-primary" : ""}`}
+              onClick={() => setEditGlyphNodes(!editGlyphNodes)}>
+              {editGlyphNodes ? "إنهاء تحرير نقاط المنحنيات" : "تحرير نقاط Bézier والحواف في مساحة الرسم"}
+            </button>
+          )}
           {selected.kind === "outline" && (
             <label className="block space-y-1"><span className="text-xs text-muted-foreground">زيادة السمك بصريًا (ليس تعديل مسار الحرف)</span>
               <input type="range" min={0} max={8} step={0.25} className="w-full"
