@@ -6,16 +6,22 @@ import { letteringSvg } from "../calligraphy/model";
 const escapeXml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Protect SVG exports from malformed imported project style values. */
+const safePaint = (value: string): string =>
+  /^(?:none|transparent|currentColor|#[0-9a-fA-F]{3,8}|rgba?\\([0-9.,%\\s]+\\)|[a-zA-Z]{2,30})$/.test(value) ? value : "none";
+const opacity01 = (value: number | undefined): number =>
+  value === undefined || !Number.isFinite(value) ? 1 : Math.min(1, Math.max(0, value));
+
 const objectToSvg = (o: VectorObject): string => {
   const s = o.style;
   const extras = [
-    s.fillOpacity !== undefined && s.fillOpacity !== 1 ? ` fill-opacity="${s.fillOpacity}"` : "",
-    s.opacity !== undefined && s.opacity !== 1 ? ` opacity="${s.opacity}"` : "",
-    s.dash ? ` stroke-dasharray="${s.dash} ${s.dash}"` : "",
+    opacity01(s.fillOpacity) !== 1 ? ` fill-opacity="${opacity01(s.fillOpacity)}"` : "",
+    opacity01(s.opacity) !== 1 ? ` opacity="${opacity01(s.opacity)}"` : "",
+    s.dash && Number.isFinite(s.dash) && s.dash > 0 ? ` stroke-dasharray="${s.dash} ${s.dash}"` : "",
   ].join("");
   return `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
     o.geometry,
-  )}" fill="${escapeXml(s.fill)}" stroke="${escapeXml(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
+  )}" fill="${safePaint(s.fill)}" stroke="${safePaint(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
 };
 
 export interface ExportOptions {
@@ -37,7 +43,7 @@ export const buildSvgDocument = (
     ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
     : "";
   const bg = options.background
-    ? `  <rect width="${a.width}" height="${a.height}" fill="${a.background}" />\n`
+    ? `  <rect width="${a.width}" height="${a.height}" fill="${safePaint(a.background)}" />\n`
     : "";
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}">`,
