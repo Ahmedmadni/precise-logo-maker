@@ -29,7 +29,7 @@ export interface LetteringItem {
   pathData?: string;
   unitsPerEm?: number;
   /** One word/run can have several independently editable outlined glyphs. */
-  groupId?: string;
+  groupId?: string | undefined;
   sourceText?: string;
   glyphIndex?: number;
 }
