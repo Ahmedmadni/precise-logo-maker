@@ -6,7 +6,7 @@ import { shapeArabicWithFont } from "../shaping";
 import { letteringSvg } from "../model";
 
 const amiriPath = resolve(process.cwd(), "node_modules/@fontsource/amiri/files/amiri-arabic-400-normal.woff");
-const font = create(new Uint8Array(readFileSync(amiriPath)));
+const font = create(readFileSync(amiriPath));
 const opts = {
   phrase: "سَلَام", font: "Amiri" as const, size: 200, x: 450, y: 500, color: "#d1a95e",
 };
