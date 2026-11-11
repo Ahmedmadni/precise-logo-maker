@@ -14,7 +14,7 @@ export function ConstructionPreview({ spec, width, height }: { spec: Constructio
   const shapes = useMemo(() => buildShapes(spec), [spec]);
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("Construction preview")} className="h-56 w-full rounded-md border border-border bg-background" dir="ltr">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("Construction preview")} className="h-56 w-full rounded-md border border-border bg-background">
         {guides && grids.map((grid) => <GridLayer key={grid.id} grid={grid} />)}
         {shapes.filter((shape) => guides || !shape.guide).map((shape, i) => (
           <path key={i} d={geometryToPathData(shape.geometry)} fill={shape.guide ? "none" : shape.style?.fill ?? "none"} stroke="currentColor" className={shape.guide ? "text-muted-foreground" : "text-foreground"} strokeWidth={shape.guide ? 1 : 2} strokeDasharray={shape.guide ? "5 4" : undefined} vectorEffect="non-scaling-stroke" />
