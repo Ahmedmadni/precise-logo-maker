@@ -5,8 +5,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches:
-      - feat/arabic-lettering-android-studio
+    branches: [main]
 
 permissions:
   contents: read

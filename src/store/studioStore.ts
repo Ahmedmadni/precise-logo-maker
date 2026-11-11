@@ -140,8 +140,17 @@ export interface StudioState {
   tool: ToolId;
   selection: string[];
   selectedLetteringId: string | null;
+  editGlyphNodes: boolean;
+  setEditGlyphNodes: (editing: boolean) => void;
+  letteringMode: "words" | "marks" | "layers";
+  setLetteringMode: (mode: "words" | "marks" | "layers") => void;
   selectLettering: (id: string | null) => void;
   addLettering: (item: LetteringItem) => void;
+  addLetteringBatch: (items: LetteringItem[]) => void;
+  replaceLetteringGroup: (groupId: string, items: LetteringItem[]) => void;
+  moveLetteringGroup: (groupId: string, dx: number, dy: number) => void;
+  duplicateLettering: (id: string) => void;
+  reorderLettering: (id: string, direction: -1 | 1) => void;
   updateLettering: (id: string, patch: Partial<LetteringItem>) => void;
   moveLettering: (id: string, dx: number, dy: number) => void;
   deleteLettering: (id: string) => void;
@@ -298,10 +307,52 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    editGlyphNodes: false,
+    setEditGlyphNodes: (editGlyphNodes) => set({ editGlyphNodes, tool: "select" }),
+    letteringMode: "words",
+    setLetteringMode: (letteringMode) => set({ letteringMode }),
     selectLettering: (id) => set({ selectedLetteringId: id, selection: [] }),
     addLettering: (item) => {
       commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
       set({ selectedLetteringId: item.id, selection: [], tool: "select" });
+    },
+    addLetteringBatch: (items) => {
+      if (!items.length) return;
+      commit(`Compose Arabic word (${items.length} glyphs)`, (doc) => ({
+        ...doc, lettering: [...(doc.lettering ?? []), ...items],
+      }));
+      set({ selectedLetteringId: items[0]!.id, selection: [], tool: "select" });
+    },
+    replaceLetteringGroup: (groupId, items) => {
+      if (!items.length) return;
+      commit("Recompose Arabic word", (doc) => ({ ...doc,
+        lettering: [...(doc.lettering ?? []).filter((entry) => entry.groupId !== groupId), ...items],
+      }));
+      set({ selectedLetteringId: items[0]!.id });
+    },
+    moveLetteringGroup: (groupId, dx, dy) => {
+      if (!groupId || (dx === 0 && dy === 0)) return;
+      commit("Move calligraphy word", (doc) => ({
+        ...doc, lettering: (doc.lettering ?? []).map((item) =>
+          item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item),
+      }));
+    },
+    duplicateLettering: (id) => {
+      const item = (get().doc.lettering ?? []).find((x) => x.id === id);
+      if (!item) return;
+      const copy = { ...item, id: `copy-${crypto.randomUUID()}`, groupId: undefined, x: item.x + 24, y: item.y + 24 };
+      commit("Duplicate calligraphy element", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), copy] }));
+      set({ selectedLetteringId: copy.id });
+    },
+    reorderLettering: (id, direction) => {
+      commit("Reorder lettering", (doc) => {
+        const lettering = [...(doc.lettering ?? [])];
+        const index = lettering.findIndex((entry) => entry.id === id);
+        const next = index + direction;
+        if (index < 0 || next < 0 || next >= lettering.length) return doc;
+        [lettering[index], lettering[next]] = [lettering[next]!, lettering[index]!];
+        return { ...doc, lettering };
+      });
     },
     updateLettering: (id, patch) =>
       commit("Edit Arabic lettering", (doc) => ({

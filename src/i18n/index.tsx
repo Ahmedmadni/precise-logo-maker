@@ -115,6 +115,7 @@ export const AR: Record<string, string> = {
   "Reset view": "إعادة ضبط العرض",
   "Export SVG": "تصدير SVG",
   "Export PNG": "تصدير PNG",
+  Transparent: "خلفية شفافة",
   "PNG export size": "حجم تصدير PNG",
 
   // Tools

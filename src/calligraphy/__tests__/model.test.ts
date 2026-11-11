@@ -31,6 +31,6 @@ describe("Arabic lettering and safe SVG export", () => {
     expect(output).not.toContain("onload");
   });
   it("gives custom Thuluth an explicit Arabic fallback", () => {
-    expect(fontFamily("Custom Thuluth")).toContain("Noto Naskh Arabic");
+    expect(fontFamily("Custom Thuluth")).toContain("Amiri");
   });
 });

@@ -39,7 +39,8 @@ export const buildSvgDocument = (
     .map(objectToSvg)
     .join("\n");
   const lettering = (doc.lettering ?? []).map(letteringSvg).filter(Boolean).join("\n");
-  const embeddedFont = doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
+  const hasLiveCustomText = (doc.lettering ?? []).some((item) => item.kind === "text" && item.font === "Custom Thuluth");
+  const embeddedFont = hasLiveCustomText && doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
     ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
     : "";
   const bg = options.background
@@ -53,8 +54,8 @@ export const buildSvgDocument = (
   ].join("\n");
 };
 
-export const downloadSvg = (doc: DocumentState, filename = "logo.svg"): void => {
-  const blob = new Blob([buildSvgDocument(doc)], { type: "image/svg+xml" });
+export const downloadSvg = (doc: DocumentState, filename = "logo.svg", options: ExportOptions = { background: true }): void => {
+  const blob = new Blob([buildSvgDocument(doc, options)], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -64,8 +65,8 @@ export const downloadSvg = (doc: DocumentState, filename = "logo.svg"): void => 
 };
 
 /** Rasterises the exported SVG to a PNG blob at the requested pixel width. */
-export const renderPng = async (doc: DocumentState, size: number): Promise<Blob> => {
-  const svg = buildSvgDocument(doc);
+export const renderPng = async (doc: DocumentState, size: number, options: ExportOptions = { background: true }): Promise<Blob> => {
+  const svg = buildSvgDocument(doc, options);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   try {
     const image = new Image();
@@ -94,8 +95,9 @@ export const downloadPng = async (
   doc: DocumentState,
   size = 1024,
   filename = `logo-${Math.round(size)}.png`,
+  options: ExportOptions = { background: true },
 ): Promise<void> => {
-  const blob = await renderPng(doc, size);
+  const blob = await renderPng(doc, size, options);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

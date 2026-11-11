@@ -26,6 +26,7 @@ import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/traci
 import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
+import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
@@ -85,6 +86,8 @@ export function StudioCanvas() {
   const selectLettering = useStudio((s) => s.selectLettering);
   const selectedLetteringId = useStudio((s) => s.selectedLetteringId);
   const moveLettering = useStudio((s) => s.moveLettering);
+  const updateLettering = useStudio((s) => s.updateLettering);
+  const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -102,6 +105,8 @@ export function StudioCanvas() {
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
   const letterDragRef = useRef<{ id: string; start: Point } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
+  const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
+  const [nodePreview, setNodePreview] = useState<{ id: string; path: string } | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
   const [handleDrag, setHandleDrag] = useState<{
@@ -339,6 +344,8 @@ export function StudioCanvas() {
     panRef.current = null;
     dragRef.current = null;
     letterDragRef.current = null;
+    nodeDragRef.current = null;
+    setNodePreview(null);
     setLetterOffset(null);
     setDragOffset(null);
     setBox(null);
@@ -426,6 +433,15 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
+      const handle = editGlyphNodes ? (e.target as Element).closest("[data-outline-node]") : null;
+      const editItem = doc.lettering?.find((item) => item.id === selectedLetteringId);
+      const rawIndex = handle?.getAttribute("data-outline-node");
+      const nodeId = rawIndex === null || rawIndex === undefined ? NaN : Number(rawIndex);
+      if (editItem?.kind === "outline" && editItem.pathData && Number.isInteger(nodeId)) {
+        nodeDragRef.current = { id: editItem.id, nodeId, startPath: editItem.pathData };
+        setNodePreview({ id: editItem.id, path: editItem.pathData });
+        return;
+      }
       const letteringId = (e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
       if (letteringId && (doc.lettering ?? []).some((item) => item.id === letteringId)) {
         selectLettering(letteringId);
@@ -512,6 +528,17 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if (nodeDragRef.current) {
+      const item = (doc.lettering ?? []).find((entry) => entry.id === nodeDragRef.current?.id);
+      if (item) {
+        const point = worldToGlyphPoint(item, world.x, world.y);
+        if (point) {
+          const path = editOutlineNode(nodeDragRef.current.startPath, nodeDragRef.current.nodeId, point.x, point.y);
+          if (path) setNodePreview({ id: item.id, path });
+        }
+      }
+      return;
+    }
     if (letterDragRef.current) {
       setLetterOffset(pt(world.x - letterDragRef.current.start.x, world.y - letterDragRef.current.start.y));
       return;
@@ -581,6 +608,15 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (nodeDragRef.current) {
+      const id = nodeDragRef.current.id;
+      const original = nodeDragRef.current.startPath;
+      nodeDragRef.current = null;
+      const changed = nodePreview?.id === id && nodePreview.path !== original ? nodePreview.path : null;
+      setNodePreview(null);
+      if (changed) updateLettering(id, { pathData: changed });
+      return;
+    }
     if (letterDragRef.current) {
       const { id } = letterDragRef.current;
       letterDragRef.current = null;
@@ -825,9 +861,21 @@ export function StudioCanvas() {
           <g>
             {(doc.lettering ?? []).map((item) => (
               <LetteringGlyph key={item.id} item={item} selected={item.id === selectedLetteringId}
-                offset={item.id === selectedLetteringId ? letterOffset : null} />
+                offset={item.id === selectedLetteringId ? letterOffset : null}
+                overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />
             ))}
           </g>
+          {/* Editable font-outline anchor and Bézier handles. Kept out of SVG exports. */}
+          {editGlyphNodes && tool === "select" && (doc.lettering ?? []).filter((item) => item.id === selectedLetteringId && item.kind === "outline").map((item) =>
+            <g key={`handles-${item.id}`}>
+              {outlineNodes(nodePreview?.id === item.id ? nodePreview.path : item.pathData ?? "").slice(0, 350).map((n) => {
+                const worldPoint = glyphPointToWorld(item, n.x, n.y);
+                return <circle key={n.id} data-outline-node={n.id} cx={worldPoint.x} cy={worldPoint.y}
+                  r={7 / view.zoom} fill={n.role === "anchor" ? "var(--color-primary)" : "#45c5d5"}
+                  stroke="#171717" strokeWidth={1 / view.zoom} className="cursor-crosshair" />;
+              })}
+            </g>
+          )}
           {/* Draft preview */}
           {preview && (
             <path

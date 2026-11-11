@@ -50,6 +50,7 @@ export function TopBar() {
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const [pngSize, setPngSize] = useState(1024);
+  const [transparent, setTransparent] = useState(false);
   const [busy, setBusy] = useState(false);
   const t = useT();
   const lang = useLangStore((s) => s.lang);
@@ -77,7 +78,7 @@ export function TopBar() {
   const exportPng = async () => {
     setBusy(true);
     try {
-      await downloadPng(doc, pngSize);
+      await downloadPng(doc, pngSize, transparent ? `logo-${pngSize}-transparent.png` : `logo-${pngSize}.png`, { background: !transparent });
     } finally {
       setBusy(false);
     }
@@ -268,10 +269,14 @@ export function TopBar() {
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden /> {t("Reset")}
         </button>
+        <label className="flex min-h-10 flex-none items-center gap-1 rounded-md border border-border px-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} />
+          {t("Transparent")}
+        </label>
         <button
           type="button"
           className={btn}
-          onClick={() => downloadSvg(doc)}
+          onClick={() => downloadSvg(doc, transparent ? "logo-transparent.svg" : "logo.svg", { background: !transparent })}
           disabled={doc.objects.length === 0 && (doc.lettering?.length ?? 0) === 0}
           title={t("Export SVG")}
         >

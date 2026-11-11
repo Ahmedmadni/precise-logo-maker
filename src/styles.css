@@ -1,4 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap");
+@import "@fontsource/amiri/arabic-400.css";
+@import "@fontsource/aref-ruqaa/arabic-400.css";
+@import "@fontsource/scheherazade-new/arabic-400.css";
+@import "@fontsource/gulzar/arabic-400.css";
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
