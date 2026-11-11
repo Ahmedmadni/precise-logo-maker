@@ -28,7 +28,8 @@ export function LetteringPanel() {
   const reorder = useStudio((s) => s.reorderLettering);
   const undo = useStudio((s) => s.undo);
   const redo = useStudio((s) => s.redo);
-  const [mode, setMode] = useState<Mode>("words");
+  const mode = useStudio((s) => s.letteringMode) as Mode;
+  const setMode = useStudio((s) => s.setLetteringMode);
   const [phrase, setPhrase] = useState("المدني");
   const [font, setFont] = useState<FontPreset>("Amiri");
   const [fontSize, setFontSize] = useState(180);
