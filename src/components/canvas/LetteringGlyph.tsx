@@ -1,7 +1,8 @@
+import { memo } from "react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { HARAKAT, ORNAMENTS, fontFamily, letteringTransform, safePath } from "../../calligraphy/model";
 
-export function LetteringGlyph({ item, selected, offset, overridePath }: {
+export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, offset, overridePath }: {
   item: LetteringItem;
   selected: boolean;
   offset?: { x: number; y: number } | null;
@@ -39,4 +40,4 @@ export function LetteringGlyph({ item, selected, offset, overridePath }: {
       ) : null}
     </g>
   );
-}
+});
