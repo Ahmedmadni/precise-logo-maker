@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Type, Trash2 } from "lucide-react";
 import { FONT_PRESETS, HARAKAT, createLettering, fontFamily, type FontPreset } from "../../calligraphy/model";
 import { useStudio } from "../../store/studioStore";
@@ -16,16 +16,7 @@ export function LetteringPanel() {
   const [fontError, setFontError] = useState("");
   const fontInput = useRef<HTMLInputElement>(null);
   const item = (doc.lettering ?? []).find((entry) => entry.id === selectedId);
-  const fontData = doc.customThuluthFont;
-  useEffect(() => {
-    if (!fontData || typeof FontFace === "undefined") return;
-    let disposed = false;
-    const face = new FontFace("Custom Thuluth", `url("${fontData}")`);
-    void face.load().then((loaded) => {
-      if (!disposed) document.fonts.add(loaded);
-    }).catch(() => { if (!disposed) setFontError(t("Could not load that font.")); });
-    return () => { disposed = true; };
-  }, [fontData, t]);
+  // The canvas bootstraps the licensed font even when this panel is closed.
 
   const addText = () => {
     const newItem = createLettering(doc.artboard.width / 2, doc.artboard.height / 2);
