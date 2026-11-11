@@ -31,7 +31,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometry, type BooleanOp } from "../objects/boolean";
 
 export type ToolId =
-  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan";
+  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan" | "lettering";
 
 export interface Artboard {
   width: number;
