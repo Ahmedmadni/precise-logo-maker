@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -43,8 +43,9 @@ import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { PathNodesSection } from "./PathNodesSection";
+import { LetteringPanel } from "./LetteringPanel";
 
-const TABS = ["Properties", "Cells", "Objects", "Grids", "Snap", "Precision", "History"] as const;
+const TABS = ["Properties", "Calligraphy", "Cells", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
 
 const fieldCls =
@@ -1873,6 +1874,9 @@ function HistoryTab() {
 export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
   const t = useT();
   const [tab, setTab] = useState<Tab>("Properties");
+  const tool = useStudio((s) => s.tool);
+  const selectedLetteringId = useStudio((s) => s.selectedLetteringId);
+  useEffect(() => { if (tool === "lettering" || selectedLetteringId) setTab("Calligraphy"); }, [tool, selectedLetteringId]);
 
   return (
     <aside className="flex h-full w-full flex-col border-border bg-card lg:w-72 lg:border-s">
@@ -1922,6 +1926,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
             <PaintSection />
           </>
         )}
+        {tab === "Calligraphy" && <LetteringPanel />}
         {tab === "Cells" && <CellsTab />}
         {tab === "Objects" && <ObjectsTab />}
         {tab === "Grids" && <GridsTab />}
