@@ -39,7 +39,8 @@ export const buildSvgDocument = (
     .map(objectToSvg)
     .join("\n");
   const lettering = (doc.lettering ?? []).map(letteringSvg).filter(Boolean).join("\n");
-  const embeddedFont = doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
+  const hasLiveCustomText = (doc.lettering ?? []).some((item) => item.kind === "text" && item.font === "Custom Thuluth");
+  const embeddedFont = hasLiveCustomText && doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
     ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
     : "";
   const bg = options.background
