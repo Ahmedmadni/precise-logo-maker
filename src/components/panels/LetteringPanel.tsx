@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Buffer } from "buffer";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Layers, LoaderCircle, RotateCcw, Sparkles, Trash2, Type, WandSparkles } from "lucide-react";
 import {
   FONT_DESCRIPTIONS, HARAKAT, ORNAMENTS, createHaraka, createOrnament,
@@ -94,6 +95,10 @@ export function LetteringPanel() {
         reader.onerror = () => reject(new Error("تعذر قراءة ملف الخط."));
         reader.readAsDataURL(file);
       });
+      const fontkit = await import("fontkit");
+      const decoded = new Uint8Array(await file.arrayBuffer());
+      const parsed = fontkit.create(Buffer.from(decoded));
+      if (!parsed.hasGlyphForCodePoint(0x627)) throw new Error("الخط لا يحتوي على حروف عربية قابلة للتشكيل.");
       useStudio.getState().setCustomThuluthFont(data);
       setFont("Custom Thuluth");
     } catch (cause) {
