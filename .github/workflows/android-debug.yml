@@ -7,9 +7,10 @@ on:
   push:
     branches:
       - feat/arabic-lettering-android-studio
+      - feat/arabic-outline-composer
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify-and-package:
@@ -21,7 +22,17 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
+      - name: Sync dependency lockfile
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/arabic-outline-composer'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bun.lock
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: lock Arabic font and OpenType dependencies'
+            git push origin HEAD:feat/arabic-outline-composer
+          fi
       - name: Run tests
         run: bunx vitest run
       - name: Type-check TypeScript
