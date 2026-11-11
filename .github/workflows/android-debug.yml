@@ -31,8 +31,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # GitHub's 2026 Ubuntu runner already includes the Android command-line SDK.
+      # Avoid setup-android@v3: it invokes the removed 'sdkmanager tools' package.
+      - name: Ensure Android compile SDK is installed
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
       - name: Generate Android Studio project
         run: bunx cap add android
       - name: Synchronize Android project
