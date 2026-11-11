@@ -143,6 +143,7 @@ export interface StudioState {
   selectLettering: (id: string | null) => void;
   addLettering: (item: LetteringItem) => void;
   addLetteringBatch: (items: LetteringItem[]) => void;
+  replaceLetteringGroup: (groupId: string, items: LetteringItem[]) => void;
   moveLetteringGroup: (groupId: string, dx: number, dy: number) => void;
   duplicateLettering: (id: string) => void;
   reorderLettering: (id: string, direction: -1 | 1) => void;
@@ -313,6 +314,13 @@ export const useStudio = create<StudioState>()((set, get) => {
         ...doc, lettering: [...(doc.lettering ?? []), ...items],
       }));
       set({ selectedLetteringId: items[0]!.id, selection: [], tool: "select" });
+    },
+    replaceLetteringGroup: (groupId, items) => {
+      if (!items.length) return;
+      commit("Recompose Arabic word", (doc) => ({ ...doc,
+        lettering: [...(doc.lettering ?? []).filter((entry) => entry.groupId !== groupId), ...items],
+      }));
+      set({ selectedLetteringId: items[0]!.id });
     },
     moveLetteringGroup: (groupId, dx, dy) => {
       if (!groupId || (dx === 0 && dy === 0)) return;
