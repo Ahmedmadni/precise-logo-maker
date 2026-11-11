@@ -1,5 +1,6 @@
 import type { FontPreset, LetteringItem } from "./model";
 import type { Font } from "fontkit";
+import { Buffer } from "buffer";
 
 /** Bundled OFL fonts — no remote CDN and no request to the Lovable backend. */
 const FONT_URLS: Partial<Record<FontPreset, () => Promise<string>>> = {
@@ -35,7 +36,7 @@ export interface ComposeOptions {
   x: number;
   y: number;
   color: string;
-  customFontData?: string;
+  customFontData?: string | undefined;
 }
 
 /**
@@ -52,7 +53,7 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
   const bytes = await getFont(options.font, options.customFontData);
   // Lazy-load the heavier font parser only when the user creates outlines.
   const fontkit = await import("fontkit");
-  const font = fontkit.create(bytes);
+  const font = fontkit.create(Buffer.from(bytes));
   return shapeArabicWithFont(font, { ...options, phrase });
 }
 
