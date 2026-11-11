@@ -140,6 +140,8 @@ export interface StudioState {
   tool: ToolId;
   selection: string[];
   selectedLetteringId: string | null;
+  letteringMode: "words" | "marks" | "layers";
+  setLetteringMode: (mode: "words" | "marks" | "layers") => void;
   selectLettering: (id: string | null) => void;
   addLettering: (item: LetteringItem) => void;
   addLetteringBatch: (items: LetteringItem[]) => void;
@@ -303,6 +305,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    letteringMode: "words",
+    setLetteringMode: (letteringMode) => set({ letteringMode }),
     selectLettering: (id) => set({ selectedLetteringId: id, selection: [] }),
     addLettering: (item) => {
       commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
