@@ -140,6 +140,8 @@ export interface StudioState {
   tool: ToolId;
   selection: string[];
   selectedLetteringId: string | null;
+  editGlyphNodes: boolean;
+  setEditGlyphNodes: (editing: boolean) => void;
   letteringMode: "words" | "marks" | "layers";
   setLetteringMode: (mode: "words" | "marks" | "layers") => void;
   selectLettering: (id: string | null) => void;
@@ -305,6 +307,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    editGlyphNodes: false,
+    setEditGlyphNodes: (editGlyphNodes) => set({ editGlyphNodes, tool: "select" }),
     letteringMode: "words",
     setLetteringMode: (letteringMode) => set({ letteringMode }),
     selectLettering: (id) => set({ selectedLetteringId: id, selection: [] }),
