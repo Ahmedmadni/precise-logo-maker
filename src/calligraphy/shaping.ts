@@ -1,4 +1,5 @@
 import type { FontPreset, LetteringItem } from "./model";
+import type { Font } from "fontkit";
 
 /** Bundled OFL fonts — no remote CDN and no request to the Lovable backend. */
 const FONT_URLS: Partial<Record<FontPreset, () => Promise<string>>> = {
@@ -52,6 +53,12 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
   // Lazy-load the heavier font parser only when the user creates outlines.
   const fontkit = await import("fontkit");
   const font = fontkit.create(bytes);
+  return shapeArabicWithFont(font, { ...options, phrase });
+}
+
+/** Pure shaping adapter: testable with a locally bundled font, no fetch/network. */
+export function shapeArabicWithFont(font: Font, options: ComposeOptions): LetteringItem[] {
+  const phrase = options.phrase.normalize("NFC").trim();
   const run = font.layout(phrase, undefined, "arab", "ARA", "rtl");
   if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
     throw new Error("تعذر تشكيل الحروف بهذا الخط.");
