@@ -107,7 +107,7 @@ export function TopBar() {
   };
 
   const btn =
-    "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
     <header className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-border bg-card px-3 py-2 [scrollbar-width:none]">
@@ -146,7 +146,7 @@ export function TopBar() {
           className={btn}
           onClick={() => {
             if (
-              doc.objects.length === 0 ||
+              doc.objects.length === 0 && (doc.lettering?.length ?? 0) === 0 ||
               window.confirm(t("Start a new document? Unsaved work is lost."))
             )
               newDocument();
@@ -272,7 +272,7 @@ export function TopBar() {
           type="button"
           className={btn}
           onClick={() => downloadSvg(doc)}
-          disabled={doc.objects.length === 0}
+          disabled={doc.objects.length === 0 && (doc.lettering?.length ?? 0) === 0}
           title={t("Export SVG")}
         >
           <Download className="h-3.5 w-3.5" aria-hidden /> SVG
@@ -293,7 +293,7 @@ export function TopBar() {
           type="button"
           className={btn}
           onClick={() => void exportPng()}
-          disabled={doc.objects.length === 0 || busy}
+          disabled={(doc.objects.length === 0 && (doc.lettering?.length ?? 0) === 0) || busy}
           title={t("Export PNG")}
         >
           <Image className="h-3.5 w-3.5" aria-hidden /> PNG
