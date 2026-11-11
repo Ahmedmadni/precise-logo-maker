@@ -6,6 +6,7 @@ import { StudioCanvas } from "../components/canvas/StudioCanvas";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
+import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { TopBar } from "../components/toolbar/TopBar";
 import { useAutosave } from "../hooks/useAutosave";
 import { useServiceWorker } from "../lib/pwa";
@@ -45,7 +46,7 @@ function StudioPage() {
       </ClientOnly>
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <ToolRail onOpenLettering={() => setPanelOpen(true)} />
+        <div className="hidden sm:flex"><ToolRail onOpenLettering={() => setPanelOpen(true)} /></div>
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
@@ -67,13 +68,14 @@ function StudioPage() {
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div className="absolute inset-y-0 end-0 w-[min(20rem,90vw)] shadow-2xl">
+            <div className="absolute inset-x-0 bottom-0 h-[min(82dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>
         )}
       </div>
-      <StatusBar />
+      <MobileToolDock openPanel={() => setPanelOpen(true)} />
+      <div className="hidden sm:block"><StatusBar /></div>
     </div>
   );
 }
@@ -85,7 +87,7 @@ function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }
       type="button"
       onClick={onToggle}
       aria-label={t("Panels")}
-      className="absolute bottom-4 end-4 z-30 inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg lg:hidden"
+      className="absolute top-3 end-3 z-30 inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg lg:hidden"
     >
       {open ? (
         <X className="h-5 w-5" aria-hidden />
