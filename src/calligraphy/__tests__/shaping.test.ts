@@ -33,6 +33,17 @@ describe("real OpenType Arabic outlines", () => {
     expect(first.every((x) => Number.isFinite(x.x) && Number.isFinite(x.y))).toBe(true);
   });
 
+  it("keeps Arabic words as independent editable groups in RTL order", () => {
+    const glyphs = shapeArabicWithFont(font, { ...opts, phrase: "بسم الله" });
+    const groups = [...new Set(glyphs.map((g) => g.groupId))];
+    expect(groups).toHaveLength(2);
+    const rightWord = glyphs.filter((g) => g.groupId === groups[0]);
+    const leftWord = glyphs.filter((g) => g.groupId === groups[1]);
+    expect(rightWord[0]!.sourceText).toBe("بسم");
+    expect(leftWord[0]!.sourceText).toBe("الله");
+    expect(Math.max(...rightWord.map((g) => g.x))).toBeGreaterThan(Math.max(...leftWord.map((g) => g.x)));
+  });
+
   it("positions combining vowel marks by OpenType layout rather than isolating Unicode letters", () => {
     const withMarks = shapeArabicWithFont(font, opts);
     const withoutMarks = shapeArabicWithFont(font, { ...opts, phrase: "سلام" });
