@@ -1,10 +1,11 @@
 import type { LetteringItem } from "../../calligraphy/model";
 import { HARAKAT, ORNAMENTS, fontFamily, letteringTransform, safePath } from "../../calligraphy/model";
 
-export function LetteringGlyph({ item, selected, offset }: {
+export function LetteringGlyph({ item, selected, offset, overridePath }: {
   item: LetteringItem;
   selected: boolean;
   offset?: { x: number; y: number } | null;
+  overridePath?: string | null;
 }) {
   const size = Math.max(1, Math.min(1000, item.size));
   const itemToDraw = offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y } : item;
@@ -13,7 +14,7 @@ export function LetteringGlyph({ item, selected, offset }: {
     : item.kind === "ornament" ? ORNAMENTS.find((m) => m.id === item.ornament) : null;
   const unit = item.unitsPerEm && item.unitsPerEm > 0 ? item.unitsPerEm : 1000;
   const scale = size / unit;
-  const outline = item.kind === "outline" ? safePath(item.pathData) : "";
+  const outline = item.kind === "outline" ? safePath(overridePath ?? item.pathData) : "";
   return (
     <g data-lettering-id={item.id} transform={transform}>
       {outline ? (
