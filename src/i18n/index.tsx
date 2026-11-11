@@ -52,6 +52,24 @@ export const AR: Record<string, string> = {
   "Replace current drawing and grids": "استبدال الرسم والشبكات الحالية",
   "Insert on artboard": "إدراج في لوح الرسم",
 
+  // Arabic vector calligraphy
+  "Arabic lettering": "الخط العربي",
+  "Add Arabic lettering, then place separate vector diacritics precisely.": "أضف كتابة عربية قابلة للتعديل، ثم ضع علامات التشكيل الفيكتور بحرية ودقة.",
+  "Add editable Arabic lettering, then place separate vector diacritics precisely.": "أضف كتابة عربية قابلة للتعديل، ثم ضع علامات التشكيل الفيكتور بحرية ودقة.",
+  "Add Arabic text": "إضافة نص عربي",
+  "Diacritic ornaments": "حركات التشكيل",
+  "Lettering elements": "عناصر الخط",
+  "Choose an element": "اختر عنصرا",
+  Text: "النص",
+  Font: "الخط",
+  Size: "الحجم",
+  Rotation: "الدوران",
+  "Custom Thuluth font": "استيراد خط الثلث",
+  "Import your licensed Thuluth font. The font will be stored in the project, but text is not converted to glyph outlines.": "يمكنك استيراد ملف خط ثلث مرخص؛ يُحفظ الخط مع المشروع، لكن النص لا يتحول تلقائيا إلى حدود حروف.",
+  "Import font": "استيراد الخط",
+  "Could not load that font.": "تعذر تحميل الخط.",
+  "Choose a licensed TTF/OTF/WOFF font under 1.5 MB.": "اختر ملف خط مرخص TTF أو OTF أو WOFF أصغر من 1.5 ميجابايت.",
+
   // App / shell
   "Logo Grid Studio": "استوديو شبكات الشعارات",
   "Phase 7 — Drawing & Paint": "المرحلة 7 — الرسم والتلوين",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
 import { PanelRightOpen, X } from "lucide-react";
@@ -11,6 +11,7 @@ import { useAutosave } from "../hooks/useAutosave";
 import { useServiceWorker } from "../lib/pwa";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 import { useLanguageBootstrap, useT } from "../i18n";
+import { useStudio } from "../store/studioStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,7 +45,7 @@ function StudioPage() {
       </ClientOnly>
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <ToolRail />
+        <ToolRail onOpenLettering={() => setPanelOpen(true)} />
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
@@ -104,5 +105,13 @@ function CanvasWithShortcuts() {
   useStudioShortcuts();
   useAutosave();
   useServiceWorker();
+  const fontData = useStudio((s) => s.doc.customThuluthFont);
+  useEffect(() => {
+    if (!fontData || typeof FontFace === "undefined") return;
+    let active = true;
+    const face = new FontFace("Custom Thuluth", `url("${fontData}")`);
+    void face.load().then((loaded) => { if (active) document.fonts.add(loaded); }).catch(() => {});
+    return () => { active = false; };
+  }, [fontData]);
   return <StudioCanvas />;
 }

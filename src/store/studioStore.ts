@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { LetteringItem } from "../calligraphy/model";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
 import type { ViewTransform } from "../core/coordinates/view";
@@ -30,7 +31,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometry, type BooleanOp } from "../objects/boolean";
 
 export type ToolId =
-  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan";
+  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan" | "lettering";
 
 export interface Artboard {
   width: number;
@@ -43,6 +44,10 @@ export interface DocumentState {
   artboard: Artboard;
   grids: Grid[];
   objects: VectorObject[];
+  /** Editable lettering and independently positioned vector harakat. */
+  lettering?: LetteringItem[];
+  /** Optional licensed user-supplied font, persisted with the .logo project. */
+  customThuluthFont?: string;
   /** Optional raster picture pinned under the grids for tracing. Never exported. */
   reference?: ReferenceImage | null;
 }
@@ -134,6 +139,13 @@ export interface StudioState {
   view: ViewTransform;
   tool: ToolId;
   selection: string[];
+  selectedLetteringId: string | null;
+  selectLettering: (id: string | null) => void;
+  addLettering: (item: LetteringItem) => void;
+  updateLettering: (id: string, patch: Partial<LetteringItem>) => void;
+  moveLettering: (id: string, dx: number, dy: number) => void;
+  deleteLettering: (id: string) => void;
+  setCustomThuluthFont: (fontDataUrl: string) => void;
   snap: SnapSettings;
   precision: PrecisionSettings;
   measurement: Measurement | null;
@@ -234,6 +246,7 @@ const initialDoc = (): DocumentState => {
     artboard,
     grids: [createSquareGrid(center, artboard.width), createConcentricGrid(center, artboard.width)],
     objects: [],
+    lettering: [],
     reference: null,
   };
 };
@@ -284,6 +297,29 @@ export const useStudio = create<StudioState>()((set, get) => {
     view: { pan: pt(0, 0), zoom: 1, rotation: 0 },
     tool: "select",
     selection: [],
+    selectedLetteringId: null,
+    selectLettering: (id) => set({ selectedLetteringId: id, selection: [] }),
+    addLettering: (item) => {
+      commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
+      set({ selectedLetteringId: item.id, selection: [], tool: "select" });
+    },
+    updateLettering: (id, patch) =>
+      commit("Edit Arabic lettering", (doc) => ({
+        ...doc,
+        lettering: (doc.lettering ?? []).map((item) => item.id === id ? { ...item, ...patch, id: item.id, kind: item.kind } : item),
+      })),
+    moveLettering: (id, dx, dy) => {
+      if (dx === 0 && dy === 0) return;
+      commit("Move Arabic lettering", (doc) => ({
+        ...doc,
+        lettering: (doc.lettering ?? []).map((item) => item.id === id ? { ...item, x: item.x + dx, y: item.y + dy } : item),
+      }));
+    },
+    deleteLettering: (id) => {
+      commit("Delete Arabic lettering", (doc) => ({ ...doc, lettering: (doc.lettering ?? []).filter((item) => item.id !== id) }));
+      if (get().selectedLetteringId === id) set({ selectedLetteringId: null });
+    },
+    setCustomThuluthFont: (fontDataUrl) => commit("Import licensed Arabic font", (doc) => ({ ...doc, customThuluthFont: fontDataUrl })),
     snap: DEFAULT_SNAP_SETTINGS,
     precision: DEFAULT_PRECISION,
     measurement: null,
@@ -544,7 +580,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         grids: doc.grids.filter((g) => g.id !== id),
       })),
 
-    setSelection: (ids) => set({ selection: ids }),
+    setSelection: (ids) => set({ selection: ids, selectedLetteringId: null }),
     toggleSelection: (id) =>
       set((s) => ({
         selection: s.selection.includes(id)
@@ -810,6 +846,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         future: [],
         historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
         selection: [],
+        selectedLetteringId: null,
         measurement: null,
       });
     },

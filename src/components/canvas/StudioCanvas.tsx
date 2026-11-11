@@ -25,6 +25,8 @@ import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../gri
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { geometryToPathData } from "../../objects/render";
+import { createLettering } from "../../calligraphy/model";
+import { LetteringGlyph } from "./LetteringGlyph";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
@@ -79,6 +81,10 @@ export function StudioCanvas() {
   const translateSelection = useStudio((s) => s.translateSelection);
   const toggleSelection = useStudio((s) => s.toggleSelection);
   const setGeometry = useStudio((s) => s.setGeometry);
+  const addLettering = useStudio((s) => s.addLettering);
+  const selectLettering = useStudio((s) => s.selectLettering);
+  const selectedLetteringId = useStudio((s) => s.selectedLetteringId);
+  const moveLettering = useStudio((s) => s.moveLettering);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -94,6 +100,8 @@ export function StudioCanvas() {
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
+  const letterDragRef = useRef<{ id: string; start: Point } | null>(null);
+  const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
   const [handleDrag, setHandleDrag] = useState<{
@@ -330,6 +338,8 @@ export function StudioCanvas() {
     // Cancel any in-progress single-finger interaction.
     panRef.current = null;
     dragRef.current = null;
+    letterDragRef.current = null;
+    setLetterOffset(null);
     setDragOffset(null);
     setBox(null);
     setHandleDrag(null);
@@ -380,6 +390,11 @@ export function StudioCanvas() {
     const anchor = draft?.points[draft.points.length - 1] ?? measureStart ?? null;
     const point = applyPrecision(anchor, snapped, e.shiftKey);
 
+    if (tool === "lettering") {
+      addLettering(createLettering(point.x, point.y));
+      return;
+    }
+
     if (tool === "measure") {
       if (!measureStart) {
         setMeasureStart(point);
@@ -411,6 +426,13 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
+      const letteringId = (e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
+      if (letteringId && (doc.lettering ?? []).some((item) => item.id === letteringId)) {
+        selectLettering(letteringId);
+        letterDragRef.current = { id: letteringId, start: world };
+        setLetterOffset(pt(0, 0));
+        return;
+      }
       // Handle editing takes priority over body dragging.
       if (selection.length === 1) {
         const target = doc.objects.find((o) => o.id === selection[0]);
@@ -490,6 +512,10 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if (letterDragRef.current) {
+      setLetterOffset(pt(world.x - letterDragRef.current.start.x, world.y - letterDragRef.current.start.y));
+      return;
+    }
 
     // The cell brush works off raw grid arithmetic — no snapping pass needed.
     if (tool === "cell") {
@@ -555,6 +581,14 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (letterDragRef.current) {
+      const { id } = letterDragRef.current;
+      letterDragRef.current = null;
+      const offset = letterOffset;
+      setLetterOffset(null);
+      if (offset) moveLettering(id, offset.x, offset.y);
+      return;
+    }
     if (paintStrokeRef.current) {
       const cells = [...paintStrokeRef.current.values()];
       paintStrokeRef.current = null;
@@ -786,6 +820,13 @@ export function StudioCanvas() {
                 />
               ) : null,
             )}
+          </g>
+          {/* Editable Arabic lettering and independently movable vector diacritics */}
+          <g>
+            {(doc.lettering ?? []).map((item) => (
+              <LetteringGlyph key={item.id} item={item} selected={item.id === selectedLetteringId}
+                offset={item.id === selectedLetteringId ? letterOffset : null} />
+            ))}
           </g>
           {/* Draft preview */}
           {preview && (
