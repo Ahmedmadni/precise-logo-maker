@@ -1,6 +1,7 @@
 import type { Artboard, DocumentState } from "../store/studioStore";
 import { geometryToPathData } from "./render";
 import type { VectorObject } from "../core/geometry/types";
+import { letteringSvg } from "../calligraphy/model";
 
 const escapeXml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -14,7 +15,7 @@ const objectToSvg = (o: VectorObject): string => {
   ].join("");
   return `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
     o.geometry,
-  )}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
+  )}" fill="${escapeXml(s.fill)}" stroke="${escapeXml(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
 };
 
 export interface ExportOptions {
@@ -31,12 +32,16 @@ export const buildSvgDocument = (
     .filter((o) => o.visible && !o.guide)
     .map(objectToSvg)
     .join("\n");
+  const lettering = (doc.lettering ?? []).map(letteringSvg).filter(Boolean).join("\n");
+  const embeddedFont = doc.customThuluthFont && /^data:font\/(?:ttf|otf|woff|woff2);base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
+    ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
+    : "";
   const bg = options.background
     ? `  <rect width="${a.width}" height="${a.height}" fill="${a.background}" />\n`
     : "";
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}">`,
-    bg + body,
+    embeddedFont + bg + [body, lettering].filter(Boolean).join("\n"),
     "</svg>",
     "",
   ].join("\n");
