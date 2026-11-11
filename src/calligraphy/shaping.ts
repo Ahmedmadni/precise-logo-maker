@@ -57,38 +57,52 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
   return shapeArabicWithFont(font, { ...options, phrase });
 }
 
-/** Pure shaping adapter: testable with a locally bundled font, no fetch/network. */
+/** 
+ * Shape each connected WORD as a unit, never isolated Unicode letters. Whitespace
+ * is a natural Arabic joining boundary; separate groups permit word-level moves.
+ */
 export function shapeArabicWithFont(font: Font, options: ComposeOptions): LetteringItem[] {
   const phrase = options.phrase.normalize("NFC").trim();
-  const run = font.layout(phrase, undefined, "arab", "ARA", "rtl");
-  if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
-    throw new Error("تعذر تشكيل الحروف بهذا الخط.");
-  }
+  const words = phrase.split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 30) throw new Error("اكتب عبارة من كلمة واحدة إلى 30 كلمة.");
   const units = font.unitsPerEm || 1000;
   const s = options.size / units;
-  const totalAdvance = run.positions.reduce((sum, p) => sum + p.xAdvance, 0);
-  let cursor = -totalAdvance / 2;
-  const groupId = `word-${crypto.randomUUID()}`;
-  const output: LetteringItem[] = [];
-  for (let index = 0; index < run.glyphs.length; index += 1) {
-    const glyph = run.glyphs[index]!;
-    const pos = run.positions[index]!;
-    const d = glyph.path.toSVG();
-    if (d) {
-      output.push({
-        id: `glyph-${crypto.randomUUID()}`, kind: "outline",
-        x: options.x + (cursor + pos.xOffset) * s,
-        y: options.y - pos.yOffset * s,
-        size: options.size,
-        rotation: 0,
-        color: options.color,
-        font: options.font,
-        groupId, glyphIndex: index, sourceText: phrase,
-        pathData: d,
-        unitsPerEm: units,
-      });
+  const runs = words.map((word) => {
+    const run = font.layout(word, undefined, "arab", "ARA", "rtl");
+    if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
+      throw new Error("تعذر تشكيل الكلمة بهذا الخط: " + word);
     }
-    cursor += pos.xAdvance;
+    return { word, run, width: run.positions.reduce((sum, p) => sum + p.xAdvance, 0) };
+  });
+  const space = font.layout(" ").positions.reduce((sum, p) => sum + p.xAdvance, 0) || units * 0.27;
+  const totalWidth = runs.reduce((sum, entry) => sum + entry.width, 0) + (runs.length - 1) * space;
+  let rightEdge = totalWidth / 2;
+  const output: LetteringItem[] = [];
+  for (const { word, run, width } of runs) {
+    // Fontkit reverses the shaped RTL run into visual LTR order. Word 0 must
+    // remain the rightmost Arabic word, but glyphs inside it advance LTR.
+    let cursor = rightEdge - width;
+    const groupId = `word-${crypto.randomUUID()}`;
+    for (let index = 0; index < run.glyphs.length; index += 1) {
+      const glyph = run.glyphs[index]!;
+      const pos = run.positions[index]!;
+      const d = glyph.path.toSVG();
+      if (d) {
+        output.push({
+          id: `glyph-${crypto.randomUUID()}`, kind: "outline",
+          x: options.x + (cursor + pos.xOffset) * s,
+          y: options.y - pos.yOffset * s,
+          size: options.size,
+          rotation: 0,
+          color: options.color,
+          font: options.font,
+          groupId, glyphIndex: index, sourceText: word,
+          pathData: d, unitsPerEm: units,
+        });
+      }
+      cursor += pos.xAdvance;
+    }
+    rightEdge -= width + space;
   }
   if (!output.length) throw new Error("لا يحتوي الخط المختار على رسومات لهذه العبارة.");
   return output;
