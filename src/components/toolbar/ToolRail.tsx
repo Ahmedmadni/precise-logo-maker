@@ -8,6 +8,7 @@ import {
   MousePointer2,
   Spline,
   Waypoints,
+  Type,
 } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
@@ -24,9 +25,10 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: typeof Hand }[] = [
   { id: "polygon", label: "Cell shape", key: "N", icon: Waypoints },
   { id: "measure", label: "Measure", key: "M", icon: Ruler },
   { id: "pan", label: "Pan", key: "H", icon: Hand },
+  { id: "lettering", label: "Arabic lettering", key: "T", icon: Type },
 ];
 
-export function ToolRail() {
+export function ToolRail({ onOpenLettering }: { onOpenLettering?: () => void } = {}) {
   const tool = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
   const t = useT();
@@ -34,13 +36,13 @@ export function ToolRail() {
   return (
     <nav
       aria-label={t("Drawing tools")}
-      className="flex h-full w-12 flex-col items-center gap-1 border-e border-border bg-card py-2 sm:w-14 sm:py-3"
+      className="flex h-full w-12 flex-col items-center gap-1 overflow-y-auto overscroll-contain border-e border-border bg-card py-2 [scrollbar-width:none] sm:w-14 sm:py-3"
     >
       {TOOLS.map(({ id, label, key, icon: Icon }) => (
         <button
           key={id}
           type="button"
-          onClick={() => setTool(id)}
+          onClick={() => { setTool(id); if (id === "lettering") onOpenLettering?.(); }}
           title={`${t(label)} (${key})`}
           aria-label={`${t(label)} ${t("tool")}`}
           aria-pressed={tool === id}
