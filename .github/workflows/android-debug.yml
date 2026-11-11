@@ -24,6 +24,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Run tests
         run: bunx vitest run
+      - name: Type-check TypeScript
+        run: bunx tsc --noEmit
       - name: Build website
         run: bun run build
       - name: Set up Java 21
