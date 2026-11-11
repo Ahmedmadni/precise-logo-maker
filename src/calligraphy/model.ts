@@ -30,6 +30,7 @@ export interface LetteringItem {
   unitsPerEm?: number;
   /** One word/run can have several independently editable outlined glyphs. */
   groupId?: string;
+  sourceText?: string;
   glyphIndex?: number;
 }
 
