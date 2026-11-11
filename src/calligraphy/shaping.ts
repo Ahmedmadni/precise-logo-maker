@@ -75,7 +75,7 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
         rotation: 0,
         color: options.color,
         font: options.font,
-        groupId, glyphIndex: index,
+        groupId, glyphIndex: index, sourceText: phrase,
         pathData: d,
         unitsPerEm: units,
       });
