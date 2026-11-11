@@ -8,7 +8,7 @@ const escapeXml = (s: string): string =>
 
 /** Protect SVG exports from malformed imported project style values. */
 const safePaint = (value: string): string =>
-  /^(?:none|transparent|currentColor|#[0-9a-fA-F]{3,8}|rgba?\\([0-9.,%\\s]+\\)|[a-zA-Z]{2,30})$/.test(value) ? value : "none";
+  /^(?:none|transparent|currentColor|#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|[a-zA-Z]{2,30})$/.test(value) ? value : "none";
 const opacity01 = (value: number | undefined): number =>
   value === undefined || !Number.isFinite(value) ? 1 : Math.min(1, Math.max(0, value));
 
