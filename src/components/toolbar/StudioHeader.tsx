@@ -90,7 +90,7 @@ export function StudioHeader() {
       <div className="me-auto flex min-w-0 items-center gap-2">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 font-serif text-xl font-bold text-primary">ش</div>
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold sm:text-base">{tr("استوديو الشعارات", "Logo Studio")}</h1>
+          <h1 className="truncate text-sm font-bold sm:text-base"><span className="sm:hidden">{tr("استوديو", "Studio")}</span><span className="hidden sm:inline">{tr("استوديو الشعارات", "Logo Studio")}</span></h1>
           <p className="hidden text-[11px] text-muted-foreground sm:block">{tr("الخط العربي والرسم الفيكتور", "Arabic lettering & vector design")}</p>
         </div>
       </div>
@@ -99,7 +99,7 @@ export function StudioHeader() {
         <Undo2 className="h-5 w-5" />
       </button>
       <button type="button" onClick={redo} disabled={!canRedo} aria-label={tr("إعادة", "Redo")}
-        className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-accent disabled:opacity-30">
+        className="hidden h-11 w-10 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-accent disabled:opacity-30 sm:flex">
         <Redo2 className="h-5 w-5" />
       </button>
       <button type="button" onClick={fit} title={tr("ملاءمة اللوحة", "Fit artboard")}
@@ -112,7 +112,7 @@ export function StudioHeader() {
         <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">{tr("المشروع", "Project")}</span>
       </button>
       <button type="button" aria-expanded={menu === "view"} onClick={() => open("view")}
-        aria-label={tr("العرض", "View")} className={`${borderButton} px-2.5`}>
+        aria-label={tr("العرض", "View")} className={`${borderButton} hidden px-2.5 sm:inline-flex`}>
         <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">{tr("عرض", "View")}</span>
       </button>
       <button type="button" aria-expanded={menu === "export"} onClick={() => open("export")}
@@ -142,6 +142,8 @@ export function StudioHeader() {
           </div>
           {menu === "file" && <div className="space-y-1">
             <button type="button" className={action} onClick={newFile}><FilePlus2 className="h-5 w-5 text-primary" />{tr("تصميم جديد", "New design")}</button>
+            <button type="button" className={action} disabled={!canRedo} onClick={() => { redo(); close(); }}><Redo2 className="h-5 w-5 text-primary" />{tr("إعادة آخر تعديل", "Redo last edit")}</button>
+            <button type="button" className={action} onClick={() => setMenu("view")}><Settings2 className="h-5 w-5 text-primary" />{tr("خيارات العرض والشبكات", "View & grid options")}</button>
             <button type="button" className={action} onClick={() => projectFile.current?.click()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
             <button type="button" className={action} onClick={() => { downloadProject(doc); close(); }}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
             <button type="button" className={action} onClick={() => referenceFile.current?.click()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
