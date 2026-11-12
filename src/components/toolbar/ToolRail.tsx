@@ -31,6 +31,7 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: typeof Hand }[] = [
 export function ToolRail({ onOpenLettering }: { onOpenLettering?: () => void } = {}) {
   const tool = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
+  const setWorkspaceSection = useStudio((s) => s.setWorkspaceSection);
   const t = useT();
 
   return (
@@ -42,7 +43,13 @@ export function ToolRail({ onOpenLettering }: { onOpenLettering?: () => void } =
         <button
           key={id}
           type="button"
-          onClick={() => { setTool(id); if (id === "lettering") onOpenLettering?.(); }}
+          onClick={() => {
+            if (id === "lettering") {
+              setTool("select");
+              setWorkspaceSection("text");
+              onOpenLettering?.();
+            } else setTool(id);
+          }}
           title={`${t(label)} (${key})`}
           aria-label={`${t(label)} ${t("tool")}`}
           aria-pressed={tool === id}
