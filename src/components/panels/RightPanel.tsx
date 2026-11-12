@@ -1956,8 +1956,8 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
         ))}
       </nav>
       <div key={section} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]">
-        {section === "text" && <LetteringPanel section="words" />}
-        {section === "ornaments" && <LetteringPanel section="marks" />}
+        {section === "text" && <LetteringPanel section="words" onCreated={onClose} />}
+        {section === "ornaments" && <LetteringPanel section="marks" onCreated={onClose} />}
         {section === "layers" && <StudioLayersPanel />}
         {section === "draw" && <StudioDrawingPanel onChoose={onClose} />}
         {section === "edit" && (selected
