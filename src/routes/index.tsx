@@ -47,7 +47,7 @@ function StudioPage() {
       </ClientOnly>
       <StudioHeader />
       <div className="flex min-h-0 flex-1">
-        <div className="hidden sm:flex"><ToolRail onOpenLettering={() => setPanelOpen(true)} /></div>
+        <div className="hidden sm:flex lg:hidden"><ToolRail onOpenLettering={() => setPanelOpen(true)} /></div>
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
