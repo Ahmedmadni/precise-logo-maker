@@ -24,6 +24,11 @@ import {
   RotateCw,
   Sparkles,
   Trash2,
+  Type,
+  Layers3,
+  SlidersHorizontal,
+  Settings2,
+  X,
 } from "lucide-react";
 import type { AlignMode } from "../../objects/align";
 
@@ -44,6 +49,9 @@ import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { PathNodesSection } from "./PathNodesSection";
 import { LetteringPanel } from "./LetteringPanel";
+import { GlyphTransformPanel } from "./GlyphTransformPanel";
+import { StudioLayersPanel } from "./StudioLayersPanel";
+import { StudioDrawingPanel } from "./StudioDrawingPanel";
 
 const TABS = ["Properties", "Calligraphy", "Cells", "Objects", "Grids", "Snap", "Precision", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -1871,68 +1879,132 @@ function HistoryTab() {
   );
 }
 
-export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
-  const t = useT();
-  const [tab, setTab] = useState<Tab>("Properties");
-  const tool = useStudio((s) => s.tool);
-  const selectedLetteringId = useStudio((s) => s.selectedLetteringId);
-  useEffect(() => { if (tool === "lettering" || selectedLetteringId) setTab("Calligraphy"); }, [tool, selectedLetteringId]);
+const MAIN_SECTIONS = [
+  { id: "text", label: "كتابة", icon: Type },
+  { id: "ornaments", label: "زخارف", icon: Sparkles },
+  { id: "edit", label: "تعديل", icon: SlidersHorizontal },
+  { id: "layers", label: "العناصر", icon: Layers3 },
+  { id: "draw", label: "رسم", icon: PenTool },
+] as const;
 
+const ADVANCED_LABELS: Record<Tab, string> = {
+  Properties: "خصائص اللوحة",
+  Calligraphy: "محرر الخط القديم",
+  Cells: "الخلايا والشبكات",
+  Objects: "الأشكال والطبقات",
+  Grids: "الشبكات",
+  Snap: "الالتقاط",
+  Precision: "الدقة والقياسات",
+  History: "سجل التعديلات",
+};
+
+export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
+  const section = useStudio((s) => s.workspaceSection);
+  const setSection = useStudio((s) => s.setWorkspaceSection);
+  const doc = useStudio((s) => s.doc);
+  const selectedGlyphId = useStudio((s) => s.selectedLetteringId);
+  const selectedGeometry = useStudio((s) => s.selection);
+  const selected = (doc.lettering ?? []).find((item) => item.id === selectedGlyphId);
+  const siblings = selected?.groupId
+    ? (doc.lettering ?? []).filter((item) => item.groupId === selected.groupId)
+    : selected ? [selected] : [];
+  const [tab, setTab] = useState<Tab>("Properties");
+  const title: Record<typeof section, string> = {
+    text: "إضافة كتابة", ornaments: "التشكيل والزخارف",
+    edit: "تعديل العنصر", layers: "عناصر التصميم",
+    draw: "أدوات الرسم", advanced: "الإعدادات المتقدمة",
+  };
   return (
-    <aside className="flex h-full w-full flex-col border-border bg-card lg:w-72 lg:border-s">
-      {onClose && (
-        <div className="flex items-center justify-between border-b border-border px-3 py-2 lg:hidden">
-          <span className="text-xs font-semibold text-foreground">{t("Panels")}</span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("Close")}
-            className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
-          >
-            {t("Close")}
-          </button>
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[21rem] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3">
+        <div>
+          <h2 className="text-sm font-bold">{title[section]}</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {section === "edit" ? selected ? "اسحب الحرف أو عدّل خصائصه هنا" : "اختر عنصرا من مساحة التصميم" :
+             section === "text" ? "اكتب الكلمة، اختر الخط، ثم أضفها" :
+             section === "ornaments" ? "اختر الحركة أو الزخرفة وأضفها" :
+             section === "layers" ? "رتب عملك وحدد العنصر الذي تريد تعديله" :
+             section === "draw" ? "اختر الأداة ثم استخدم مساحة الرسم" :
+             "خيارات متخصصة للرسم الهندسي"}
+          </p>
         </div>
-      )}
-      <div
-        className="flex flex-wrap border-b border-border"
-        role="tablist"
-        aria-label={t("Studio panels")}
-      >
-        {TABS.map((name) => (
-          <button
-            key={name}
-            role="tab"
-            aria-selected={tab === name}
-            type="button"
-            onClick={() => setTab(name)}
+        <div className="flex items-center gap-1">
+          <button type="button" aria-label="الإعدادات المتقدمة" title="الإعدادات المتقدمة"
+            onClick={() => setSection(section === "advanced" ? "draw" : "advanced")}
+            className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-muted-foreground",
+              section === "advanced" ? "border-primary bg-primary/10 text-primary" : "border-border")}>
+            <Settings2 className="h-5 w-5" aria-hidden />
+          </button>
+          {onClose && <button type="button" onClick={onClose} aria-label="إغلاق اللوحة"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-foreground lg:hidden">
+            <X className="h-5 w-5" aria-hidden />
+          </button>}
+        </div>
+      </header>
+      <nav aria-label="الأقسام الرئيسية" className="grid shrink-0 grid-cols-5 border-b border-border p-1">
+        {MAIN_SECTIONS.map(({ id, label, icon: Icon }) => (
+          <button type="button" key={id} aria-current={section === id ? "page" : undefined}
+            aria-label={label}
+            onClick={() => setSection(id)}
             className={cn(
-              "flex-1 px-2 py-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground",
-              tab === name && "border-b-2 border-primary text-foreground",
-            )}
-          >
-            {t(name)}
+              "flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] text-muted-foreground transition-colors",
+              section === id && "bg-primary/10 font-semibold text-primary",
+            )}>
+            <Icon className="h-5 w-5" aria-hidden />
+            <span>{label}</span>
           </button>
         ))}
-      </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-3">
-        {tab === "Properties" && (
-          <>
-            <ArtboardSection />
-            <hr className="border-border" />
-            <ObjectSection />
-            <hr className="border-border" />
-            <GuideLayerSection />
-            <hr className="border-border" />
-            <PaintSection />
-          </>
+      </nav>
+      <div key={section} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]">
+        {section === "text" && <LetteringPanel section="words" />}
+        {section === "ornaments" && <LetteringPanel section="marks" />}
+        {section === "layers" && <StudioLayersPanel />}
+        {section === "draw" && <StudioDrawingPanel onChoose={onClose} />}
+        {section === "edit" && (selected
+          ? <GlyphTransformPanel key={selected.id} selected={selected} siblings={siblings} />
+          : selectedGeometry.length > 0
+            ? <div className="space-y-4">
+                <ObjectSection />
+                <details className="rounded-xl border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-semibold">الألوان وحدود الشكل</summary>
+                  <div className="mt-3"><PaintSection /></div>
+                </details>
+              </div>
+            : <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-6 text-center">
+                <SlidersHorizontal className="mx-auto h-8 w-8 text-primary" />
+                <h3 className="mt-2 text-sm font-semibold">اختر حرفا أو شكلا لتعديله</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">اضغط على أي عنصر في الرسم أو اختره من قائمة «العناصر».</p>
+                <button type="button" onClick={() => setSection("layers")}
+                  className="mt-4 min-h-11 rounded-lg bg-primary px-5 text-xs font-semibold text-primary-foreground">
+                  فتح العناصر
+                </button>
+              </div>)}
+        {section === "advanced" && (
+          <div className="space-y-4">
+            <p className="text-xs leading-5 text-muted-foreground">
+              هذه الخيارات مخصصة للرسم الهندسي المتقدم. لن تحتاج إليها لتصميم كلمة عربية أو شعار بسيط.
+            </p>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              القسم
+              <select className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                value={tab} onChange={(e) => setTab(e.target.value as Tab)}>
+                {TABS.filter((name) => name !== "Calligraphy").map((name) => (
+                  <option key={name} value={name}>{ADVANCED_LABELS[name]}</option>
+                ))}
+              </select>
+            </label>
+            {tab === "Properties" && <div className="space-y-3">
+              <ArtboardSection /><hr className="border-border" /><GuideLayerSection />
+              <hr className="border-border" /><ObjectSection /><hr className="border-border" /><PaintSection />
+            </div>}
+            {tab === "Cells" && <CellsTab />}
+            {tab === "Objects" && <ObjectsTab />}
+            {tab === "Grids" && <GridsTab />}
+            {tab === "Snap" && <SnapTab />}
+            {tab === "Precision" && <PrecisionTab />}
+            {tab === "History" && <HistoryTab />}
+          </div>
         )}
-        {tab === "Calligraphy" && <LetteringPanel />}
-        {tab === "Cells" && <CellsTab />}
-        {tab === "Objects" && <ObjectsTab />}
-        {tab === "Grids" && <GridsTab />}
-        {tab === "Snap" && <SnapTab />}
-        {tab === "Precision" && <PrecisionTab />}
-        {tab === "History" && <HistoryTab />}
       </div>
     </aside>
   );
