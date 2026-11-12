@@ -149,6 +149,8 @@ export interface StudioState {
   commitLetteringPreview: () => void;
   editGlyphNodes: boolean;
   setEditGlyphNodes: (editing: boolean) => void;
+  workspaceSection: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced";
+  setWorkspaceSection: (section: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced") => void;
   letteringMode: "words" | "marks" | "layers";
   setLetteringMode: (mode: "words" | "marks" | "layers") => void;
   selectLettering: (id: string | null) => void;
@@ -335,19 +337,21 @@ export const useStudio = create<StudioState>()((set, get) => {
     },
     editGlyphNodes: false,
     setEditGlyphNodes: (editGlyphNodes) => set({ editGlyphNodes, tool: "select" }),
+    workspaceSection: "text",
+    setWorkspaceSection: (workspaceSection) => set({ workspaceSection }),
     letteringMode: "words",
     setLetteringMode: (letteringMode) => set({ letteringMode }),
-    selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, letteringPreview: null }),
+    selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, letteringPreview: null, ...(id ? { workspaceSection: "edit" as const } : {}) }),
     addLettering: (item) => {
       commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
-      set({ selectedLetteringId: item.id, selection: [], tool: "select" });
+      set({ selectedLetteringId: item.id, selection: [], tool: "select", workspaceSection: "edit" });
     },
     addLetteringBatch: (items) => {
       if (!items.length) return;
       commit(`Compose Arabic word (${items.length} glyphs)`, (doc) => ({
         ...doc, lettering: [...(doc.lettering ?? []), ...items],
       }));
-      set({ selectedLetteringId: items[0]!.id, selection: [], tool: "select" });
+      set({ selectedLetteringId: items[0]!.id, selection: [], tool: "select", workspaceSection: "edit" });
     },
     replaceLetteringGroup: (groupId, items) => {
       if (!items.length) return;
