@@ -84,8 +84,9 @@ export function GlyphTransformPanel({ selected, siblings }: {
             "عنصر قابل للتحريك والتدوير والتحجيم."}
         </p>
       </header>
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold">التحريك باللمس أو السحب</h4>
+      <details open className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">1. نقل الحرف وتحديد موضعه</summary>
+        <div className="mt-3 space-y-2">
         <div className="grid grid-cols-2 gap-2">
           {(["glyph", "word"] as const).map((scope) => (
             <button key={scope} type="button" onClick={() => setMoveScope(scope)}
@@ -111,7 +112,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 onClick={() => nudge(dx * step, dy * step)}><Icon className="h-5 w-5" /></button>
             ))}
         </div>
-      </div>
+        </div>
+      </details>
 
       {selected.kind === "text" && (
         <label className="block space-y-1 text-xs">النص
@@ -119,30 +121,34 @@ export function GlyphTransformPanel({ selected, siblings }: {
             onChange={(e) => update(selected.id, { text: e.target.value })} />
         </label>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        {([
-          ["x", "موضع X", -100000, 100000],
-          ["y", "موضع Y", -100000, 100000],
-          ["size", "حجم العنصر", 1, 1000],
-        ] as const).map(([key, label, min, max]) => (
-          <label key={key} className="block space-y-1">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <input type="number" className={input} min={min} max={max} value={selected[key]}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                if (Number.isFinite(val)) update(selected.id, { [key]: clamp(val, min, max) });
-              }} />
-          </label>
-        ))}
-        <label className="block space-y-1">
-          <span className="text-xs text-muted-foreground">لون العنصر</span>
-          <input type="color" className="min-h-11 w-full rounded-lg border border-border bg-background p-1"
-            value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
-        </label>
-      </div>
+      <label className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border px-3 text-xs font-semibold">
+        لون العنصر
+        <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
+          value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
+      </label>
+      <details className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">الإحداثيات الدقيقة (X / Y / الحجم)</summary>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {([
+            ["x", "موضع X", -100000, 100000],
+            ["y", "موضع Y", -100000, 100000],
+            ["size", "حجم العنصر", 1, 1000],
+          ] as const).map(([key, label, min, max]) => (
+            <label key={key} className="block space-y-1">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <input type="number" className={input} min={min} max={max} value={selected[key]}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (Number.isFinite(val)) update(selected.id, { [key]: clamp(val, min, max) });
+                }} />
+            </label>
+          ))}
+        </div>
+      </details>
 
-      <div className="space-y-3 border-t border-border pt-3">
-        <h4 className="text-xs font-semibold">الإطالة والدوران والسُمك</h4>
+      <details open className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">2. الحجم والدوران والسُمك</summary>
+        <div className="mt-3 space-y-3">
         {([
           ["scaleX", "إطالة الحرف أفقيًا", 0.35, 4, 0.05],
           ["scaleY", "إطالة الحرف رأسيًا", 0.35, 4, 0.05],
@@ -166,12 +172,14 @@ export function GlyphTransformPanel({ selected, siblings }: {
           onClick={() => { commitPreview(); update(selected.id, { scaleX: 1, scaleY: 1, rotation: 0, weight: 0 }); }}>
           <RotateCcw className="h-4 w-4" /> إعادة الإطالة والدوران والسُمك للأصل
         </button>
-      </div>
+        </div>
+      </details>
 
       {isOutline && (
         <>
-          <section className="space-y-3 border-t border-border pt-3">
-            <h4 className="text-xs font-semibold">إطالة ذيل الحرف ومنحنياته (Morph)</h4>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-xs font-bold">3. مدّ أطراف الحرف ونحت منحنياته</summary>
+            <div className="mt-3 space-y-3">
             <p className="text-[11px] leading-5 text-muted-foreground">
               تعدّل هذه الأداة نقاط مسار الحرف الفعلية تدريجيًا، مع تثبيت منطقة الاتصال قدر الإمكان.
               يختلف ذلك عن التحجيم الأفقي العادي.
@@ -199,8 +207,11 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 onKeyUp={finishStretch} onBlur={finishStretch} />
             </label>
             <p className="text-[11px] text-muted-foreground">يمكنك تطبيق المد أكثر من مرة، والتراجع عن كل عملية بشكل مستقل.</p>
-          </section>
-          <section className="space-y-3 border-t border-border pt-3">
+            </div>
+          </details>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-xs font-bold">4. تحرير نقاط الحرف (متقدم)</summary>
+            <div className="mt-3 space-y-3">
             <button type="button" className={`${button} w-full ${editNodes ? "border-primary bg-primary/15" : ""}`}
               onClick={() => setEditNodes(!editNodes)}>
               {editNodes ? "إغلاق مقابض نقاط الحرف" : "فتح محرر نقاط Bézier للحرف"}
@@ -241,20 +252,27 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 )}
               </div>
             )}
-          </section>
-          <AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} />
+            </div>
+          </details>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-xs font-bold">5. بدائل أشكال الحروف من الخط</summary>
+            <div className="mt-3"><AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} /></div>
+          </details>
         </>
       )}
 
-      <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
+      <details className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">إدارة العنصر: نسخ، ترتيب، حذف</summary>
+        <div className="mt-3 grid grid-cols-3 gap-2">
         <button type="button" className={button} onClick={() => duplicate(selected.id)}>
           <Copy className="h-4 w-4" />نسخ
         </button>
         <button type="button" className={button} onClick={() => reorder(selected.id, -1)}>للخلف</button>
         <button type="button" className={button} onClick={() => reorder(selected.id, 1)}>للأمام</button>
       </div>
-      <button type="button" className={button + " w-full border-destructive text-destructive"}
+      <button type="button" className={button + " mt-3 w-full border-destructive text-destructive"}
         onClick={() => remove(selected.id)}><Trash2 className="h-4 w-4" />حذف العنصر المحدد</button>
+      </details>
     </section>
   );
 }
