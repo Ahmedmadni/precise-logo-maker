@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Buffer } from "buffer";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Layers, LoaderCircle, RotateCcw, Sparkles, Trash2, Type, WandSparkles } from "lucide-react";
+import { Layers, LoaderCircle, RotateCcw, Sparkles, Type, WandSparkles } from "lucide-react";
 import {
   FONT_DESCRIPTIONS, HARAKAT, ORNAMENTS, createHaraka, createOrnament,
   fontFamily, type FontPreset, type LetteringItem,
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
 import { useStudio } from "../../store/studioStore";
+import { GlyphTransformPanel } from "./GlyphTransformPanel";
 
 const field = "w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
@@ -18,17 +19,10 @@ type Mode = "words" | "marks" | "layers";
 export function LetteringPanel() {
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
-  const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
-  const setEditGlyphNodes = useStudio((s) => s.setEditGlyphNodes);
   const select = useStudio((s) => s.selectLettering);
   const insert = useStudio((s) => s.addLettering);
   const insertBatch = useStudio((s) => s.addLetteringBatch);
   const replaceGroup = useStudio((s) => s.replaceLetteringGroup);
-  const groupMove = useStudio((s) => s.moveLetteringGroup);
-  const update = useStudio((s) => s.updateLettering);
-  const remove = useStudio((s) => s.deleteLettering);
-  const duplicate = useStudio((s) => s.duplicateLettering);
-  const reorder = useStudio((s) => s.reorderLettering);
   const undo = useStudio((s) => s.undo);
   const redo = useStudio((s) => s.redo);
   const mode = useStudio((s) => s.letteringMode) as Mode;
@@ -44,7 +38,6 @@ export function LetteringPanel() {
 
   const items = doc.lettering ?? [];
   const selected = items.find((entry) => entry.id === selectedId);
-  const currentGroup = selected?.groupId;
   const grouped = new Map<string, LetteringItem[]>();
   for (const item of items) if (item.groupId) {
     const existing = grouped.get(item.groupId) ?? [];
@@ -117,11 +110,6 @@ export function LetteringPanel() {
     const y = selected?.y ?? doc.artboard.height / 2;
     insert(createOrnament(ornament.id, x, y));
     setMode("layers");
-  };
-  const shift = (dx: number, dy: number) => {
-    if (!selected) return;
-    if (selected.groupId) groupMove(selected.groupId, dx, dy);
-    else update(selected.id, { x: selected.x + dx, y: selected.y + dy });
   };
 
   return (
@@ -263,67 +251,8 @@ export function LetteringPanel() {
         </section>
       )}
 
-      {selected && (
-        <section className="space-y-3 rounded-xl border border-primary/40 bg-background p-3">
-          <h3 className="font-semibold">خصائص العنصر المحدد</h3>
-          <p className="text-[11px] text-muted-foreground">
-            {selected.kind === "outline" ? "مسار SVG حقيقي لا يعتمد على الخط المثبت" : selected.kind === "text" ? "نص قابل للتحرير" : "شكل فيكتور"}
-          </p>
-          {selected.kind === "text" && (
-            <textarea dir="rtl" className={field} value={selected.text ?? ""} onChange={(e) => update(selected.id, { text: e.target.value })} />
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              ["x", "الموضع X", -100000, 100000],
-              ["y", "الموضع Y", -100000, 100000],
-              ["size", "الحجم", 1, 1000],
-              ["rotation", "الدوران °", -3600, 3600],
-              ["scaleX", "اتساع الحرف", -10, 10],
-              ["scaleY", "ارتفاع الحرف", -10, 10],
-            ] as const).map(([key, label, min, max]) => (
-              <label className="block space-y-1" key={key}><span className="text-xs text-muted-foreground">{label}</span>
-                <input className={field} type="number" min={min} max={max} step={key === "scaleX" || key === "scaleY" ? 0.05 : 1}
-                  value={selected[key] ?? (key === "scaleX" || key === "scaleY" ? 1 : 0)}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (Number.isFinite(v)) update(selected.id, { [key]: clamp(v, min, max) });
-                  }} />
-              </label>
-            ))}
-          </div>
-          {selected.kind === "outline" && (
-            <button type="button" className={`${button} w-full ${editGlyphNodes ? "border-primary text-primary" : ""}`}
-              onClick={() => setEditGlyphNodes(!editGlyphNodes)}>
-              {editGlyphNodes ? "إنهاء تحرير نقاط المنحنيات" : "تحرير نقاط Bézier والحواف في مساحة الرسم"}
-            </button>
-          )}
-          {selected.kind === "outline" && (
-            <label className="block space-y-1"><span className="text-xs text-muted-foreground">زيادة السمك بصريًا (ليس تعديل مسار الحرف)</span>
-              <input type="range" min={0} max={8} step={0.25} className="w-full"
-                value={selected.weight ?? 0} onChange={(e) => update(selected.id, { weight: Number(e.target.value) })} />
-            </label>
-          )}
-          <label className="flex items-center justify-between text-xs">لون العنصر
-            <input type="color" className="h-10 w-20 rounded-md" value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
-          </label>
-          <p className="text-xs text-muted-foreground">تحريك دقيق {selected.groupId ? "للكلمة بكاملها" : "للعنصر"}</p>
-          <div className="grid grid-cols-4 gap-2">
-            {([[ArrowRight, 8, 0, "يمين"], [ArrowLeft, -8, 0, "يسار"], [ArrowUp, 0, -8, "أعلى"], [ArrowDown, 0, 8, "أسفل"]] as const).map(([Icon, dx, dy, label]) => (
-              <button className={button + " px-1"} type="button" title={label} key={label} onClick={() => shift(dx, dy)}>
-                <Icon className="h-4 w-4" />
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button type="button" className={button} onClick={() => duplicate(selected.id)}><Copy className="h-4 w-4" />نسخ</button>
-            <button type="button" className={button} onClick={() => reorder(selected.id, -1)}>للخلف</button>
-            <button type="button" className={button} onClick={() => reorder(selected.id, 1)}>للأمام</button>
-          </div>
-          <button type="button" className={button + " w-full border-destructive text-destructive"} onClick={() => remove(selected.id)}>
-            <Trash2 className="h-4 w-4" />حذف العنصر
-          </button>
-        </section>
-      )}
+      {selected && <GlyphTransformPanel key={selected.id} selected={selected}
+        siblings={selected.groupId ? grouped.get(selected.groupId) ?? [selected] : [selected]} />}
       <div className="flex gap-2">
         <button type="button" className={button + " flex-1"} onClick={undo}>تراجع</button>
         <button type="button" className={button + " flex-1"} onClick={redo}>إعادة</button>
