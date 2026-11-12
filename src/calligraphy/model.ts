@@ -32,7 +32,7 @@ export interface LetteringItem {
   groupId?: string | undefined;
   sourceText?: string;
   /** OpenType variant tag used when this word was shaped (if the font supports it). */
-  alternateFeature?: string;
+  alternateFeature?: string | undefined;
   /** Concrete font glyph ID, not a Unicode code point. */
   fontGlyphId?: number;
   glyphIndex?: number;
