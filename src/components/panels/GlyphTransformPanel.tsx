@@ -121,27 +121,30 @@ export function GlyphTransformPanel({ selected, siblings }: {
             onChange={(e) => update(selected.id, { text: e.target.value })} />
         </label>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        {([
-          ["x", "موضع X", -100000, 100000],
-          ["y", "موضع Y", -100000, 100000],
-          ["size", "حجم العنصر", 1, 1000],
-        ] as const).map(([key, label, min, max]) => (
-          <label key={key} className="block space-y-1">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <input type="number" className={input} min={min} max={max} value={selected[key]}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                if (Number.isFinite(val)) update(selected.id, { [key]: clamp(val, min, max) });
-              }} />
-          </label>
-        ))}
-        <label className="block space-y-1">
-          <span className="text-xs text-muted-foreground">لون العنصر</span>
-          <input type="color" className="min-h-11 w-full rounded-lg border border-border bg-background p-1"
-            value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
-        </label>
-      </div>
+      <label className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border px-3 text-xs font-semibold">
+        لون العنصر
+        <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
+          value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
+      </label>
+      <details className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">الإحداثيات الدقيقة (X / Y / الحجم)</summary>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {([
+            ["x", "موضع X", -100000, 100000],
+            ["y", "موضع Y", -100000, 100000],
+            ["size", "حجم العنصر", 1, 1000],
+          ] as const).map(([key, label, min, max]) => (
+            <label key={key} className="block space-y-1">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <input type="number" className={input} min={min} max={max} value={selected[key]}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (Number.isFinite(val)) update(selected.id, { [key]: clamp(val, min, max) });
+                }} />
+            </label>
+          ))}
+        </div>
+      </details>
 
       <details open className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">2. الحجم والدوران والسُمك</summary>
