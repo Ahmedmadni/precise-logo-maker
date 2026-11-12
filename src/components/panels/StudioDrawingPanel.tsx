@@ -1,4 +1,4 @@
-import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, PenLine, Ruler, Shapes, Spline, Waypoints } from "lucide-react";
+import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, PenLine, Ruler, Shapes, Spline } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 
