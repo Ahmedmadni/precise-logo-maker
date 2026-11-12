@@ -1,5 +1,6 @@
 import type { FontPreset, LetteringItem } from "./model";
 import type { Font } from "fontkit";
+import { centerLetteringAt, letteringGroupBounds } from "./morph";
 import { Buffer } from "buffer";
 
 /** Bundled OFL fonts — no remote CDN and no request to the Lovable backend. */
@@ -37,6 +38,7 @@ export interface ComposeOptions {
   y: number;
   color: string;
   customFontData?: string | undefined;
+  alternateFeature?: string | undefined;
 }
 
 /**
@@ -68,7 +70,8 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
   const units = font.unitsPerEm || 1000;
   const s = options.size / units;
   const runs = words.map((word) => {
-    const run = font.layout(word, undefined, "arab", "ARA", "rtl");
+    const features = options.alternateFeature ? [options.alternateFeature] : undefined;
+    const run = font.layout(word, features, "arab", "ARA", "rtl");
     if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
       throw new Error("تعذر تشكيل الكلمة بهذا الخط: " + word);
     }
@@ -97,6 +100,7 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
           color: options.color,
           font: options.font,
           groupId, glyphIndex: index, sourceText: word,
+          fontGlyphId: glyph.id, alternateFeature: options.alternateFeature,
           pathData: d, unitsPerEm: units,
         });
       }
@@ -106,4 +110,67 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
   }
   if (!output.length) throw new Error("لا يحتوي الخط المختار على رسومات لهذه العبارة.");
   return output;
+}
+
+/** Only real glyph substitutions returned by the active font appear as variants. */
+export interface OpenTypeAlternate {
+  tag: string;
+  label: string;
+  glyphs: LetteringItem[];
+}
+const TAG_LABELS: Record<string, string> = {
+  default: "الشكل الأصلي",
+  aalt: "بدائل الخط",
+  salt: "البديل الأسلوبي",
+  swsh: "الامتدادات الزخرفية",
+  cswh: "الامتدادات السياقية",
+  rlig: "التراكيب الإلزامية",
+};
+const alternateLabel = (tag: string) =>
+  TAG_LABELS[tag] ?? (tag.startsWith("ss") ? `المجموعة الأسلوبية ${tag.slice(2)}` :
+    tag.startsWith("cv") ? `بدائل الحروف ${tag.slice(2)}` : tag);
+
+const visualSignature = (items: LetteringItem[]) =>
+  items.map((g) => `${g.fontGlyphId}|${g.pathData}|${Math.round(g.x * 100)}|${Math.round(g.y * 100)}`).join(";");
+
+/**
+ * Enumerate supported OpenType features without manufacturing fictitious letters.
+ * A feature may exist in the font but have no effect for this word; omit it.
+ * Whole-word shaping preserves contextual connections and ligatures.
+ */
+export async function listWordAlternates(
+  source: LetteringItem,
+  currentWord: LetteringItem[],
+  customFontData?: string,
+): Promise<OpenTypeAlternate[]> {
+  if (!source.sourceText || !source.font || source.kind !== "outline" || !currentWord.length) return [];
+  const raw = await getFont(source.font, customFontData);
+  const kit = await import("fontkit");
+  const font = kit.create(Buffer.from(raw));
+  const tags = (font.availableFeatures ?? []).filter((tag) =>
+    /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag));
+  const currentBounds = letteringGroupBounds(currentWord);
+  if (!currentBounds) return [];
+  const center = { x: currentBounds.x + currentBounds.width / 2, y: currentBounds.y + currentBounds.height / 2 };
+  const options: ComposeOptions = {
+    phrase: source.sourceText, font: source.font, size: source.size,
+    x: center.x, y: center.y, color: source.color,
+  };
+  const choices = [{ tag: "default", feature: undefined as string | undefined }, ...tags.slice(0, 24)
+    .map((tag) => ({ tag, feature: tag }))];
+  const variants: OpenTypeAlternate[] = [];
+  const seen = new Set<string>();
+  for (const option of choices) {
+    try {
+      const itemOptions: ComposeOptions = { ...options, alternateFeature: option.feature };
+      const glyphs = centerLetteringAt(shapeArabicWithFont(font, itemOptions), center);
+      const signature = visualSignature(glyphs);
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      variants.push({ tag: option.tag, label: alternateLabel(option.tag), glyphs });
+    } catch {
+      // Some font features have unsupported inputs or fail to shape this word.
+    }
+  }
+  return variants;
 }

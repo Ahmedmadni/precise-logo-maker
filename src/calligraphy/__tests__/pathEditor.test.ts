@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editOutlineNode, glyphPointToWorld, outlineNodes, parseOutline, worldToGlyphPoint } from "../pathEditor";
+import { editOutlineNode, glyphPointToWorld, outlineNodes, parseOutline, smoothOutlineAnchor, worldToGlyphPoint } from "../pathEditor";
 import { letteringSvg, createLettering, createOrnament } from "../model";
 
 describe("outline node editor", () => {
@@ -29,6 +29,17 @@ describe("outline node editor", () => {
     const local = worldToGlyphPoint(item, world.x, world.y)!;
     expect(local.x).toBeCloseTo(350, 6);
     expect(local.y).toBeCloseTo(400, 6);
+  });
+  it("smooths a cubic joint by matching outgoing and incoming tangents", () => {
+    const d = "M0 0 C2 10 8 10 10 0 C14 -3 18 -10 20 0";
+    const result = smoothOutlineAnchor(d, 3);
+    expect(result).not.toBeNull();
+    const nodes = outlineNodes(result!);
+    const anchor = nodes[3]!, incoming = nodes[2]!, outgoing = nodes[4]!;
+    const ux = anchor.x - incoming.x, uy = anchor.y - incoming.y;
+    const vx = outgoing.x - anchor.x, vy = outgoing.y - anchor.y;
+    expect(ux * vy - uy * vx).toBeCloseTo(0, 2);
+    expect(smoothOutlineAnchor("M0 0 L10 10", 1)).toBeNull();
   });
   it("exports ornaments as SVG paths without HTML text", () => {
     const ornament = createOrnament("star8", 100, 100);

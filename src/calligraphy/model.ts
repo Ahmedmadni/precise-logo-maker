@@ -31,6 +31,10 @@ export interface LetteringItem {
   /** One word/run can have several independently editable outlined glyphs. */
   groupId?: string | undefined;
   sourceText?: string;
+  /** OpenType variant tag used when this word was shaped (if the font supports it). */
+  alternateFeature?: string | undefined;
+  /** Concrete font glyph ID, not a Unicode code point. */
+  fontGlyphId?: number;
   glyphIndex?: number;
 }
 
@@ -113,7 +117,7 @@ export const letteringTransform = (item: LetteringItem): string => {
 export const letteringSvg = (item: LetteringItem): string => {
   const size = Number.isFinite(item.size) ? Math.max(1, Math.min(1000, item.size)) : 48;
   const attrs = `transform="${letteringTransform(item)}" fill="${safeColor(item.color)}"`;
-  const outlineWidth = Number.isFinite(item.weight) ? Math.max(0, Math.min(10, item.weight ?? 0)) : 0;
+  const outlineWidth = Number.isFinite(item.weight) ? Math.max(0, Math.min(20, item.weight ?? 0)) : 0;
   if (item.kind === "outline") {
     const d = safePath(item.pathData);
     if (!d) return "";

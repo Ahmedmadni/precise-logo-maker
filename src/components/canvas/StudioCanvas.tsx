@@ -28,6 +28,7 @@ import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
 import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
+import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
@@ -88,6 +89,11 @@ export function StudioCanvas() {
   const moveLettering = useStudio((s) => s.moveLettering);
   const updateLettering = useStudio((s) => s.updateLettering);
   const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
+  const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
+  const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
+  const letteringPreview = useStudio((s) => s.letteringPreview);
+  const setLetteringPreview = useStudio((s) => s.setLetteringPreview);
+  const commitLetteringPreview = useStudio((s) => s.commitLetteringPreview);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -103,9 +109,13 @@ export function StudioCanvas() {
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
-  const letterDragRef = useRef<{ id: string; start: Point } | null>(null);
+  const letterDragRef = useRef<{ id: string; start: Point; scope: "glyph" | "word"; groupId?: string } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
+  const scaleDragRef = useRef<{
+    id: string; start: Point; axis: "scaleX" | "scaleY" | "rotation"; side: number;
+    value: number; dimension: number; rotation: number; pivot: Point;
+  } | null>(null);
   const [nodePreview, setNodePreview] = useState<{ id: string; path: string } | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
@@ -345,6 +355,8 @@ export function StudioCanvas() {
     dragRef.current = null;
     letterDragRef.current = null;
     nodeDragRef.current = null;
+    scaleDragRef.current = null;
+    useStudio.setState({ letteringPreview: null });
     setNodePreview(null);
     setLetterOffset(null);
     setDragOffset(null);
@@ -433,11 +445,29 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
+      const resizeNode = !editGlyphNodes ? (e.target as Element).closest("[data-glyph-handle]") : null;
+      const edge = resizeNode?.getAttribute("data-glyph-handle");
+      const glyph = doc.lettering?.find((item) => item.id === selectedLetteringId);
+      if (glyph?.kind === "outline" && edge && glyph.pathData) {
+        const marker = glyphTransformHandles(glyph).find((h) => h.edge === edge);
+        const points = outlineNodes(glyph.pathData);
+        if (marker && points.length) {
+          const vals = points.map((p) => marker.axis === "scaleX" ? p.x : p.y);
+          const width = Math.max(...vals) - Math.min(...vals);
+          const currentScale = marker.axis === "scaleX" ? glyph.scaleX ?? 1 : glyph.scaleY ?? 1;
+          const dimension = Math.max(1, width * glyph.size / (glyph.unitsPerEm || 1000) * Math.abs(currentScale));
+          scaleDragRef.current = { id: glyph.id, start: world, axis: marker.axis,
+            side: marker.side, value: marker.axis === "rotation" ? glyph.rotation : currentScale,
+            dimension, rotation: glyph.rotation, pivot: { x: glyph.x, y: glyph.y } };
+          return;
+        }
+      }
       const handle = editGlyphNodes ? (e.target as Element).closest("[data-outline-node]") : null;
       const editItem = doc.lettering?.find((item) => item.id === selectedLetteringId);
       const rawIndex = handle?.getAttribute("data-outline-node");
       const nodeId = rawIndex === null || rawIndex === undefined ? NaN : Number(rawIndex);
       if (editItem?.kind === "outline" && editItem.pathData && Number.isInteger(nodeId)) {
+        setSelectedGlyphNodeId(nodeId);
         nodeDragRef.current = { id: editItem.id, nodeId, startPath: editItem.pathData };
         setNodePreview({ id: editItem.id, path: editItem.pathData });
         return;
@@ -445,7 +475,9 @@ export function StudioCanvas() {
       const letteringId = (e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
       if (letteringId && (doc.lettering ?? []).some((item) => item.id === letteringId)) {
         selectLettering(letteringId);
-        letterDragRef.current = { id: letteringId, start: world };
+        const letter = doc.lettering?.find((item) => item.id === letteringId);
+        letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
+          ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
         setLetterOffset(pt(0, 0));
         return;
       }
@@ -528,6 +560,25 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if (scaleDragRef.current) {
+      const dragging = scaleDragRef.current;
+      const dx = world.x - dragging.start.x;
+      const dy = world.y - dragging.start.y;
+      if (dragging.axis === "rotation") {
+        const a0 = Math.atan2(dragging.start.y - dragging.pivot.y, dragging.start.x - dragging.pivot.x);
+        const a1 = Math.atan2(world.y - dragging.pivot.y, world.x - dragging.pivot.x);
+        const delta = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0)) * 180 / Math.PI;
+        setLetteringPreview(dragging.id, { rotation: Math.max(-180, Math.min(180, dragging.value + delta)) });
+      } else {
+        const theta = dragging.rotation * Math.PI / 180;
+        const displacement = dragging.axis === "scaleX"
+          ? dx * Math.cos(theta) + dy * Math.sin(theta)
+          : -dx * Math.sin(theta) + dy * Math.cos(theta);
+        const factor = 1 + dragging.side * displacement / dragging.dimension;
+        setLetteringPreview(dragging.id, { [dragging.axis]: Math.max(0.35, Math.min(4, dragging.value * factor)) });
+      }
+      return;
+    }
     if (nodeDragRef.current) {
       const item = (doc.lettering ?? []).find((entry) => entry.id === nodeDragRef.current?.id);
       if (item) {
@@ -608,6 +659,11 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (scaleDragRef.current) {
+      scaleDragRef.current = null;
+      commitLetteringPreview();
+      return;
+    }
     if (nodeDragRef.current) {
       const id = nodeDragRef.current.id;
       const original = nodeDragRef.current.startPath;
@@ -618,11 +674,14 @@ export function StudioCanvas() {
       return;
     }
     if (letterDragRef.current) {
-      const { id } = letterDragRef.current;
+      const { id, scope, groupId } = letterDragRef.current;
       letterDragRef.current = null;
       const offset = letterOffset;
       setLetterOffset(null);
-      if (offset) moveLettering(id, offset.x, offset.y);
+      if (offset) {
+        if (scope === "word" && groupId) useStudio.getState().moveLetteringGroup(groupId, offset.x, offset.y);
+        else moveLettering(id, offset.x, offset.y);
+      }
       return;
     }
     if (paintStrokeRef.current) {
@@ -860,11 +919,23 @@ export function StudioCanvas() {
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
             {(doc.lettering ?? []).map((item) => (
-              <LetteringGlyph key={item.id} item={item} selected={item.id === selectedLetteringId}
-                offset={item.id === selectedLetteringId ? letterOffset : null}
+              <LetteringGlyph key={item.id}
+                item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+                selected={item.id === selectedLetteringId}
+                offset={letterOffset && (
+                  item.id === selectedLetteringId ||
+                  (letterDragRef.current?.scope === "word" && !!item.groupId &&
+                   item.groupId === letterDragRef.current.groupId)
+                ) ? letterOffset : null}
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />
             ))}
           </g>
+          {/* Touch-accessible stretch and rotation handles; not exported. */}
+          {!editGlyphNodes && tool === "select" && (doc.lettering ?? [])
+            .filter((item) => item.id === selectedLetteringId && item.kind === "outline")
+            .map((item) => <GlyphTransformHandles key={`resize-${item.id}`}
+              item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+              zoom={view.zoom} />)}
           {/* Editable font-outline anchor and Bézier handles. Kept out of SVG exports. */}
           {editGlyphNodes && tool === "select" && (doc.lettering ?? []).filter((item) => item.id === selectedLetteringId && item.kind === "outline").map((item) =>
             <g key={`handles-${item.id}`}>

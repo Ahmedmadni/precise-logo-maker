@@ -140,6 +140,13 @@ export interface StudioState {
   tool: ToolId;
   selection: string[];
   selectedLetteringId: string | null;
+  letteringMoveScope: "glyph" | "word";
+  setLetteringMoveScope: (scope: "glyph" | "word") => void;
+  selectedGlyphNodeId: number | null;
+  setSelectedGlyphNodeId: (id: number | null) => void;
+  letteringPreview: { id: string; patch: Partial<LetteringItem> } | null;
+  setLetteringPreview: (id: string, patch: Partial<LetteringItem>) => void;
+  commitLetteringPreview: () => void;
   editGlyphNodes: boolean;
   setEditGlyphNodes: (editing: boolean) => void;
   letteringMode: "words" | "marks" | "layers";
@@ -307,11 +314,30 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    letteringMoveScope: "glyph",
+    setLetteringMoveScope: (letteringMoveScope) => set({ letteringMoveScope }),
+    selectedGlyphNodeId: null,
+    setSelectedGlyphNodeId: (selectedGlyphNodeId) => set({ selectedGlyphNodeId }),
+    letteringPreview: null,
+    setLetteringPreview: (id, patch) => set({ letteringPreview: { id, patch } }),
+    commitLetteringPreview: () => {
+      const preview = get().letteringPreview;
+      if (!preview) return;
+      set({ letteringPreview: null });
+      const item = get().doc.lettering?.find((entry) => entry.id === preview.id);
+      if (!item) return;
+      const changed = Object.entries(preview.patch).some(([key, val]) => item[key as keyof LetteringItem] !== val);
+      if (!changed) return;
+      commit("Adjust Arabic glyph", (doc) => ({
+        ...doc,
+        lettering: (doc.lettering ?? []).map((entry) => entry.id === preview.id ? { ...entry, ...preview.patch } : entry),
+      }));
+    },
     editGlyphNodes: false,
     setEditGlyphNodes: (editGlyphNodes) => set({ editGlyphNodes, tool: "select" }),
     letteringMode: "words",
     setLetteringMode: (letteringMode) => set({ letteringMode }),
-    selectLettering: (id) => set({ selectedLetteringId: id, selection: [] }),
+    selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, letteringPreview: null }),
     addLettering: (item) => {
       commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
       set({ selectedLetteringId: item.id, selection: [], tool: "select" });
@@ -328,7 +354,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       commit("Recompose Arabic word", (doc) => ({ ...doc,
         lettering: [...(doc.lettering ?? []).filter((entry) => entry.groupId !== groupId), ...items],
       }));
-      set({ selectedLetteringId: items[0]!.id });
+      set({ selectedLetteringId: items[0]!.id, letteringPreview: null, selectedGlyphNodeId: null });
     },
     moveLetteringGroup: (groupId, dx, dy) => {
       if (!groupId || (dx === 0 && dy === 0)) return;
@@ -898,6 +924,8 @@ export const useStudio = create<StudioState>()((set, get) => {
         historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
         selection: [],
         selectedLetteringId: null,
+        selectedGlyphNodeId: null,
+        letteringPreview: null,
         measurement: null,
       });
     },
