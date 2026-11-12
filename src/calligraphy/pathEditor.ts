@@ -151,3 +151,24 @@ export function worldToGlyphPoint(item: LetteringItem, wx: number, wy: number): 
     y: -(dx * Math.sin(angle) + dy * Math.cos(angle)) / sy,
   };
 }
+
+/**
+ * Align the outgoing Bézier handle with the incoming handle at an anchor.
+ * This adjusts the actual SVG control point; it is not a visual filter.
+ */
+export function smoothOutlineAnchor(d: string, anchorId: number): string | null {
+  const nodes = outlineNodes(d);
+  const anchor = nodes.find((n) => n.id === anchorId);
+  const incoming = nodes.find((n) => n.id === anchorId - 1);
+  const outgoing = nodes.find((n) => n.id === anchorId + 1);
+  if (!anchor || anchor.role !== "anchor" || incoming?.role !== "control" ||
+      outgoing?.role !== "control") return null;
+  const dx = anchor.x - incoming.x;
+  const dy = anchor.y - incoming.y;
+  const incomingLength = Math.hypot(dx, dy);
+  const outgoingLength = Math.hypot(outgoing.x - anchor.x, outgoing.y - anchor.y);
+  if (incomingLength < 0.0001 || outgoingLength < 0.0001) return null;
+  return editOutlineNode(d, anchorId + 1,
+    anchor.x + dx / incomingLength * outgoingLength,
+    anchor.y + dy / incomingLength * outgoingLength);
+}
