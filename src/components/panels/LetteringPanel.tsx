@@ -7,7 +7,7 @@ import {
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
 import { useStudio } from "../../store/studioStore";
-import { GlyphTransformPanel } from "./GlyphTransformPanel";
+/* Letter controls are deliberately located in the separate Edit workspace. */
 
 const field = "w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
@@ -16,7 +16,7 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 type Mode = "words" | "marks" | "layers";
 
-export function LetteringPanel() {
+export function LetteringPanel({ section }: { section?: "words" | "marks" | "layers" } = {}) {
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
   const select = useStudio((s) => s.selectLettering);
@@ -25,8 +25,14 @@ export function LetteringPanel() {
   const replaceGroup = useStudio((s) => s.replaceLetteringGroup);
   const undo = useStudio((s) => s.undo);
   const redo = useStudio((s) => s.redo);
-  const mode = useStudio((s) => s.letteringMode) as Mode;
-  const setMode = useStudio((s) => s.setLetteringMode);
+  const storedMode = useStudio((s) => s.letteringMode) as Mode;
+  const setStoredMode = useStudio((s) => s.setLetteringMode);
+  const setWorkspaceSection = useStudio((s) => s.setWorkspaceSection);
+  const mode = section ?? storedMode;
+  const setMode = (next: Mode) => {
+    setStoredMode(next);
+    if (section) setWorkspaceSection(next === "words" ? "text" : next === "marks" ? "ornaments" : "layers");
+  };
   const [phrase, setPhrase] = useState("المدني");
   const [font, setFont] = useState<FontPreset>("Amiri");
   const [fontSize, setFontSize] = useState(180);
@@ -66,7 +72,7 @@ export function LetteringPanel() {
       if (editRun) replaceGroup(editRun, rendered);
       else insertBatch(rendered);
       setEditRun(null);
-      setMode("layers");
+      setWorkspaceSection("edit");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر إنشاء مسارات الخط.");
     } finally {
@@ -103,24 +109,18 @@ export function LetteringPanel() {
     const x = selected?.x ?? doc.artboard.width / 2;
     const y = (selected?.y ?? doc.artboard.height / 2) - Math.min(65, fontSize / 2);
     insert(createHaraka(mark.id, x, y));
-    setMode("layers");
+    setWorkspaceSection("edit");
   };
   const createDecoration = (ornament: (typeof ORNAMENTS)[number]) => {
     const x = selected?.x ?? doc.artboard.width / 2;
     const y = selected?.y ?? doc.artboard.height / 2;
     insert(createOrnament(ornament.id, x, y));
-    setMode("layers");
+    setWorkspaceSection("edit");
   };
 
   return (
-    <div className="space-y-4 pb-20 text-sm" dir="rtl">
-      <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-        <p className="font-semibold text-foreground">استوديو الخط العربي الاحترافي</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          شكّل الكلمة أولا ثم عدّل كل شكل حرفي ومساره كعنصر فيكتور مستقل. لا يتطلب الحساب أو رصيد Lovable.
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-background p-1" role="tablist" aria-label="أدوات الخط">
+    <div className="space-y-4 pb-6 text-sm" dir="rtl">
+      {!section && <div className="grid grid-cols-3 gap-1 rounded-xl bg-background p-1" role="tablist" aria-label="أدوات الخط">
         {([
           ["words", "الكلمات", Type],
           ["marks", "التشكيل والزخارف", Sparkles],
@@ -132,7 +132,7 @@ export function LetteringPanel() {
             <Icon className="h-4 w-4 shrink-0" />{label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {mode === "words" && (
         <section className="space-y-3">
@@ -167,10 +167,7 @@ export function LetteringPanel() {
             {editRun ? "إعادة تشكيل الكلمة المحددة" : "إنشاء مسارات فيكتور مستقلة للحروف"}
           </button>
           {editRun && <button className={button + " w-full"} onClick={() => setEditRun(null)} type="button">إلغاء استبدال الكلمة</button>}
-          <div className="rounded-lg border border-border p-3 text-xs leading-6 text-muted-foreground">
-            خطوط Amiri وAref Ruqaa وScheherazade New وGulzar مدمجة ومفتوحة الترخيص. ليست خطوط ثلث حقيقية.
-            لخط الثلث الأصلي استورد خطا مرخصا لديك؛ يحفظ المشروع أشكال الحروف كمسارات SVG بعد تشكيل الكلمة كاملة.
-          </div>
+          <p className="text-xs leading-5 text-muted-foreground">بعد الإضافة يمكنك تحديد أي حرف وإطالته وتحريكه من تبويب «تعديل».</p>
           <input ref={fontInput} type="file" accept=".ttf,.otf,.woff,.woff2" className="hidden" onChange={(e) => {
             void uploadFont(e.target.files?.[0]); e.target.value = "";
           }} />
@@ -251,16 +248,12 @@ export function LetteringPanel() {
         </section>
       )}
 
-      {selected && <GlyphTransformPanel key={selected.id} selected={selected}
-        siblings={selected.groupId ? grouped.get(selected.groupId) ?? [selected] : [selected]} />}
-      <div className="flex gap-2">
+       {!section && <div className="flex gap-2">
         <button type="button" className={button + " flex-1"} onClick={undo}>تراجع</button>
         <button type="button" className={button + " flex-1"} onClick={redo}>إعادة</button>
-      </div>
+      </div>}
       {error && <div role="alert" className="rounded-lg border border-destructive/50 p-3 text-xs text-destructive">{error}</div>}
-      <p className="text-[11px] leading-5 text-muted-foreground">
-        استيراد الخطوط ومكتبة الزخارف لا يمنحان حقوقًا في خطوط تجارية خاصة. استخدم الخطوط المسموح لك باستعمالها فقط.
-      </p>
+      {!section && <p className="text-[11px] leading-5 text-muted-foreground">استخدم خطوطا مرخصة للاستخدام التجاري.</p>}
     </div>
   );
 }
