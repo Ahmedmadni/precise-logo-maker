@@ -19,6 +19,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
   return (
     <g data-lettering-id={item.id} transform={transform}>
       {outline ? (
+        <>
         <path d={outline} transform={`scale(${scale} ${-scale})`}
           fill={item.color} stroke={item.color}
           strokeWidth={Math.max(0, item.weight ?? 0) / scale}
@@ -27,6 +28,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
         <path d={outline} transform={`scale(${scale} ${-scale})`} fill="none"
           stroke="transparent" strokeWidth={Math.max(14, item.weight ?? 0) / scale}
           pointerEvents="stroke" aria-hidden="true" />
+        </>
       ) : mark ? (
         <path d={mark.path}
           transform={`translate(${-size / 2} ${-size / 2}) scale(${size / 100})`}
