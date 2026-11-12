@@ -88,6 +88,9 @@ export function StudioCanvas() {
   const moveLettering = useStudio((s) => s.moveLettering);
   const updateLettering = useStudio((s) => s.updateLettering);
   const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
+  const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
+  const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
+  const letteringPreview = useStudio((s) => s.letteringPreview);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -103,7 +106,7 @@ export function StudioCanvas() {
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
   const dragRef = useRef<{ start: Point; last: Point } | null>(null);
-  const letterDragRef = useRef<{ id: string; start: Point } | null>(null);
+  const letterDragRef = useRef<{ id: string; start: Point; scope: "glyph" | "word"; groupId?: string } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
   const [nodePreview, setNodePreview] = useState<{ id: string; path: string } | null>(null);
@@ -438,6 +441,7 @@ export function StudioCanvas() {
       const rawIndex = handle?.getAttribute("data-outline-node");
       const nodeId = rawIndex === null || rawIndex === undefined ? NaN : Number(rawIndex);
       if (editItem?.kind === "outline" && editItem.pathData && Number.isInteger(nodeId)) {
+        setSelectedGlyphNodeId(nodeId);
         nodeDragRef.current = { id: editItem.id, nodeId, startPath: editItem.pathData };
         setNodePreview({ id: editItem.id, path: editItem.pathData });
         return;
@@ -445,7 +449,9 @@ export function StudioCanvas() {
       const letteringId = (e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
       if (letteringId && (doc.lettering ?? []).some((item) => item.id === letteringId)) {
         selectLettering(letteringId);
-        letterDragRef.current = { id: letteringId, start: world };
+        const letter = doc.lettering?.find((item) => item.id === letteringId);
+        letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
+          ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
         setLetterOffset(pt(0, 0));
         return;
       }
@@ -618,11 +624,14 @@ export function StudioCanvas() {
       return;
     }
     if (letterDragRef.current) {
-      const { id } = letterDragRef.current;
+      const { id, scope, groupId } = letterDragRef.current;
       letterDragRef.current = null;
       const offset = letterOffset;
       setLetterOffset(null);
-      if (offset) moveLettering(id, offset.x, offset.y);
+      if (offset) {
+        if (scope === "word" && groupId) useStudio.getState().moveLetteringGroup(groupId, offset.x, offset.y);
+        else moveLettering(id, offset.x, offset.y);
+      }
       return;
     }
     if (paintStrokeRef.current) {
@@ -860,8 +869,14 @@ export function StudioCanvas() {
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
             {(doc.lettering ?? []).map((item) => (
-              <LetteringGlyph key={item.id} item={item} selected={item.id === selectedLetteringId}
-                offset={item.id === selectedLetteringId ? letterOffset : null}
+              <LetteringGlyph key={item.id}
+                item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+                selected={item.id === selectedLetteringId}
+                offset={letterOffset && (
+                  item.id === selectedLetteringId ||
+                  (letterDragRef.current?.scope === "word" && !!item.groupId &&
+                   item.groupId === letterDragRef.current.groupId)
+                ) ? letterOffset : null}
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />
             ))}
           </g>
