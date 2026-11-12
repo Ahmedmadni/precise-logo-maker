@@ -16,7 +16,10 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 type Mode = "words" | "marks" | "layers";
 
-export function LetteringPanel({ section }: { section?: "words" | "marks" | "layers" } = {}) {
+export function LetteringPanel({ section, onCreated }: {
+  section?: "words" | "marks" | "layers";
+  onCreated?: (() => void) | undefined;
+} = {}) {
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
   const select = useStudio((s) => s.selectLettering);
@@ -73,6 +76,7 @@ export function LetteringPanel({ section }: { section?: "words" | "marks" | "lay
       else insertBatch(rendered);
       setEditRun(null);
       setWorkspaceSection("edit");
+      onCreated?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر إنشاء مسارات الخط.");
     } finally {
@@ -110,12 +114,14 @@ export function LetteringPanel({ section }: { section?: "words" | "marks" | "lay
     const y = (selected?.y ?? doc.artboard.height / 2) - Math.min(65, fontSize / 2);
     insert(createHaraka(mark.id, x, y));
     setWorkspaceSection("edit");
+    onCreated?.();
   };
   const createDecoration = (ornament: (typeof ORNAMENTS)[number]) => {
     const x = selected?.x ?? doc.artboard.width / 2;
     const y = selected?.y ?? doc.artboard.height / 2;
     insert(createOrnament(ornament.id, x, y));
     setWorkspaceSection("edit");
+    onCreated?.();
   };
 
   return (
