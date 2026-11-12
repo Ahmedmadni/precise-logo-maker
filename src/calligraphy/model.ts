@@ -31,6 +31,10 @@ export interface LetteringItem {
   /** One word/run can have several independently editable outlined glyphs. */
   groupId?: string | undefined;
   sourceText?: string;
+  /** OpenType variant tag used when this word was shaped (if the font supports it). */
+  alternateFeature?: string;
+  /** Concrete font glyph ID, not a Unicode code point. */
+  fontGlyphId?: number;
   glyphIndex?: number;
 }
 
