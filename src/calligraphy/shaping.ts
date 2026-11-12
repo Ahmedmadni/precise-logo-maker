@@ -1,5 +1,6 @@
 import type { FontPreset, LetteringItem } from "./model";
 import type { Font } from "fontkit";
+import { centerLetteringAt, letteringGroupBounds } from "./morph";
 import { Buffer } from "buffer";
 
 /** Bundled OFL fonts — no remote CDN and no request to the Lovable backend. */
@@ -37,6 +38,7 @@ export interface ComposeOptions {
   y: number;
   color: string;
   customFontData?: string | undefined;
+  alternateFeature?: string | undefined;
 }
 
 /**
@@ -68,7 +70,8 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
   const units = font.unitsPerEm || 1000;
   const s = options.size / units;
   const runs = words.map((word) => {
-    const run = font.layout(word, undefined, "arab", "ARA", "rtl");
+    const features = options.alternateFeature ? [options.alternateFeature] : undefined;
+    const run = font.layout(word, features, "arab", "ARA", "rtl");
     if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
       throw new Error("تعذر تشكيل الكلمة بهذا الخط: " + word);
     }
@@ -97,6 +100,7 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
           color: options.color,
           font: options.font,
           groupId, glyphIndex: index, sourceText: word,
+          fontGlyphId: glyph.id, alternateFeature: options.alternateFeature,
           pathData: d, unitsPerEm: units,
         });
       }
