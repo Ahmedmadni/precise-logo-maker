@@ -14,7 +14,7 @@ const tools: { id: ToolId; label: string; description: string; icon: typeof PenL
   { id: "measure", label: "قياس", description: "الأطوال والزوايا", icon: Ruler },
 ];
 
-export function StudioDrawingPanel({ onChoose }: { onChoose?: () => void }) {
+export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | undefined }) {
   const selected = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
   const showGrids = useStudio((s) => s.showGrids);
