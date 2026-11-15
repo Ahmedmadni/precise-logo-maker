@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultCalligraphyGuides, glyphWorldBounds, placeAttachedHaraka,
-  relayoutHarakat, remapMarksAfterRecomposition,
+  relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline,
 } from "../harakaAnchoring";
 import { createHaraka, letteringSvg, type LetteringItem } from "../model";
 import { buildSvgDocument } from "../../objects/export";
 import type { DocumentState } from "../../store/studioStore";
+import { parseProject, serializeProject } from "../../objects/project";
 
 const glyph = (id = "g1", x = 200, y = 300): LetteringItem => ({
   id, kind: "outline", x, y, size: 100, rotation: 0, color: "#aabbcc",
@@ -62,6 +63,30 @@ describe("intelligent Arabic diacritic attachment", () => {
     const next = relayoutHarakat([oldGlyph, mark], [mark]);
     expect(next[0]!.attachedToGlyphId).toBeUndefined();
     expect(next[0]!.anchorMode).toBe("manual");
+  });
+});
+
+describe("baseline snapping and editable local projects", () => {
+  it("snaps a close glyph to a visible guideline only when enabled", () => {
+    const guide = { ...defaultCalligraphyGuides(600), snapEnabled: true };
+    const close = glyph("g1", 200, 307);
+    const snapped = snapGlyphToBaseline(close, guide);
+    expect(snapped.y).toBe(300);
+    expect(snapped.baselineOffset).toBe(-7);
+    expect(snapGlyphToBaseline(glyph("g1", 200, 350), guide).y).toBe(350);
+    expect(snapGlyphToBaseline(close, { ...guide, snapEnabled: false })).toEqual(close);
+  });
+  it("round-trips links and calligraphy baseline settings through .logo documents", () => {
+    const g = glyph();
+    const m = placeAttachedHaraka("fatha", g);
+    const doc: DocumentState = {
+      artboard: { width: 800, height: 600, unit: "px", background: "#ffffff" },
+      grids: [], objects: [], lettering: [g, m],
+      calligraphyGuides: { ...defaultCalligraphyGuides(600), visible: true, snapEnabled: true },
+    };
+    const restored = parseProject(serializeProject(doc));
+    expect(restored?.lettering?.[1]?.attachedToGlyphId).toBe(g.id);
+    expect(restored?.calligraphyGuides?.snapEnabled).toBe(true);
   });
 });
 
