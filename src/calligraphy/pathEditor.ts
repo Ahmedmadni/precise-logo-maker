@@ -130,12 +130,16 @@ export function editOutlineNode(d: string, nodeId: number, x: number, y: number)
 /** Convert a font-outline point into the studio's SVG world coordinates. */
 export function glyphPointToWorld(item: LetteringItem, x: number, y: number): { x: number; y: number } {
   const units = item.unitsPerEm || 1000, s = item.size / units;
-  const dx = x * s * (item.scaleX ?? 1);
-  const dy = -y * s * (item.scaleY ?? 1);
+  const sx = x * s * (item.scaleX ?? 1);
+  const sy = -y * s * (item.scaleY ?? 1);
+  const skewY = Math.tan(Math.max(-60, Math.min(60, item.skewY ?? 0)) * Math.PI / 180);
+  const skewX = Math.tan(Math.max(-60, Math.min(60, item.skewX ?? 0)) * Math.PI / 180);
+  const py = sy + skewY * sx;
+  const px = sx + skewX * py;
   const angle = item.rotation * Math.PI / 180;
   return {
-    x: item.x + dx * Math.cos(angle) - dy * Math.sin(angle),
-    y: item.y + dx * Math.sin(angle) + dy * Math.cos(angle),
+    x: item.x + px * Math.cos(angle) - py * Math.sin(angle),
+    y: item.y + px * Math.sin(angle) + py * Math.cos(angle),
   };
 }
 
@@ -146,10 +150,13 @@ export function worldToGlyphPoint(item: LetteringItem, wx: number, wy: number): 
   if (!sx || !sy) return null;
   const angle = -item.rotation * Math.PI / 180;
   const dx = wx - item.x, dy = wy - item.y;
-  return {
-    x: (dx * Math.cos(angle) - dy * Math.sin(angle)) / sx,
-    y: -(dx * Math.sin(angle) + dy * Math.cos(angle)) / sy,
-  };
+  const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
+  const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
+  const skewX = Math.tan(Math.max(-60, Math.min(60, item.skewX ?? 0)) * Math.PI / 180);
+  const skewY = Math.tan(Math.max(-60, Math.min(60, item.skewY ?? 0)) * Math.PI / 180);
+  const originalX = rotatedX - skewX * rotatedY;
+  const originalY = rotatedY - skewY * originalX;
+  return { x: originalX / sx, y: -originalY / sy };
 }
 
 /**
