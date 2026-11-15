@@ -376,7 +376,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     duplicateLettering: (id) => {
       const item = (get().doc.lettering ?? []).find((x) => x.id === id);
       if (!item) return;
-      const copy = { ...item, id: `copy-${crypto.randomUUID()}`, groupId: undefined, x: item.x + 24, y: item.y + 24 };
+      const copy = { ...item, id: `copy-${crypto.randomUUID()}`, groupId: undefined, x: item.x + 24, y: item.y + 24, ...(item.kind === "haraka" ? { anchorMode: "manual" as const } : {}) };
       commit("Duplicate calligraphy element", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), copy] }));
       set({ selectedLetteringId: copy.id });
     },
