@@ -1,4 +1,4 @@
-import { outlineNodes, parseOutline } from "./pathEditor";
+import { glyphPointToWorld, outlineNodes, parseOutline } from "./pathEditor";
 import type { LetteringItem } from "./model";
 
 export type MorphDirection = "right" | "left" | "up" | "down";
@@ -62,14 +62,7 @@ export function letteringGroupBounds(items: LetteringItem[]): { x: number; y: nu
   for (const item of items) {
     if (item.kind !== "outline" || !item.pathData) continue;
     const nodes = outlineNodes(item.pathData);
-    const s = item.size / (item.unitsPerEm || 1000);
-    const angle = item.rotation * Math.PI / 180;
-    const cos = Math.cos(angle), sin = Math.sin(angle);
-    for (const n of nodes) {
-      const x = n.x * s * (item.scaleX ?? 1);
-      const y = -n.y * s * (item.scaleY ?? 1);
-      points.push({ x: item.x + x * cos - y * sin, y: item.y + x * sin + y * cos });
-    }
+    for (const n of nodes) points.push(glyphPointToWorld(item, n.x, n.y));
   }
   if (!points.length) return null;
   const minX = Math.min(...points.map((p) => p.x)), maxX = Math.max(...points.map((p) => p.x));
