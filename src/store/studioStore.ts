@@ -371,11 +371,17 @@ export const useStudio = create<StudioState>()((set, get) => {
       commit("Move calligraphy word", (doc) => {
         const moved = (doc.lettering ?? []).map((item) =>
           item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item);
-        const anchor = moved.find((item) => item.kind === "outline" && item.groupId === groupId);
+        const anchors = moved.filter((item) => item.kind === "outline" && item.groupId === groupId);
+        const baseline = doc.calligraphyGuides?.baselineY ?? 0;
+        const anchor = anchors.length ? anchors.reduce((best, item) =>
+          Math.abs(item.y - baseline) < Math.abs(best.y - baseline) ? item : best) : undefined;
         const snap = anchor ? snapGlyphToBaseline(anchor, doc.calligraphyGuides) : undefined;
         const correction = snap && anchor ? snap.y - anchor.y : 0;
         const output = correction ? moved.map((item) =>
-          item.groupId === groupId ? { ...item, y: item.y + correction } : item) : moved;
+          item.groupId === groupId ? {
+            ...item, y: item.y + correction,
+            ...(item.id === anchor?.id ? { baselineOffset: snap!.baselineOffset } : {}),
+          } : item) : moved;
         return { ...doc, lettering: relayoutHarakat(doc.lettering ?? [], output) };
       });
     },
