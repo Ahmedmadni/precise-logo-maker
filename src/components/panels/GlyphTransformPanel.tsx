@@ -5,6 +5,7 @@ import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
+import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
@@ -121,6 +122,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
             onChange={(e) => update(selected.id, { text: e.target.value })} />
         </label>
       )}
+      <GlyphAnchorInspector selected={selected} />
       <label className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border px-3 text-xs font-semibold">
         لون العنصر
         <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
