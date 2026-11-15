@@ -21,6 +21,12 @@ export interface LetteringItem {
   scaleY?: number;
   /** An optional stroke that makes the outlined glyph optically heavier. */
   weight?: number;
+  /** Offset in artboard pixels relative to the main calligraphy baseline. */
+  baselineOffset?: number;
+  /** Glyph anchor which this diacritic follows, if any. */
+  attachedToGlyphId?: string | undefined;
+  anchorMode?: "auto" | "manual";
+  stackOrder?: number;
   text?: string;
   font?: FontPreset;
   mark?: HarakaId;
