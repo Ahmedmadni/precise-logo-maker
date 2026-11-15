@@ -100,3 +100,21 @@ export function placeAttachedHaraka(
 export function mayStackShadda(mark: HarakaId, siblingMarks: LetteringItem[]): boolean {
   return STACK_SHADDA.has(mark) && siblingMarks.some((item) => item.mark === "shadda");
 }
+
+/** Keep artwork and diacritics linked when font substitution changes glyph IDs. */
+export function remapMarksAfterRecomposition(
+  oldItems: LetteringItem[], newGlyphs: LetteringItem[], oldGroupId: string,
+): LetteringItem[] {
+  const oldGlyphs = oldItems.filter((item) => item.kind === "outline" && item.groupId === oldGroupId);
+  const newWord = newGlyphs.filter((item) => item.kind === "outline");
+  const oldRank = new Map(oldGlyphs.map((glyph, i) => [glyph.id, i]));
+  const updated = oldItems.filter((item) => item.groupId !== oldGroupId).map((item) => {
+    if (item.kind !== "haraka" || !item.attachedToGlyphId) return item;
+    const rank = oldRank.get(item.attachedToGlyphId);
+    if (rank === undefined || !newWord.length) return item;
+    const target = newWord[Math.min(newWord.length - 1, Math.round(rank * (newWord.length - 1) / Math.max(1, oldGlyphs.length - 1)))];
+    return { ...item, attachedToGlyphId: target!.id };
+  });
+  const merged = [...updated, ...newGlyphs];
+  return relayoutHarakat(oldItems, merged);
+}
