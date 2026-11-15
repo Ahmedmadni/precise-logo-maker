@@ -7,6 +7,7 @@ import {
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
 import { useStudio } from "../../store/studioStore";
+import { placeAttachedHaraka } from "../../calligraphy/harakaAnchoring";
 /* Letter controls are deliberately located in the separate Edit workspace. */
 
 const field = "w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -110,9 +111,14 @@ export function LetteringPanel({ section, onCreated }: {
   };
 
   const createMark = (mark: (typeof HARAKAT)[number]) => {
-    const x = selected?.x ?? doc.artboard.width / 2;
-    const y = (selected?.y ?? doc.artboard.height / 2) - Math.min(65, fontSize / 2);
-    insert(createHaraka(mark.id, x, y));
+    const target = selected?.kind === "outline" ? selected :
+      selected?.kind === "haraka" && selected.attachedToGlyphId
+        ? items.find((item) => item.id === selected.attachedToGlyphId && item.kind === "outline")
+        : undefined;
+    const item = target
+      ? placeAttachedHaraka(mark.id, target, items)
+      : createHaraka(mark.id, doc.artboard.width / 2, doc.artboard.height / 2 - 65);
+    insert(item);
     setWorkspaceSection("edit");
     onCreated?.();
   };
@@ -187,6 +193,9 @@ export function LetteringPanel({ section, onCreated }: {
         <section className="space-y-4">
           <div>
             <h3 className="mb-2 font-semibold">حركات التشكيل الفيكتور</h3>
+            <p className="mb-2 text-xs leading-5 text-muted-foreground">
+              حدد حرفا أولا لربط الحركة به تلقائيا. ويمكن تغيير موضعها أو فك الارتباط من «تعديل».
+            </p>
             <div className="grid grid-cols-4 gap-2">
               {HARAKAT.map((mark) => (
                 <button key={mark.id} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background"
