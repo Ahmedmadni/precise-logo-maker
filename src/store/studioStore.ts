@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
-import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
+import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
 import type { ViewTransform } from "../core/coordinates/view";
@@ -368,10 +368,16 @@ export const useStudio = create<StudioState>()((set, get) => {
     },
     moveLetteringGroup: (groupId, dx, dy) => {
       if (!groupId || (dx === 0 && dy === 0)) return;
-      commit("Move calligraphy word", (doc) => ({
-        ...doc, lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) =>
-          item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item)),
-      }));
+      commit("Move calligraphy word", (doc) => {
+        const moved = (doc.lettering ?? []).map((item) =>
+          item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item);
+        const anchor = moved.find((item) => item.kind === "outline" && item.groupId === groupId);
+        const snap = anchor ? snapGlyphToBaseline(anchor, doc.calligraphyGuides) : undefined;
+        const correction = snap && anchor ? snap.y - anchor.y : 0;
+        const output = correction ? moved.map((item) =>
+          item.groupId === groupId ? { ...item, y: item.y + correction } : item) : moved;
+        return { ...doc, lettering: relayoutHarakat(doc.lettering ?? [], output) };
+      });
     },
     duplicateLettering: (id) => {
       const item = (get().doc.lettering ?? []).find((x) => x.id === id);
@@ -400,7 +406,10 @@ export const useStudio = create<StudioState>()((set, get) => {
       if (dx === 0 && dy === 0) return;
       commit("Move Arabic lettering", (doc) => ({
         ...doc,
-        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id ? { ...item, x: item.x + dx, y: item.y + dy, ...(item.kind === "haraka" ? { anchorMode: "manual" as const } : {}) } : item)),
+        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id
+          ? snapGlyphToBaseline({ ...item, x: item.x + dx, y: item.y + dy,
+              ...(item.kind === "haraka" ? { anchorMode: "manual" as const } : {}) }, doc.calligraphyGuides)
+          : item)),
       }));
     },
     deleteLettering: (id) => {
