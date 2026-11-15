@@ -26,6 +26,11 @@ export function CalligraphyGuidesPanel() {
         سطور قياس بصرية تساعد على توزيع الحروف والارتفاعات، ولا تظهر في SVG أو PNG النهائي.
       </p>
       {guides.visible && <div className="space-y-2">
+        <label className="flex min-h-11 items-center justify-between rounded-lg border border-border px-3 text-xs">
+          جذب الحروف إلى سطر الأساس عند الاقتراب منه
+          <input type="checkbox" checked={guides.snapEnabled} className="h-5 w-5"
+            onChange={(e) => setValue("snapEnabled", e.target.checked)} />
+        </label>
         {settingsFields.map(({ id, label }) => (
           <label key={id} className="flex min-h-11 items-center justify-between gap-2 text-xs">
             <span>{label}</span>
