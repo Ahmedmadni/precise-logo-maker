@@ -75,7 +75,7 @@ describe("guides never leak into printable output", () => {
       calligraphyGuides: { ...defaultCalligraphyGuides(600), visible: true },
     };
     const svg = buildSvgDocument(doc, { background: false });
-    expect(svg).toContain("glyph");
+    expect(svg).toContain("<g ");
     expect(svg).toContain('d="');
     expect(svg).not.toContain("سطر الأساس");
     expect(svg).not.toContain("ascender");
