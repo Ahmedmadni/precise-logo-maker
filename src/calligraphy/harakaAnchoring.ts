@@ -118,3 +118,14 @@ export function remapMarksAfterRecomposition(
   const merged = [...updated, ...newGlyphs];
   return relayoutHarakat(oldItems, merged);
 }
+
+/** Magnetically align an outlined glyph origin to the baseline if enabled. */
+export function snapGlyphToBaseline(
+  item: LetteringItem, guides: CalligraphyGuideSettings | undefined, threshold = 12,
+): LetteringItem {
+  if (item.kind !== "outline" || !guides?.snapEnabled || !Number.isFinite(guides.baselineY)) return item;
+  const delta = guides.baselineY - item.y;
+  if (Math.abs(delta) > threshold) return item;
+  return { ...item, y: guides.baselineY,
+    baselineOffset: (item.baselineOffset ?? 0) + delta };
+}
