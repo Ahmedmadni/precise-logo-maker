@@ -924,7 +924,7 @@ export function StudioCanvas() {
           <g>
             {(doc.lettering ?? []).map((item) => {
               const draggedId = letterDragRef.current?.id;
-              const dragging = draggedId && doc.lettering?.find((glyph) => glyph.id === draggedId);
+              const dragging = draggedId ? doc.lettering?.find((glyph) => glyph.id === draggedId) : undefined;
               const isWordDragged = letterDragRef.current?.scope === "word" && !!dragging?.groupId;
               const linkedToDragged = item.kind === "haraka" && item.attachedToGlyphId &&
                 (item.attachedToGlyphId === draggedId ||
