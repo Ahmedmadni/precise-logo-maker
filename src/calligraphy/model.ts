@@ -44,6 +44,10 @@ export interface LetteringItem {
   alternateFeature?: string | undefined;
   /** Concrete font glyph ID, not a Unicode code point. */
   fontGlyphId?: number;
+  /** Manual SVG contour labels. No implicit anatomical identification. */
+  contourRoles?: Record<string, "unassigned" | "head" | "body" | "tail" | "join" | "dot" | "counter">;
+  /** Local font-unit entry and exit markers, NOT part of printed artwork. */
+  joinAnchors?: { entry?: { x: number; y: number }; exit?: { x: number; y: number } };
   glyphIndex?: number;
 }
 

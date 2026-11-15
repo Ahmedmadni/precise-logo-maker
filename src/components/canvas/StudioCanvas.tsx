@@ -28,6 +28,9 @@ import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
 import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
+import { GlyphContourOverlay } from "./GlyphContourOverlay";
+import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
+import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../calligraphy/contourComposer";
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
@@ -96,6 +99,10 @@ export function StudioCanvas() {
   const letteringPreview = useStudio((s) => s.letteringPreview);
   const setLetteringPreview = useStudio((s) => s.setLetteringPreview);
   const commitLetteringPreview = useStudio((s) => s.commitLetteringPreview);
+  const editGlyphContours = useStudio((s) => s.editGlyphContours);
+  const selectedContourIndex = useStudio((s) => s.selectedContourIndex);
+  const setSelectedContourIndex = useStudio((s) => s.setSelectedContourIndex);
+  const editJoinAnchors = useStudio((s) => s.editJoinAnchors);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -114,6 +121,10 @@ export function StudioCanvas() {
   const letterDragRef = useRef<{ id: string; start: Point; scope: "glyph" | "word"; groupId?: string } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
+  const contourDragRef = useRef<{
+    id: string; index: number; path: string; localStart: Point;
+  } | null>(null);
+  const joinDragRef = useRef<{ id: string; side: JoinSide } | null>(null);
   const scaleDragRef = useRef<{
     id: string; start: Point; axis: "scaleX" | "scaleY" | "rotation"; side: number;
     value: number; dimension: number; rotation: number; pivot: Point;
@@ -357,6 +368,8 @@ export function StudioCanvas() {
     dragRef.current = null;
     letterDragRef.current = null;
     nodeDragRef.current = null;
+    contourDragRef.current = null;
+    joinDragRef.current = null;
     scaleDragRef.current = null;
     useStudio.setState({ letteringPreview: null });
     setNodePreview(null);
@@ -447,7 +460,29 @@ export function StudioCanvas() {
     }
 
     if (tool === "select") {
-      const resizeNode = !editGlyphNodes ? (e.target as Element).closest("[data-glyph-handle]") : null;
+      const target = e.target as Element;
+      const outline = doc.lettering?.find((item) => item.id === selectedLetteringId);
+      const clickedContour = editGlyphContours ? target.closest("[data-contour-index]") : null;
+      const rawContourIndex = clickedContour?.getAttribute("data-contour-index");
+      const contourIndex = rawContourIndex === null || rawContourIndex === undefined ? NaN : Number(rawContourIndex);
+      if (outline?.kind === "outline" && outline.pathData && Number.isInteger(contourIndex)) {
+        const localStart = worldToGlyphPoint(outline, world.x, world.y);
+        if (localStart) {
+          setSelectedContourIndex(contourIndex);
+          contourDragRef.current = { id: outline.id, index: contourIndex,
+            path: outline.pathData, localStart };
+          setNodePreview({ id: outline.id, path: outline.pathData });
+          return;
+        }
+      }
+      const clickedJoin = editJoinAnchors ? target.closest("[data-join-side]") : null;
+      const side = clickedJoin?.getAttribute("data-join-side");
+      if (outline?.kind === "outline" && (side === "entry" || side === "exit")) {
+        joinDragRef.current = { id: outline.id, side };
+        return;
+      }
+      const resizeNode = !editGlyphNodes && !editGlyphContours && !editJoinAnchors
+        ? target.closest("[data-glyph-handle]") : null;
       const edge = resizeNode?.getAttribute("data-glyph-handle");
       const glyph = doc.lettering?.find((item) => item.id === selectedLetteringId);
       if (glyph?.kind === "outline" && edge && glyph.pathData) {
@@ -562,6 +597,30 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if (contourDragRef.current) {
+      const dragging = contourDragRef.current;
+      const item = (doc.lettering ?? []).find((entry) => entry.id === dragging.id);
+      if (item) {
+        const current = worldToGlyphPoint(item, world.x, world.y);
+        if (current) {
+          const path = moveOutlineContour(dragging.path, dragging.index,
+            current.x - dragging.localStart.x, current.y - dragging.localStart.y);
+          if (path) setNodePreview({ id: item.id, path });
+        }
+      }
+      return;
+    }
+    if (joinDragRef.current) {
+      const dragging = joinDragRef.current;
+      const item = (doc.lettering ?? []).find((entry) => entry.id === dragging.id);
+      if (item) {
+        const local = positionJoinAnchor(item, world.x, world.y);
+        if (local) setLetteringPreview(dragging.id, {
+          joinAnchors: { ...item.joinAnchors, [dragging.side]: local },
+        });
+      }
+      return;
+    }
     if (scaleDragRef.current) {
       const dragging = scaleDragRef.current;
       const dx = world.x - dragging.start.x;
@@ -661,6 +720,19 @@ export function StudioCanvas() {
       return;
     }
     panRef.current = null;
+    if (contourDragRef.current) {
+      const { id, path: original } = contourDragRef.current;
+      contourDragRef.current = null;
+      const changed = nodePreview?.id === id && nodePreview.path !== original ? nodePreview.path : null;
+      setNodePreview(null);
+      if (changed) updateLettering(id, { pathData: changed });
+      return;
+    }
+    if (joinDragRef.current) {
+      joinDragRef.current = null;
+      commitLetteringPreview();
+      return;
+    }
     if (scaleDragRef.current) {
       scaleDragRef.current = null;
       commitLetteringPreview();
@@ -939,8 +1011,19 @@ export function StudioCanvas() {
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
             })}
           </g>
+          {/* Named editable contours and join anchors are not part of exported SVG. */}
+          {editGlyphContours && tool === "select" && (doc.lettering ?? [])
+            .filter((item) => item.id === selectedLetteringId && item.kind === "outline")
+            .map((item) => <GlyphContourOverlay key={`contours-${item.id}`}
+              item={item} index={selectedContourIndex} zoom={view.zoom}
+              overridePath={nodePreview?.id === item.id ? nodePreview.path : undefined} />)}
+          {editJoinAnchors && tool === "select" && (doc.lettering ?? [])
+            .filter((item) => item.id === selectedLetteringId && item.kind === "outline")
+            .map((item) => <GlyphJoinOverlay key={`join-${item.id}`}
+              item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+              zoom={view.zoom} />)}
           {/* Touch-accessible stretch and rotation handles; not exported. */}
-          {!editGlyphNodes && tool === "select" && (doc.lettering ?? [])
+          {!editGlyphNodes && !editGlyphContours && !editJoinAnchors && tool === "select" && (doc.lettering ?? [])
             .filter((item) => item.id === selectedLetteringId && item.kind === "outline")
             .map((item) => <GlyphTransformHandles key={`resize-${item.id}`}
               item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}

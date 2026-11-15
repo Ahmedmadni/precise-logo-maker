@@ -5,6 +5,7 @@ import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
+import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
 import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
@@ -258,8 +259,9 @@ export function GlyphTransformPanel({ selected, siblings }: {
             )}
             </div>
           </details>
+          <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} />
           <details className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-xs font-bold">5. بدائل أشكال الحروف من الخط</summary>
+            <summary className="cursor-pointer text-xs font-bold">8. بدائل أشكال الحروف من الخط</summary>
             <div className="mt-3"><AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} /></div>
           </details>
         </>
