@@ -28,6 +28,8 @@ import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
 import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
+import { CalligraphyGuides } from "./CalligraphyGuides";
+import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
@@ -881,6 +883,8 @@ export function StudioCanvas() {
             doc.grids
               .filter((g) => g.weight === "secondary")
               .map((g) => <GridLayer key={g.id} grid={g} />)}
+          {/* Calligraphy baselines stay in the editor, never in exported SVG. */}
+          <CalligraphyGuides settings={doc.calligraphyGuides ?? defaultCalligraphyGuides(doc.artboard.height)} width={doc.artboard.width} />
           {/* Shapes */}
           <g>
             {doc.objects.map((o) =>
@@ -918,17 +922,22 @@ export function StudioCanvas() {
           </g>
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
-            {(doc.lettering ?? []).map((item) => (
-              <LetteringGlyph key={item.id}
+            {(doc.lettering ?? []).map((item) => {
+              const draggedId = letterDragRef.current?.id;
+              const dragging = draggedId ? doc.lettering?.find((glyph) => glyph.id === draggedId) : undefined;
+              const isWordDragged = letterDragRef.current?.scope === "word" && !!dragging?.groupId;
+              const linkedToDragged = item.kind === "haraka" && item.attachedToGlyphId &&
+                (item.attachedToGlyphId === draggedId ||
+                 (isWordDragged && !!doc.lettering?.find((glyph) =>
+                   glyph.id === item.attachedToGlyphId && glyph.groupId === dragging.groupId)));
+              const moved = item.id === selectedLetteringId ||
+                (isWordDragged && item.groupId === dragging?.groupId) || linkedToDragged;
+              return <LetteringGlyph key={item.id}
                 item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
                 selected={item.id === selectedLetteringId}
-                offset={letterOffset && (
-                  item.id === selectedLetteringId ||
-                  (letterDragRef.current?.scope === "word" && !!item.groupId &&
-                   item.groupId === letterDragRef.current.groupId)
-                ) ? letterOffset : null}
-                overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />
-            ))}
+                offset={letterOffset && moved ? letterOffset : null}
+                overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
+            })}
           </g>
           {/* Touch-accessible stretch and rotation handles; not exported. */}
           {!editGlyphNodes && tool === "select" && (doc.lettering ?? [])

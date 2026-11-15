@@ -5,11 +5,12 @@ import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
+import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-type SliderKey = "scaleX" | "scaleY" | "rotation" | "weight";
+type SliderKey = "scaleX" | "scaleY" | "skewX" | "skewY" | "rotation" | "weight";
 const directions: { key: MorphDirection; label: string; icon: typeof ArrowRight }[] = [
   { key: "right", label: "مد لليمين", icon: ArrowRight },
   { key: "left", label: "مد لليسار", icon: ArrowLeft },
@@ -121,6 +122,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
             onChange={(e) => update(selected.id, { text: e.target.value })} />
         </label>
       )}
+      <GlyphAnchorInspector selected={selected} />
       <label className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border px-3 text-xs font-semibold">
         لون العنصر
         <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
@@ -153,12 +155,14 @@ export function GlyphTransformPanel({ selected, siblings }: {
           ["scaleX", "إطالة الحرف أفقيًا", 0.35, 4, 0.05],
           ["scaleY", "إطالة الحرف رأسيًا", 0.35, 4, 0.05],
           ["rotation", "تدوير الحرف", -180, 180, 1],
+          ["skewX", "ميل الحرف أفقيًا", -50, 50, 1],
+          ["skewY", "ميل الحرف رأسيًا", -50, 50, 1],
           ...(isOutline ? [["weight", "سُمك إضافي للضربة (Stroke)", 0, 20, 0.25]] as const : []),
         ] as [SliderKey, string, number, number, number][]).map(([key, label, min, max, interval]) => (
           <div key={key} className="space-y-1">
             <label htmlFor={`glyph-slider-${key}`} className="flex items-center justify-between text-xs">
               {label}
-              <span className="font-mono text-foreground" dir="ltr">{sliderValue(key).toFixed(key === "rotation" ? 0 : 2)}{key === "rotation" ? "°" : key === "weight" ? " px" : "×"}</span>
+              <span className="font-mono text-foreground" dir="ltr">{sliderValue(key).toFixed(key === "rotation" || key === "skewX" || key === "skewY" ? 0 : 2)}{key === "rotation" || key === "skewX" || key === "skewY" ? "°" : key === "weight" ? " px" : "×"}</span>
             </label>
             <input id={`glyph-slider-${key}`} type="range" min={min} max={max} step={interval}
               className="min-h-10 w-full accent-[var(--color-primary)]"
@@ -169,7 +173,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
           </div>
         ))}
         <button type="button" className={button + " w-full"}
-          onClick={() => { commitPreview(); update(selected.id, { scaleX: 1, scaleY: 1, rotation: 0, weight: 0 }); }}>
+          onClick={() => { commitPreview(); update(selected.id, { scaleX: 1, scaleY: 1, skewX: 0, skewY: 0, rotation: 0, weight: 0 }); }}>
           <RotateCcw className="h-4 w-4" /> إعادة الإطالة والدوران والسُمك للأصل
         </button>
         </div>

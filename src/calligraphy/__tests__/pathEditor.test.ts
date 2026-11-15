@@ -41,6 +41,17 @@ describe("outline node editor", () => {
     expect(ux * vy - uy * vx).toBeCloseTo(0, 2);
     expect(smoothOutlineAnchor("M0 0 L10 10", 1)).toBeNull();
   });
+  it("keeps Bézier handle coordinates accurate with independent X/Y shear", () => {
+    const glyph = {
+      ...createLettering(130, 280), kind: "outline" as const,
+      size: 165, unitsPerEm: 1000,
+      scaleX: 1.3, scaleY: 0.75, rotation: 25, skewX: 19, skewY: -12,
+    };
+    const point = glyphPointToWorld(glyph, 350, -90);
+    const inverse = worldToGlyphPoint(glyph, point.x, point.y)!;
+    expect(inverse.x).toBeCloseTo(350, 5);
+    expect(inverse.y).toBeCloseTo(-90, 5);
+  });
   it("exports ornaments as SVG paths without HTML text", () => {
     const ornament = createOrnament("star8", 100, 100);
     const svg = letteringSvg(ornament);
