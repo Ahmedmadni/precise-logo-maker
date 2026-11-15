@@ -19,6 +19,9 @@ export interface LetteringItem {
   color: string;
   scaleX?: number;
   scaleY?: number;
+  /** Shear angles in degrees, limited for predictable Bézier editing. */
+  skewX?: number;
+  skewY?: number;
   /** An optional stroke that makes the outlined glyph optically heavier. */
   weight?: number;
   /** Offset in artboard pixels relative to the main calligraphy baseline. */
@@ -117,7 +120,9 @@ export const letteringTransform = (item: LetteringItem): string => {
   const angle = Number.isFinite(item.rotation) ? item.rotation : 0;
   const sx = Number.isFinite(item.scaleX) ? Math.max(-20, Math.min(20, item.scaleX ?? 1)) : 1;
   const sy = Number.isFinite(item.scaleY) ? Math.max(-20, Math.min(20, item.scaleY ?? 1)) : 1;
-  return `translate(${x} ${y}) rotate(${angle}) scale(${sx} ${sy})`;
+  const skewX = Number.isFinite(item.skewX) ? Math.max(-60, Math.min(60, item.skewX ?? 0)) : 0;
+  const skewY = Number.isFinite(item.skewY) ? Math.max(-60, Math.min(60, item.skewY ?? 0)) : 0;
+  return `translate(${x} ${y}) rotate(${angle}) skewX(${skewX}) skewY(${skewY}) scale(${sx} ${sy})`;
 };
 
 export const letteringSvg = (item: LetteringItem): string => {
