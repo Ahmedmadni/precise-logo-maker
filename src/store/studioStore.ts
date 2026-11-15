@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
+import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
 import type { ViewTransform } from "../core/coordinates/view";
@@ -46,6 +47,8 @@ export interface DocumentState {
   objects: VectorObject[];
   /** Editable lettering and independently positioned vector harakat. */
   lettering?: LetteringItem[];
+  /** Optional calligraphy guidelines, never included in SVG/PNG exports. */
+  calligraphyGuides?: CalligraphyGuideSettings;
   /** Optional licensed user-supplied font, persisted with the .logo project. */
   customThuluthFont?: string;
   /** Optional raster picture pinned under the grids for tracing. Never exported. */
@@ -164,6 +167,8 @@ export interface StudioState {
   moveLettering: (id: string, dx: number, dy: number) => void;
   deleteLettering: (id: string) => void;
   setCustomThuluthFont: (fontDataUrl: string) => void;
+  setCalligraphyGuides: (patch: Partial<CalligraphyGuideSettings>) => void;
+  setLetteringBaselineOffset: (id: string, offset: number) => void;
   snap: SnapSettings;
   precision: PrecisionSettings;
   measurement: Measurement | null;
@@ -265,6 +270,7 @@ const initialDoc = (): DocumentState => {
     grids: [createSquareGrid(center, artboard.width), createConcentricGrid(center, artboard.width)],
     objects: [],
     lettering: [],
+    calligraphyGuides: defaultCalligraphyGuides(artboard.height),
     reference: null,
   };
 };
@@ -332,7 +338,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       if (!changed) return;
       commit("Adjust Arabic glyph", (doc) => ({
         ...doc,
-        lettering: (doc.lettering ?? []).map((entry) => entry.id === preview.id ? { ...entry, ...preview.patch } : entry),
+        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((entry) => entry.id === preview.id ? { ...entry, ...preview.patch, ...(entry.kind === "haraka" && (preview.patch.x !== undefined || preview.patch.y !== undefined) ? { anchorMode: "manual" as const } : {}) } : entry)),
       }));
     },
     editGlyphNodes: false,
@@ -343,28 +349,28 @@ export const useStudio = create<StudioState>()((set, get) => {
     setLetteringMode: (letteringMode) => set({ letteringMode }),
     selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, letteringPreview: null, ...(id ? { workspaceSection: "edit" as const } : {}) }),
     addLettering: (item) => {
-      commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: [...(doc.lettering ?? []), item] }));
+      commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: relayoutHarakat(doc.lettering ?? [], [...(doc.lettering ?? []), item]) }));
       set({ selectedLetteringId: item.id, selection: [], tool: "select", workspaceSection: "edit" });
     },
     addLetteringBatch: (items) => {
       if (!items.length) return;
       commit(`Compose Arabic word (${items.length} glyphs)`, (doc) => ({
-        ...doc, lettering: [...(doc.lettering ?? []), ...items],
+        ...doc, lettering: relayoutHarakat(doc.lettering ?? [], [...(doc.lettering ?? []), ...items]),
       }));
       set({ selectedLetteringId: items[0]!.id, selection: [], tool: "select", workspaceSection: "edit" });
     },
     replaceLetteringGroup: (groupId, items) => {
       if (!items.length) return;
       commit("Recompose Arabic word", (doc) => ({ ...doc,
-        lettering: [...(doc.lettering ?? []).filter((entry) => entry.groupId !== groupId), ...items],
+        lettering: remapMarksAfterRecomposition(doc.lettering ?? [], items, groupId),
       }));
       set({ selectedLetteringId: items[0]!.id, letteringPreview: null, selectedGlyphNodeId: null });
     },
     moveLetteringGroup: (groupId, dx, dy) => {
       if (!groupId || (dx === 0 && dy === 0)) return;
       commit("Move calligraphy word", (doc) => ({
-        ...doc, lettering: (doc.lettering ?? []).map((item) =>
-          item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item),
+        ...doc, lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) =>
+          item.groupId === groupId ? { ...item, x: item.x + dx, y: item.y + dy } : item)),
       }));
     },
     duplicateLettering: (id) => {
@@ -387,20 +393,33 @@ export const useStudio = create<StudioState>()((set, get) => {
     updateLettering: (id, patch) =>
       commit("Edit Arabic lettering", (doc) => ({
         ...doc,
-        lettering: (doc.lettering ?? []).map((item) => item.id === id ? { ...item, ...patch, id: item.id, kind: item.kind } : item),
+        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id ? { ...item, ...patch, id: item.id, kind: item.kind,
+          ...(item.kind === "haraka" && (patch.x !== undefined || patch.y !== undefined) && patch.anchorMode === undefined ? { anchorMode: "manual" as const } : {}) } : item)),
       })),
     moveLettering: (id, dx, dy) => {
       if (dx === 0 && dy === 0) return;
       commit("Move Arabic lettering", (doc) => ({
         ...doc,
-        lettering: (doc.lettering ?? []).map((item) => item.id === id ? { ...item, x: item.x + dx, y: item.y + dy } : item),
+        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id ? { ...item, x: item.x + dx, y: item.y + dy, ...(item.kind === "haraka" ? { anchorMode: "manual" as const } : {}) } : item)),
       }));
     },
     deleteLettering: (id) => {
-      commit("Delete Arabic lettering", (doc) => ({ ...doc, lettering: (doc.lettering ?? []).filter((item) => item.id !== id) }));
+      commit("Delete Arabic lettering", (doc) => ({ ...doc, lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).filter((item) => item.id !== id)) }));
       if (get().selectedLetteringId === id) set({ selectedLetteringId: null });
     },
     setCustomThuluthFont: (fontDataUrl) => commit("Import licensed Arabic font", (doc) => ({ ...doc, customThuluthFont: fontDataUrl })),
+    setCalligraphyGuides: (patch) => commit("Update calligraphy guides", (doc) => ({
+      ...doc, calligraphyGuides: { ...(doc.calligraphyGuides ?? defaultCalligraphyGuides(doc.artboard.height)), ...patch },
+    })),
+    setLetteringBaselineOffset: (id, offset) => {
+      if (!Number.isFinite(offset) || Math.abs(offset) > 10000) return;
+      commit("Raise / lower Arabic glyph", (doc) => {
+        const previous = doc.lettering ?? [];
+        return { ...doc, lettering: relayoutHarakat(previous, previous.map((item) => item.id === id ? {
+          ...item, y: item.y + offset - (item.baselineOffset ?? 0), baselineOffset: offset,
+        } : item)) };
+      });
+    },
     snap: DEFAULT_SNAP_SETTINGS,
     precision: DEFAULT_PRECISION,
     measurement: null,
