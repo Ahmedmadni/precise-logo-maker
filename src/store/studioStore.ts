@@ -152,6 +152,12 @@ export interface StudioState {
   commitLetteringPreview: () => void;
   editGlyphNodes: boolean;
   setEditGlyphNodes: (editing: boolean) => void;
+  editGlyphContours: boolean;
+  setEditGlyphContours: (editing: boolean) => void;
+  selectedContourIndex: number | null;
+  setSelectedContourIndex: (index: number | null) => void;
+  editJoinAnchors: boolean;
+  setEditJoinAnchors: (editing: boolean) => void;
   workspaceSection: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced";
   setWorkspaceSection: (section: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced") => void;
   letteringMode: "words" | "marks" | "layers";
@@ -342,12 +348,24 @@ export const useStudio = create<StudioState>()((set, get) => {
       }));
     },
     editGlyphNodes: false,
-    setEditGlyphNodes: (editGlyphNodes) => set({ editGlyphNodes, tool: "select" }),
+    setEditGlyphNodes: (editGlyphNodes) => set({
+      editGlyphNodes, editGlyphContours: false, editJoinAnchors: false, tool: "select",
+    }),
+    editGlyphContours: false,
+    setEditGlyphContours: (editGlyphContours) => set({
+      editGlyphContours, editGlyphNodes: false, editJoinAnchors: false, tool: "select",
+    }),
+    selectedContourIndex: null,
+    setSelectedContourIndex: (selectedContourIndex) => set({ selectedContourIndex }),
+    editJoinAnchors: false,
+    setEditJoinAnchors: (editJoinAnchors) => set({
+      editJoinAnchors, editGlyphNodes: false, editGlyphContours: false, tool: "select",
+    }),
     workspaceSection: "text",
     setWorkspaceSection: (workspaceSection) => set({ workspaceSection }),
     letteringMode: "words",
     setLetteringMode: (letteringMode) => set({ letteringMode }),
-    selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, letteringPreview: null, ...(id ? { workspaceSection: "edit" as const } : {}) }),
+    selectLettering: (id) => set({ selectedLetteringId: id, selection: [], selectedGlyphNodeId: null, selectedContourIndex: null, letteringPreview: null, ...(id ? { workspaceSection: "edit" as const } : {}) }),
     addLettering: (item) => {
       commit("Add Arabic lettering", (doc) => ({ ...doc, lettering: relayoutHarakat(doc.lettering ?? [], [...(doc.lettering ?? []), item]) }));
       set({ selectedLetteringId: item.id, selection: [], tool: "select", workspaceSection: "edit" });
@@ -963,6 +981,9 @@ export const useStudio = create<StudioState>()((set, get) => {
         selection: [],
         selectedLetteringId: null,
         selectedGlyphNodeId: null,
+        selectedContourIndex: null,
+        editGlyphContours: false,
+        editJoinAnchors: false,
         letteringPreview: null,
         measurement: null,
       });
