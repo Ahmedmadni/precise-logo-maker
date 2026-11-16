@@ -17,7 +17,7 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       onClick: () => { setTool("select"); closePanel(); } },
     { id: "text", label: "كتابة", icon: Type, active: section === "text" && panelOpen,
       onClick: () => { setSection("text"); setTool("select"); openPanel(); } },
-    { id: "ornaments", label: "زخارف", icon: Sparkles, active: section === "ornaments" && panelOpen,
+    { id: "ornaments", label: "تشكيل", icon: Sparkles, active: section === "ornaments" && panelOpen,
       onClick: () => { setSection("ornaments"); setTool("select"); openPanel(); } },
     { id: "edit", label: "تعديل", icon: SlidersHorizontal, active: section === "edit" && panelOpen,
       onClick: () => { setSection("edit"); setTool("select"); openPanel(); } },
@@ -31,7 +31,7 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       {actions.map(({ id, label, icon: Icon, active, onClick }) => (
         <button key={id} type="button" aria-label={label} aria-pressed={active} onClick={onClick}
           className={cn(
-            "flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[10px] text-muted-foreground transition-colors",
+            "flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] text-muted-foreground transition-colors",
             active && "bg-primary/10 font-semibold text-primary",
           )}>
           <Icon className="h-[19px] w-[19px]" aria-hidden />
