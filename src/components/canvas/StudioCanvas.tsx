@@ -1079,7 +1079,8 @@ export function StudioCanvas() {
           </g>
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
-            {(doc.lettering ?? []).map((item) => {
+            {[...sourceLettering.filter((item) => item.kind === "bridge"),
+              ...sourceLettering.filter((item) => item.kind !== "bridge")].map((item) => {
               const draggedId = letterDragRef.current?.id;
               const dragging = draggedId ? doc.lettering?.find((glyph) => glyph.id === draggedId) : undefined;
               const isWordDragged = letterDragRef.current?.scope === "word" && !!dragging?.groupId;
