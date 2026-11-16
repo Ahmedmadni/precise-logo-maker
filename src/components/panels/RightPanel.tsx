@@ -1881,7 +1881,7 @@ function HistoryTab() {
 
 const MAIN_SECTIONS = [
   { id: "text", label: "كتابة", icon: Type },
-  { id: "ornaments", label: "زخارف", icon: Sparkles },
+  { id: "ornaments", label: "تشكيل", icon: Sparkles },
   { id: "edit", label: "تعديل", icon: SlidersHorizontal },
   { id: "layers", label: "العناصر", icon: Layers3 },
   { id: "draw", label: "رسم", icon: PenTool },
@@ -1915,14 +1915,14 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
     draw: "أدوات الرسم", advanced: "الإعدادات المتقدمة",
   };
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[21rem] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[23rem] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3">
         <div>
           <h2 className="text-sm font-bold">{title[section]}</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {section === "edit" ? selected ? "اسحب الحرف أو عدّل خصائصه هنا" : "اختر عنصرا من مساحة التصميم" :
              section === "text" ? "اكتب الكلمة، اختر الخط، ثم أضفها" :
-             section === "ornaments" ? "اختر الحركة أو الزخرفة وأضفها" :
+             section === "ornaments" ? "اختر الحركات أو الزخارف من المجموعة المناسبة" :
              section === "layers" ? "رتب عملك وحدد العنصر الذي تريد تعديله" :
              section === "draw" ? "اختر الأداة ثم استخدم مساحة الرسم" :
              "خيارات متخصصة للرسم الهندسي"}
@@ -1941,7 +1941,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
           </button>}
         </div>
       </header>
-      <nav aria-label="الأقسام الرئيسية" className="grid shrink-0 grid-cols-5 border-b border-border p-1">
+      <nav aria-label="الأقسام الرئيسية" className="hidden shrink-0 grid-cols-5 border-b border-border p-1 sm:grid">
         {MAIN_SECTIONS.map(({ id, label, icon: Icon }) => (
           <button type="button" key={id} aria-current={section === id ? "page" : undefined}
             aria-label={label}
