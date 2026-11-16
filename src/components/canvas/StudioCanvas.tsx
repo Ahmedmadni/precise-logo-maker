@@ -34,7 +34,7 @@ import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../cal
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
-import { touchPair, pinchView, type PinchSnapshot } from "./touchGestures";
+import { touchPair, pinchView, shouldIgnorePalmContact, type PinchSnapshot } from "./touchGestures";
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
@@ -405,7 +405,7 @@ export function StudioCanvas() {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Reject incidental palm contact while the stylus is down.
     // A genuine two-finger touch gesture still works without an active pen.
-    if (activePointerTypeRef.current === "pen" && e.pointerType === "touch") return;
+    if (shouldIgnorePalmContact(activePointerTypeRef.current, e.pointerType)) return;
     // Capture on the stable canvas, not an SVG glyph that can unmount while editing.
     e.currentTarget.setPointerCapture?.(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -851,6 +851,7 @@ export function StudioCanvas() {
   };
 
   const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(e.pointerId)) return;
     pointersRef.current.delete(e.pointerId);
     activePointerRef.current = null;
     activePointerTypeRef.current = null;
