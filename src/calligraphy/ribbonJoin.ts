@@ -95,9 +95,6 @@ const minus = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   ({ x: a.x - b.x, y: a.y - b.y });
 const mul = (p: { x: number; y: number }, n: number) =>
   ({ x: p.x * n, y: p.y * n });
-const lerp = (a: { x: number; y: number }, b: { x: number; y: number }, t: number) =>
-  add(mul(a, 1 - t), mul(b, t));
-
 /** Continuous position and smoothly interpolated width at every sample. */
 export function sampleRibbon(
   item: LetteringItem, all: LetteringItem[], steps = 16,
