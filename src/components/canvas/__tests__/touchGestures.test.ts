@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { screenToWorld, worldToScreen, type ViewTransform } from "../../../core/coordinates/view";
-import { pinchView, touchPair } from "../touchGestures";
+import { pinchView, shouldIgnorePalmContact, touchPair } from "../touchGestures";
 
 describe("tablet pen and two-finger pinch geometry", () => {
+  it("does not let palm contact cancel an active stylus stroke", () => {
+    expect(shouldIgnorePalmContact("pen", "touch")).toBe(true);
+    expect(shouldIgnorePalmContact("touch", "touch")).toBe(false);
+    expect(shouldIgnorePalmContact(null, "touch")).toBe(false);
+    expect(shouldIgnorePalmContact("pen", "pen")).toBe(false);
+  });
   it("computes midpoint in canvas pixels, not page pixels", () => {
     const fingers = new Map([[1, { x: 190, y: 320 }], [2, { x: 290, y: 400 }]]);
     const pair = touchPair(fingers, { x: 100, y: 200 })!;
