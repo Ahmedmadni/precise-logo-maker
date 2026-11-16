@@ -1051,9 +1051,15 @@ export function StudioCanvas() {
             <g key={`handles-${item.id}`}>
               {outlineNodes(nodePreview?.id === item.id ? nodePreview.path : item.pathData ?? "").slice(0, 350).map((n) => {
                 const worldPoint = glyphPointToWorld(item, n.x, n.y);
-                return <circle key={n.id} data-outline-node={n.id} cx={worldPoint.x} cy={worldPoint.y}
-                  r={7 / view.zoom} fill={n.role === "anchor" ? "var(--color-primary)" : "#45c5d5"}
-                  stroke="#171717" strokeWidth={1 / view.zoom} className="cursor-crosshair" />;
+                return <g key={n.id} data-outline-node={n.id}
+                  className="cursor-crosshair" aria-label={n.role === "anchor" ? "نقطة تثبيت الحرف" : "مقبض منحنى Bézier"}>
+                  <circle cx={worldPoint.x} cy={worldPoint.y}
+                    r={18 / view.zoom} fill="transparent" stroke="none" pointerEvents="all" />
+                  <circle cx={worldPoint.x} cy={worldPoint.y}
+                    r={(n.id === useStudio.getState().selectedGlyphNodeId ? 8 : 6) / view.zoom}
+                    fill={n.role === "anchor" ? "var(--color-primary)" : "#45c5d5"}
+                    stroke="#171717" strokeWidth={1.5 / view.zoom} pointerEvents="none" />
+                </g>;
               })}
             </g>
           )}
