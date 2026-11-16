@@ -50,6 +50,7 @@ import { useT } from "../../i18n";
 import { PathNodesSection } from "./PathNodesSection";
 import { LetteringPanel } from "./LetteringPanel";
 import { GlyphTransformPanel } from "./GlyphTransformPanel";
+import { RibbonJoinInspector } from "./RibbonJoinInspector";
 import { StudioLayersPanel } from "./StudioLayersPanel";
 import { StudioDrawingPanel } from "./StudioDrawingPanel";
 
@@ -1924,6 +1925,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
               ? selected.kind === "haraka" ? "موضع الحركة وربطها بالحرف واللون والحجم" :
                 selected.kind === "ornament" ? "التحريك والتدوير وتنسيق الزخرفة" :
                 selected.kind === "outline" ? "تحرير الحرف: الأساسيات، المسارات، الوصلات والبدائل" :
+                selected.kind === "bridge" ? "وصلة فيكتور مرتبطة بالحروف: الانحناء والسُمك واللون" :
                 "غيّر النص والموضع والحجم"
               : selectedGeometry.length > 0 ? "تعديل الشكل الهندسي المحدد" : "اختر عنصرا من مساحة التصميم" :
              section === "text" ? "اكتب الكلمة، اختر الخط، ثم أضفها" :
@@ -1966,7 +1968,9 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
         {section === "layers" && <StudioLayersPanel />}
         {section === "draw" && <StudioDrawingPanel onChoose={onClose} />}
         {section === "edit" && (selected
-          ? <GlyphTransformPanel key={selected.id} selected={selected} siblings={siblings} />
+          ? selected.kind === "bridge"
+            ? <RibbonJoinInspector key={selected.id} item={selected} />
+            : <GlyphTransformPanel key={selected.id} selected={selected} siblings={siblings} />
           : selectedGeometry.length > 0
             ? <div className="space-y-4">
                 <ObjectSection />
