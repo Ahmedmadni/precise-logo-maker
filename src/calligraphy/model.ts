@@ -1,3 +1,6 @@
+import type { RibbonLink } from "./ribbonJoin";
+import { buildRibbonPath } from "./ribbonJoin";
+
 /**
  * Core calligraphy document model. Text is editable for drafts; "outline" stores
  * actual font-shaped vector glyph paths, detached from the source font.
@@ -10,7 +13,7 @@ export type FontPreset = "Amiri" | "Aref Ruqaa" | "Scheherazade New" | "Gulzar" 
 
 export interface LetteringItem {
   id: string;
-  kind: "text" | "haraka" | "outline" | "ornament";
+  kind: "text" | "haraka" | "outline" | "ornament" | "bridge";
   x: number;
   y: number;
   /** Pixel height (font size for an outline). */
@@ -36,6 +39,8 @@ export interface LetteringItem {
   ornament?: OrnamentId;
   /** Permanent outline produced from OpenType shaping; no live font needed. */
   pathData?: string;
+  /** Editable, dynamically rendered connection between two other outlined glyphs. */
+  ribbon?: RibbonLink;
   unitsPerEm?: number;
   /** One word/run can have several independently editable outlined glyphs. */
   groupId?: string | undefined;
@@ -129,7 +134,11 @@ export const letteringTransform = (item: LetteringItem): string => {
   return `translate(${x} ${y}) rotate(${angle}) skewX(${skewX}) skewY(${skewY}) scale(${sx} ${sy})`;
 };
 
-export const letteringSvg = (item: LetteringItem): string => {
+export const letteringSvg = (item: LetteringItem, allItems: LetteringItem[] = []): string => {
+  if (item.kind === "bridge") {
+    const path = safePath(buildRibbonPath(item, allItems) ?? undefined);
+    return path ? `  <path d="${path}" fill="${safeColor(item.color)}" />` : "";
+  }
   const size = Number.isFinite(item.size) ? Math.max(1, Math.min(1000, item.size)) : 48;
   const attrs = `transform="${letteringTransform(item)}" fill="${safeColor(item.color)}"`;
   const outlineWidth = Number.isFinite(item.weight) ? Math.max(0, Math.min(20, item.weight ?? 0)) : 0;
