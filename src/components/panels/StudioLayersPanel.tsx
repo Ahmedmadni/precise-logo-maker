@@ -78,7 +78,7 @@ export function StudioLayersPanel() {
             type="search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="ابحث عن كلمة أو حركة أو زخرفة..."
             aria-label="البحث في عناصر التصميم"
-            className="min-h-12 w-full rounded-xl border border-border bg-background pe-10 ps-3 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="min-h-12 w-full rounded-xl border border-border bg-background ps-10 pe-3 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
           />
         </div>
         <nav aria-label="تصفية عناصر التصميم" className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
@@ -118,7 +118,7 @@ export function StudioLayersPanel() {
         </h4>
         {visibleGroups.map(([groupId, glyphs]) => {
           const isSelected = glyphs.some((g) => g.id === glyphId);
-          const expanded = query.trim().length > 0 || (opened[groupId] ?? isSelected);
+          const expanded = opened[groupId] ?? (query.trim().length > 0 || isSelected);
           return <section key={groupId} className="rounded-xl border border-border bg-card">
             <button type="button" onClick={() => setOpened((s) => ({ ...s, [groupId]: !expanded }))}
               aria-expanded={expanded} aria-label={`عرض أجزاء كلمة ${glyphs[0]?.sourceText ?? "عربية"}`}
