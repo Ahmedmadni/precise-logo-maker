@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
@@ -12,6 +12,7 @@ const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-l
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 type SliderKey = "scaleX" | "scaleY" | "skewX" | "skewY" | "rotation" | "weight";
+type InspectorTab = "basic" | "paths" | "joins" | "alternates";
 const directions: { key: MorphDirection; label: string; icon: typeof ArrowRight }[] = [
   { key: "right", label: "مد لليمين", icon: ArrowRight },
   { key: "left", label: "مد لليسار", icon: ArrowLeft },
@@ -38,9 +39,26 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setPreview = useStudio((s) => s.setLetteringPreview);
   const commitPreview = useStudio((s) => s.commitLetteringPreview);
   const [step, setStep] = useState(5);
+  const [activeTab, setActiveTab] = useState<InspectorTab>("basic");
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
   const isOutline = selected.kind === "outline" && !!selected.pathData;
+  const tabs = [
+    { id: "basic" as const, label: "أساسي", icon: Move, detail: "التحريك والحجم واللون" },
+    ...(isOutline ? [
+      { id: "paths" as const, label: "المسارات", icon: PencilRuler, detail: "المد والنقاط والأجزاء" },
+      { id: "joins" as const, label: "الوصلات", icon: Waypoints, detail: "الدخول والخروج" },
+      { id: "alternates" as const, label: "البدائل", icon: Shapes, detail: "أشكال الخط المتاحة" },
+    ] : []),
+  ];
+  const changeTab = (next: InspectorTab) => {
+    if (next === activeTab) return;
+    commitLetteringPreview();
+    useStudio.getState().setEditGlyphNodes(false);
+    useStudio.getState().setEditGlyphContours(false);
+    useStudio.getState().setEditJoinAnchors(false);
+    setActiveTab(next);
+  };
   const pending = preview?.id === selected.id ? preview.patch : {};
   const currentPath = pending.pathData ?? selected.pathData ?? "";
   const nodes = isOutline ? outlineNodes(currentPath).slice(0, 350) : [];
@@ -80,14 +98,25 @@ export function GlyphTransformPanel({ selected, siblings }: {
   return (
     <section className="space-y-4 rounded-xl border border-primary/40 bg-background p-3 text-sm" dir="rtl">
       <header className="space-y-1">
-        <h3 className="font-semibold">التحكم الدقيق في الحرف أو العنصر</h3>
+        <h3 className="font-semibold">{selected.kind === "outline" ? "تحرير الحرف المحدد" : selected.kind === "haraka" ? "تحرير حركة التشكيل" : selected.kind === "ornament" ? "تحرير الزخرفة" : "تحرير النص"}</h3>
         <p className="text-[11px] leading-5 text-muted-foreground">
-          {isOutline ? "هذا حرف فيكتور حقيقي. تحكم في جسمه أو حرك نقاطه الفردية." :
-            "عنصر قابل للتحريك والتدوير والتحجيم."}
+          {isOutline ? "اختر نوع التعديل من الأدوات التالية. لن تُعرض أدوات الخط الدقيقة كلها دفعة واحدة." :
+            "غيّر الموضع والحجم واللون، أو اسحب العنصر مباشرة على اللوحة."}
         </p>
       </header>
+      <nav aria-label="أدوات تحرير العنصر" className={`grid gap-1.5 ${isOutline ? "grid-cols-4" : "grid-cols-1"}`}>
+        {tabs.map(({ id, label, icon: Icon, detail }) => (
+          <button type="button" key={id} aria-pressed={activeTab === id} title={detail}
+            onClick={() => changeTab(id)}
+            className={`${button} flex min-h-[62px] min-w-0 flex-col gap-1 px-1 text-[11px] ${activeTab === id ? "border-primary bg-primary/15 font-semibold text-primary" : ""}`}>
+            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{label}</span>
+          </button>
+        ))}
+      </nav>
+      {activeTab !== "basic" && <p className="text-xs leading-5 text-muted-foreground">{tabs.find((tab) => tab.id === activeTab)?.detail}</p>}
+      {activeTab === "basic" && <>
       <details open className="rounded-lg border border-border p-3">
-        <summary className="cursor-pointer text-xs font-bold">1. نقل الحرف وتحديد موضعه</summary>
+        <summary className="cursor-pointer text-xs font-bold">تحريك العنصر والموضع</summary>
         <div className="mt-3 space-y-2">
         <div className="grid grid-cols-2 gap-2">
           {(["glyph", "word"] as const).map((scope) => (
@@ -150,7 +179,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
       </details>
 
       <details open className="rounded-lg border border-border p-3">
-        <summary className="cursor-pointer text-xs font-bold">2. الحجم والدوران والسُمك</summary>
+        <summary className="cursor-pointer text-xs font-bold">الحجم والدوران والسُمك</summary>
         <div className="mt-3 space-y-3">
         {([
           ["scaleX", "إطالة الحرف أفقيًا", 0.35, 4, 0.05],
@@ -180,10 +209,11 @@ export function GlyphTransformPanel({ selected, siblings }: {
         </div>
       </details>
 
-      {isOutline && (
+      </>}
+      {isOutline && activeTab === "paths" && (
         <>
           <details className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-xs font-bold">3. مدّ أطراف الحرف ونحت منحنياته</summary>
+            <summary className="cursor-pointer text-xs font-bold">إطالة الأطراف وتشكيل المنحنيات</summary>
             <div className="mt-3 space-y-3">
             <p className="text-[11px] leading-5 text-muted-foreground">
               تعدّل هذه الأداة نقاط مسار الحرف الفعلية تدريجيًا، مع تثبيت منطقة الاتصال قدر الإمكان.
@@ -215,7 +245,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
             </div>
           </details>
           <details className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-xs font-bold">4. تحرير نقاط الحرف (متقدم)</summary>
+            <summary className="cursor-pointer text-xs font-bold">نقاط Bézier والمقابض</summary>
             <div className="mt-3 space-y-3">
             <button type="button" className={`${button} w-full ${editNodes ? "border-primary bg-primary/15" : ""}`}
               onClick={() => setEditNodes(!editNodes)}>
@@ -259,15 +289,13 @@ export function GlyphTransformPanel({ selected, siblings }: {
             )}
             </div>
           </details>
-          <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} />
-          <details className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer text-xs font-bold">8. بدائل أشكال الحروف من الخط</summary>
-            <div className="mt-3"><AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} /></div>
-          </details>
+          <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="contours" />
         </>
       )}
 
-      <details className="rounded-lg border border-border p-3">
+      {isOutline && activeTab === "joins" && <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="joins" />}
+      {isOutline && activeTab === "alternates" && <AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} />}
+      {activeTab === "basic" && <details className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">إدارة العنصر: نسخ، ترتيب، حذف</summary>
         <div className="mt-3 grid grid-cols-3 gap-2">
         <button type="button" className={button} onClick={() => duplicate(selected.id)}>
@@ -278,7 +306,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
       </div>
       <button type="button" className={button + " mt-3 w-full border-destructive text-destructive"}
         onClick={() => remove(selected.id)}><Trash2 className="h-4 w-4" />حذف العنصر المحدد</button>
-      </details>
+      </details>}
     </section>
   );
 }
