@@ -39,6 +39,14 @@ export const Route = createFileRoute("/")({
 
 function StudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
+  useEffect(() => {
+    if (!panelOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPanelOpen(false);
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [panelOpen]);
 
   return (
     <div className="dark flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -66,14 +74,14 @@ function StudioPage() {
           <RightPanel />
         </div>
         {panelOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button
               type="button"
-              aria-label="Close"
+              aria-label="إغلاق لوحة الأدوات"
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div className="absolute inset-x-0 bottom-0 h-[min(84dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
+            <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>
