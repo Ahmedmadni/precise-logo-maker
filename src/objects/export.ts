@@ -38,7 +38,8 @@ export const buildSvgDocument = (
     .filter((o) => o.visible && !o.guide)
     .map(objectToSvg)
     .join("\n");
-  const lettering = (doc.lettering ?? []).map(letteringSvg).filter(Boolean).join("\n");
+  const letteringItems = doc.lettering ?? [];
+  const lettering = letteringItems.map((item) => letteringSvg(item, letteringItems)).filter(Boolean).join("\n");
   const hasLiveCustomText = (doc.lettering ?? []).some((item) => item.kind === "text" && item.font === "Custom Thuluth");
   const embeddedFont = hasLiveCustomText && doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
     ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
