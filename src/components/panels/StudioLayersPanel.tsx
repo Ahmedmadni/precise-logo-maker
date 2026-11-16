@@ -47,8 +47,8 @@ export function StudioLayersPanel() {
           <h4 className="font-semibold text-xs text-muted-foreground">الكلمات المركبة</h4>
           <span className="text-xs text-muted-foreground">{groups.size}</span>
         </div>
-        {[...groups].map(([groupId, glyphs], index) => (
-          <details key={groupId} className="group rounded-xl border border-border bg-card" defaultOpen={glyphs.some((g) => g.id === glyphId) || index === 0}>
+        {[...groups].map(([groupId, glyphs]) => (
+          <details key={groupId} className="group rounded-xl border border-border bg-card">
             <summary className="cursor-pointer list-none px-3 py-3 text-sm font-medium marker:hidden">
               <span className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2"><Type className="h-4 w-4 text-primary" />
