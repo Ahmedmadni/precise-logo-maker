@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
 import type { JoinGuideSelection } from "../calligraphy/joinAssistant";
+import { remapRibbons } from "../calligraphy/ribbonJoin";
 import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
@@ -408,7 +409,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     replaceLetteringGroup: (groupId, items) => {
       if (!items.length) return;
       commit("Recompose Arabic word", (doc) => ({ ...doc,
-        lettering: remapMarksAfterRecomposition(doc.lettering ?? [], items, groupId),
+        lettering: remapRibbons(doc.lettering ?? [],
+          remapMarksAfterRecomposition(doc.lettering ?? [], items, groupId), groupId),
       }));
       set({ selectedLetteringId: items[0]!.id, letteringPreview: null, selectedGlyphNodeId: null });
     },
@@ -465,7 +467,13 @@ export const useStudio = create<StudioState>()((set, get) => {
       }));
     },
     deleteLettering: (id) => {
-      commit("Delete Arabic lettering", (doc) => ({ ...doc, lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).filter((item) => item.id !== id)) }));
+      commit("Delete Arabic lettering", (doc) => ({
+        ...doc,
+        lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).filter((item) =>
+          item.id !== id &&
+          (item.kind !== "bridge" || (item.ribbon?.sourceGlyphId !== id &&
+            item.ribbon?.targetGlyphId !== id)))),
+      }));
       if (get().selectedLetteringId === id) set({ selectedLetteringId: null });
     },
     setCustomThuluthFont: (fontDataUrl) => commit("Import licensed Arabic font", (doc) => ({ ...doc, customThuluthFont: fontDataUrl })),
