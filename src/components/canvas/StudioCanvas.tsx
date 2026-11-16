@@ -1068,6 +1068,7 @@ export function StudioCanvas() {
                 (isWordDragged && item.groupId === dragging?.groupId) || linkedToDragged;
               return <LetteringGlyph key={item.id}
                 item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+                allItems={doc.lettering ?? []}
                 selected={item.id === selectedLetteringId}
                 offset={letterOffset && moved ? letterOffset : null}
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
