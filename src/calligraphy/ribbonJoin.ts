@@ -18,7 +18,7 @@ export interface RibbonLink {
   /** Tangent angles in degrees relative to the source-to-target chord. */
   startAngle?: number;
   endAngle?: number;
-  /** -1 emphasizes change near the start; +1 near the end. */
+  /** +1 shifts thickness change earlier; -1 delays it toward the end. */
   widthEase?: number;
 }
 
