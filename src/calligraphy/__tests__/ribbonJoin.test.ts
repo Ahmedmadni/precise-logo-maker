@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createLettering, letteringSvg, type LetteringItem } from "../model";
-import { buildRibbonPath, createRibbonLink, remapRibbons } from "../ribbonJoin";
+import { buildRibbonPath, createRibbonLink, remapRibbons, sampleRibbon } from "../ribbonJoin";
 import { buildSvgDocument } from "../../objects/export";
 import { parseProject, serializeProject } from "../../objects/project";
 import type { DocumentState } from "../../store/studioStore";
@@ -25,7 +25,8 @@ describe("editable SVG ribbon between calligraphy glyphs", () => {
     expect(path).toMatch(/^M /);
     expect(path).toContain(" C ");
     expect(path).toMatch(/ Z$/);
-    expect(path.match(/ C /g)).toHaveLength(2);
+    // Multiple smooth cubic segments per edge, rather than two coarse curves.
+    expect(path.match(/ C /g)!.length).toBeGreaterThan(20);
     expect(letteringSvg(item, [source, target])).toContain(`d="${path}"`);
     expect(letteringSvg(item)).toBe("");
   });
@@ -39,6 +40,49 @@ describe("editable SVG ribbon between calligraphy glyphs", () => {
     const anchor = worldJoinAnchor(movedSource, "exit")!;
     expect(Number.isFinite(anchor.x)).toBe(true);
     expect(item.ribbon?.sourceGlyphId).toBe(source.id);
+  });
+  it("keeps tangent directions independent and avoids kinks in the centerline", () => {
+    const base = createRibbonLink(source, target)!;
+    const angled = { ...base, ribbon: { ...base.ribbon!,
+      startAngle: 34, endAngle: -24, curvature: 0.22, widthEase: -0.6 } };
+    const samples = sampleRibbon(angled, [source, target], 64)!;
+    expect(samples).toHaveLength(65);
+    expect(samples[0]!.width).toBeCloseTo(angled.ribbon.startWidth, 8);
+    expect(samples[64]!.width).toBeCloseTo(angled.ribbon.endWidth, 8);
+    const start = samples[0]!.center;
+    const finish = samples[64]!.center;
+    const chord = Math.atan2(finish.y - start.y, finish.x - start.x);
+    const tangentAngle = (a: {x:number;y:number}, b:{x:number;y:number}) =>
+      Math.atan2(b.y - a.y, b.x - a.x);
+    const radians = (deg:number) => deg * Math.PI / 180;
+    expect(tangentAngle(samples[0]!.center, samples[1]!.center) - chord)
+      .toBeCloseTo(radians(34), 1);
+    expect(tangentAngle(samples[63]!.center, samples[64]!.center) - chord)
+      .toBeCloseTo(radians(-24), 1);
+    expect(buildRibbonPath(angled, [source, target])).not.toEqual(buildRibbonPath(base, [source, target]));
+  });
+  it("smoothly changes ribbon width and preserves exact endpoint widths", () => {
+    const base = createRibbonLink(source, target)!;
+    const value = { ...base, ribbon: { ...base.ribbon!,
+      startWidth: 5, endWidth: 45, widthEase: 0.8 } };
+    const samples = sampleRibbon(value, [source, target], 64)!;
+    expect(samples[0]!.width).toBe(5);
+    expect(samples.at(-1)!.width).toBe(45);
+    expect(samples.every((s, i) => i === 0 || s.width >= samples[i - 1]!.width)).toBe(true);
+    expect(samples[1]!.width - samples[0]!.width).toBeLessThan(0.1);
+    expect(samples[64]!.width - samples[63]!.width).toBeLessThan(0.1);
+    expect(samples.every((s) => Number.isFinite(s.center.x) && Number.isFinite(s.normal.y))).toBe(true);
+  });
+  it("opens legacy .logo ribbons without tangent/width easing properties", () => {
+    const base = createRibbonLink(source, target)!;
+    const spec = { ...base.ribbon! };
+    delete (spec as Partial<typeof spec>).startAngle;
+    delete (spec as Partial<typeof spec>).endAngle;
+    delete (spec as Partial<typeof spec>).widthEase;
+    const legacy = { ...base, ribbon: spec };
+    expect(buildRibbonPath(legacy, [source, target])).toBeTruthy();
+    const explicit = { ...legacy, ribbon: { ...spec, startAngle: 0, endAngle: 0, widthEase: 0 } };
+    expect(buildRibbonPath(legacy, [source, target])).toBe(buildRibbonPath(explicit, [source, target]));
   });
   it("supports asymmetric width and curvature while preserving original glyph paths", () => {
     const item = createRibbonLink(source, target)!;
@@ -54,6 +98,10 @@ describe("editable SVG ribbon between calligraphy glyphs", () => {
     expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, curvature: Infinity } },
       [source, target])).toBeNull();
     expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, startWidth: -2 } },
+      [source, target])).toBeNull();
+    expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, startAngle: 100 } },
+      [source, target])).toBeNull();
+    expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, widthEase: NaN } },
       [source, target])).toBeNull();
     expect(createRibbonLink(source, source)).toBeNull();
     const identical = { ...target, x: source.x, y: source.y,
