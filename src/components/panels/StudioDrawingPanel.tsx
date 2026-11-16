@@ -28,18 +28,36 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
         <h3 className="text-sm font-semibold">أدوات الرسم الفيكتور</h3>
         <p className="mt-1 text-xs text-muted-foreground">اختر أداة ثم ارسم مباشرة على المساحة. للتعديل في الأشكال اختر «تحديد وتحريك».</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {tools.map(({ id, label, description, icon: Icon }) => (
-          <button key={id} type="button"
-            className={`min-h-[76px] rounded-xl border p-3 text-right transition-colors ${selected === id ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/40"}`}
-            onClick={() => { setTool(id); onChoose?.(); }}
-            aria-pressed={selected === id}>
-            <Icon className={`mb-1 h-5 w-5 ${selected === id ? "text-primary" : "text-muted-foreground"}`} />
-            <span className="block text-xs font-semibold">{label}</span>
-            <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">{description}</span>
-          </button>
-        ))}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-foreground">الأدوات الأساسية</p>
+        <div className="grid grid-cols-2 gap-2">
+          {tools.slice(0, 6).map(({ id, label, description, icon: Icon }) => (
+            <button key={id} type="button" aria-pressed={selected === id}
+              className={`min-h-[84px] rounded-xl border p-3 text-right transition-colors ${selected === id ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/40"}`}
+              onClick={() => { setTool(id); onChoose?.(); }}>
+              <Icon className={`mb-1 h-5 w-5 ${selected === id ? "text-primary" : "text-muted-foreground"}`} />
+              <span className="block text-xs font-semibold">{label}</span>
+              <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{description}</span>
+            </button>
+          ))}
+        </div>
       </div>
+      <details className="rounded-xl border border-border bg-background p-3">
+        <summary className="cursor-pointer text-xs font-semibold">
+          أدوات رسم إضافية — مضلعات، خلايا وقياس
+        </summary>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {tools.slice(6).map(({ id, label, description, icon: Icon }) => (
+            <button key={id} type="button" aria-pressed={selected === id}
+              className={`min-h-[84px] rounded-xl border p-3 text-right ${selected === id ? "border-primary bg-primary/10" : "border-border bg-card"}`}
+              onClick={() => { setTool(id); onChoose?.(); }}>
+              <Icon className="mb-1 h-5 w-5 text-primary" />
+              <span className="block text-xs font-semibold">{label}</span>
+              <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{description}</span>
+            </button>
+          ))}
+        </div>
+      </details>
       <details className="rounded-xl border border-border bg-background p-3">
         <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold"><Compass className="h-4 w-4 text-primary" /> إعدادات الرسم المساعدة</summary>
         <div className="mt-3 grid grid-cols-2 gap-2">

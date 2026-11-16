@@ -47,8 +47,8 @@ export function StudioLayersPanel() {
           <h4 className="font-semibold text-xs text-muted-foreground">الكلمات المركبة</h4>
           <span className="text-xs text-muted-foreground">{groups.size}</span>
         </div>
-        {[...groups].map(([groupId, glyphs], index) => (
-          <details key={groupId} className="group rounded-xl border border-border bg-card" open={glyphs.some((g) => g.id === glyphId) || index === 0}>
+        {[...groups].map(([groupId, glyphs]) => (
+          <details key={groupId} className="group rounded-xl border border-border bg-card">
             <summary className="cursor-pointer list-none px-3 py-3 text-sm font-medium marker:hidden">
               <span className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2"><Type className="h-4 w-4 text-primary" />
@@ -61,7 +61,7 @@ export function StudioLayersPanel() {
                 <button key={item.id} type="button" className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}
                   onClick={() => selectLetter(item.id)}>
                   <MousePointer2 className="h-4 w-4 text-primary" />
-                  <span>جزء حرفي {i + 1}</span>
+                  <span>شكل حرفي {i + 1}</span>
                   <span className="me-auto text-[11px] text-muted-foreground">تعديل</span>
                 </button>
               ))}

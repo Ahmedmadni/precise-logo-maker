@@ -19,8 +19,8 @@ const roles: { value: ContourRole; label: string }[] = [
   { value: "counter", label: "فراغ داخلي" },
 ];
 
-export function GlyphContoursJoinPanel({ selected, siblings }: {
-  selected: LetteringItem; siblings: LetteringItem[];
+export function GlyphContoursJoinPanel({ selected, siblings, part }: {
+  selected: LetteringItem; siblings: LetteringItem[]; part: "contours" | "joins";
 }) {
   const update = useStudio((s) => s.updateLettering);
   const editContours = useStudio((s) => s.editGlyphContours);
@@ -80,8 +80,8 @@ export function GlyphContoursJoinPanel({ selected, siblings }: {
 
   return (
     <section className="space-y-3" dir="rtl">
-      <details className="rounded-xl border border-border p-3">
-        <summary className="cursor-pointer text-xs font-bold">6. أجزاء مسارات الحرف — النقاط والذيل</summary>
+      {part === "contours" && <details open className="rounded-xl border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">أجزاء الحرف والمسارات الداخلية</summary>
         <div className="mt-3 space-y-3">
           <p className="text-xs leading-5 text-muted-foreground">
             هنا يمكنك اختيار كل مسار مغلق داخل الحرف وتحريكه أو تسميته (رأس، جسم، ذيل، نقطة...).
@@ -135,9 +135,9 @@ export function GlyphContoursJoinPanel({ selected, siblings }: {
             </p>
           </>}
         </div>
-      </details>
-      <details className="rounded-xl border border-border p-3">
-        <summary className="cursor-pointer text-xs font-bold">7. نقاط الدخول والخروج واتصال الحروف</summary>
+      </details>}
+      {part === "joins" && <details open className="rounded-xl border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">نقاط الدخول والخروج بين الحروف</summary>
         <div className="mt-3 space-y-3">
           <p className="text-xs leading-5 text-muted-foreground">
             حدد نقطتي دخول وخروج الحرف بدقة، ثم قرّب الحروف من بعضها بالمحاذاة الهندسية.
@@ -192,7 +192,7 @@ export function GlyphContoursJoinPanel({ selected, siblings }: {
           </p>}
           {notice && <p role="status" className="text-xs leading-5 text-primary">{notice}</p>}
         </div>
-      </details>
+      </details>}
     </section>
   );
 }

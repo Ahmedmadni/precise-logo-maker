@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
-import { PanelRightOpen, X } from "lucide-react";
+import { PanelRightOpen, SlidersHorizontal, X } from "lucide-react";
 import { StudioCanvas } from "../components/canvas/StudioCanvas";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
@@ -54,6 +54,9 @@ function StudioPage() {
           </ClientOnly>
           <StudioEmptyGuide openPanel={() => setPanelOpen(true)} />
           <ClientOnly fallback={null}>
+            <SelectionQuickEdit panelOpen={panelOpen} openPanel={() => setPanelOpen(true)} />
+          </ClientOnly>
+          <ClientOnly fallback={null}>
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
           </ClientOnly>
         </main>
@@ -70,7 +73,7 @@ function StudioPage() {
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div className="absolute inset-x-0 bottom-0 h-[min(78dvh,42rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
+            <div className="absolute inset-x-0 bottom-0 h-[min(84dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>
@@ -79,6 +82,21 @@ function StudioPage() {
       <MobileToolDock openPanel={() => setPanelOpen(true)} closePanel={() => setPanelOpen(false)} panelOpen={panelOpen} />
       <div className="hidden sm:block"><StatusBar /></div>
     </div>
+  );
+}
+
+function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; openPanel: () => void }) {
+  const glyph = useStudio((s) => s.selectedLetteringId);
+  const geometryCount = useStudio((s) => s.selection.length);
+  const setSection = useStudio((s) => s.setWorkspaceSection);
+  if (panelOpen || (!glyph && geometryCount === 0)) return null;
+  return (
+    <button type="button" onClick={() => { setSection("edit"); openPanel(); }}
+      aria-label="تحرير العنصر المحدد"
+      className="absolute bottom-4 end-3 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-primary/60 bg-card/95 px-4 text-xs font-semibold text-primary shadow-xl backdrop-blur-sm sm:hidden">
+      <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+      {glyph ? "تعديل الحرف المحدد" : "تعديل الشكل المحدد"}
+    </button>
   );
 }
 
