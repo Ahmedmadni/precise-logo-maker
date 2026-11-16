@@ -23,13 +23,14 @@ export function matchesLayerSearch(query: string, ...terms: (string | null | und
 export function letteringLayerLabel(item: LetteringItem): string {
   if (item.kind === "haraka") return harakaLabels.get(item.mark ?? "fatha") ?? "حركة تشكيل";
   if (item.kind === "ornament") return ornamentLabels.get(item.ornament ?? "leaf") ?? "زخرفة";
+  if (item.kind === "bridge") return "وصلة منحنية بين الحروف";
   if (item.kind === "text") return item.text || "نص";
   return item.sourceText || "حرف فيكتور";
 }
 
 export function layerCategoryForItem(item: LetteringItem): Exclude<LayerCategory,"all" | "words" | "shapes"> | "words" {
   if (item.kind === "haraka") return "marks";
-  if (item.kind === "ornament") return "ornaments";
+  if (item.kind === "ornament" || item.kind === "bridge") return "ornaments";
   return "words";
 }
 
