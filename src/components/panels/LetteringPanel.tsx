@@ -177,16 +177,20 @@ export function LetteringPanel({ section, onCreated }: {
           <button type="button" disabled={busy || !phrase.trim()} onClick={() => void compose()}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 font-semibold text-primary-foreground disabled:opacity-50">
             {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <WandSparkles className="h-5 w-5" />}
-            {editRun ? "إعادة تشكيل الكلمة المحددة" : "إنشاء مسارات فيكتور مستقلة للحروف"}
+            {editRun ? "تحديث حروف الكلمة المحددة" : "إضافة الكلمة كحروف قابلة للتعديل"}
           </button>
           {editRun && <button className={button + " w-full"} onClick={() => setEditRun(null)} type="button">إلغاء استبدال الكلمة</button>}
-          <p className="text-xs leading-5 text-muted-foreground">بعد الإضافة يمكنك تحديد أي حرف وإطالته وتحريكه من تبويب «تعديل».</p>
+          <p className="text-xs leading-5 text-muted-foreground">بعد إضافة الكلمة اضغط على أي حرف، ثم اختر «تعديل» للتحكم في حجمه، ومكانه، ونقاطه.</p>
           <input ref={fontInput} type="file" accept=".ttf,.otf,.woff,.woff2" className="hidden" onChange={(e) => {
             void uploadFont(e.target.files?.[0]); e.target.value = "";
           }} />
-          <button className={button + " w-full"} type="button" onClick={() => fontInput.current?.click()}>
-            استيراد خط ثلث مرخص (TTF/OTF/WOFF)
-          </button>
+          <details className="rounded-xl border border-border p-3">
+            <summary className="cursor-pointer text-xs font-semibold">خط خاص أو إعدادات متقدمة</summary>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">يمكنك تحميل خط عربي مرخص من جهازك. لتعديل تفاصيل الحروف لاحقًا استخدم تبويب «تعديل».</p>
+            <button className={button + " mt-3 w-full"} type="button" onClick={() => fontInput.current?.click()}>
+              استيراد ملف خط (TTF / OTF / WOFF)
+            </button>
+          </details>
         </section>
       )}
 
