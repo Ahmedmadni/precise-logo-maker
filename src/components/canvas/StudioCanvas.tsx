@@ -98,6 +98,7 @@ export function StudioCanvas() {
   const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
   const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
   const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
+  const selectedGlyphNodeId = useStudio((s) => s.selectedGlyphNodeId);
   const letteringPreview = useStudio((s) => s.letteringPreview);
   const setLetteringPreview = useStudio((s) => s.setLetteringPreview);
   const commitLetteringPreview = useStudio((s) => s.commitLetteringPreview);
@@ -145,6 +146,7 @@ export function StudioCanvas() {
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinchRef = useRef<PinchSnapshot | null>(null);
   const activePointerRef = useRef<number | null>(null);
+  const activePointerTypeRef = useRef<string | null>(null);
   // After a two-finger gesture, the remaining finger must not resume a stroke.
   const suppressSinglePointerRef = useRef(false);
   const [size, setSize] = useState({ width: 1200, height: 800 });
@@ -382,6 +384,7 @@ export function StudioCanvas() {
     pinchRef.current = { ...pair, view: viewRef.current };
     suppressSinglePointerRef.current = true;
     activePointerRef.current = null;
+    activePointerTypeRef.current = null;
     // Cancel rather than commit a pen stroke, brush stroke or glyph edit.
     cancelActiveInteraction();
   };
@@ -400,6 +403,9 @@ export function StudioCanvas() {
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Reject incidental palm contact while the stylus is down.
+    // A genuine two-finger touch gesture still works without an active pen.
+    if (activePointerTypeRef.current === "pen" && e.pointerType === "touch") return;
     // Capture on the stable canvas, not an SVG glyph that can unmount while editing.
     e.currentTarget.setPointerCapture?.(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -409,6 +415,7 @@ export function StudioCanvas() {
     }
     if (suppressSinglePointerRef.current) return;
     activePointerRef.current = e.pointerId;
+    activePointerTypeRef.current = e.pointerType;
     const isPan = spaceDown || e.button === 1 || tool === "pan";
     if (isPan) {
       panRef.current = { x: e.clientX, y: e.clientY };
@@ -727,12 +734,14 @@ export function StudioCanvas() {
       if (pointersRef.current.size < 2) pinchRef.current = null;
       if (pointersRef.current.size === 0) {
         activePointerRef.current = null;
+        activePointerTypeRef.current = null;
         suppressSinglePointerRef.current = false;
       }
       return;
     }
     if (e && activePointerRef.current !== null && e.pointerId !== activePointerRef.current) return;
     activePointerRef.current = null;
+    activePointerTypeRef.current = null;
     panRef.current = null;
     if (contourDragRef.current) {
       const { id, path: original } = contourDragRef.current;
@@ -844,6 +853,7 @@ export function StudioCanvas() {
   const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
     pointersRef.current.delete(e.pointerId);
     activePointerRef.current = null;
+    activePointerTypeRef.current = null;
     pinchRef.current = null;
     cancelActiveInteraction();
     suppressSinglePointerRef.current = pointersRef.current.size > 0;
@@ -1056,7 +1066,7 @@ export function StudioCanvas() {
                   <circle cx={worldPoint.x} cy={worldPoint.y}
                     r={18 / view.zoom} fill="transparent" stroke="none" pointerEvents="all" />
                   <circle cx={worldPoint.x} cy={worldPoint.y}
-                    r={(n.id === useStudio.getState().selectedGlyphNodeId ? 8 : 6) / view.zoom}
+                    r={(n.id === selectedGlyphNodeId ? 8 : 6) / view.zoom}
                     fill={n.role === "anchor" ? "var(--color-primary)" : "#45c5d5"}
                     stroke="#171717" strokeWidth={1.5 / view.zoom} pointerEvents="none" />
                 </g>;
