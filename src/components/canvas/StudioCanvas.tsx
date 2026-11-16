@@ -30,6 +30,7 @@ import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } f
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
+import { GlyphJoinDistanceGuide } from "./GlyphJoinDistanceGuide";
 import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../calligraphy/contourComposer";
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
@@ -109,6 +110,7 @@ export function StudioCanvas() {
   const selectedContourIndex = useStudio((s) => s.selectedContourIndex);
   const setSelectedContourIndex = useStudio((s) => s.setSelectedContourIndex);
   const editJoinAnchors = useStudio((s) => s.editJoinAnchors);
+  const joinGuide = useStudio((s) => s.joinGuide);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
@@ -1071,6 +1073,19 @@ export function StudioCanvas() {
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
             })}
           </g>
+          {/* Live join measurement and target anchors are editor-only overlays. */}
+          {editJoinAnchors && joinGuide && selectedLetteringId === joinGuide.sourceId && (() => {
+            const items = doc.lettering ?? [];
+            const lookup = (id: string) => {
+              const item = items.find((g) => g.id === id);
+              return item && letteringPreview?.id === item.id
+                ? { ...item, ...letteringPreview.patch } : item;
+            };
+            const source = lookup(joinGuide.sourceId);
+            const target = lookup(joinGuide.targetId);
+            return source && target ? <GlyphJoinDistanceGuide
+              source={source} target={target} sides={joinGuide} zoom={view.zoom} /> : null;
+          })()}
           {/* Named editable contours and join anchors are not part of exported SVG. */}
           {editGlyphContours && tool === "select" && (doc.lettering ?? [])
             .filter((item) => item.id === selectedLetteringId && item.kind === "outline")
