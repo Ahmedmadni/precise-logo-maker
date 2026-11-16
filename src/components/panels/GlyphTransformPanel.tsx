@@ -53,7 +53,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   ];
   const changeTab = (next: InspectorTab) => {
     if (next === activeTab) return;
-    commitLetteringPreview();
+    commitPreview();
     useStudio.getState().setEditGlyphNodes(false);
     useStudio.getState().setEditGlyphContours(false);
     useStudio.getState().setEditJoinAnchors(false);
