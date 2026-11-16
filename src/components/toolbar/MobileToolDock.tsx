@@ -27,7 +27,7 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       onClick: () => { setSection("draw"); openPanel(); } },
   ];
   return (
-    <nav aria-label="الأدوات الرئيسية" className="flex shrink-0 items-stretch gap-0.5 border-t border-border bg-card px-1 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] sm:hidden" dir="rtl">
+    <nav aria-label="الأدوات الرئيسية" className="relative z-50 flex shrink-0 items-stretch gap-0.5 border-t border-border bg-card px-1 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] sm:hidden" dir="rtl">
       {actions.map(({ id, label, icon: Icon, active, onClick }) => (
         <button key={id} type="button" aria-label={label} aria-pressed={active} onClick={onClick}
           className={cn(
