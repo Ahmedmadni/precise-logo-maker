@@ -38,6 +38,7 @@ export function LetteringPanel({ section, onCreated }: {
     if (section) setWorkspaceSection(next === "words" ? "text" : next === "marks" ? "ornaments" : "layers");
   };
   const [phrase, setPhrase] = useState("المدني");
+  const [markCategory, setMarkCategory] = useState<"harakat" | "decorations">("harakat");
   const [font, setFont] = useState<FontPreset>("Amiri");
   const [fontSize, setFontSize] = useState(180);
   const [ink, setInk] = useState("#d1a95e");
@@ -191,27 +192,39 @@ export function LetteringPanel({ section, onCreated }: {
 
       {mode === "marks" && (
         <section className="space-y-4">
-          <div>
-            <h3 className="mb-2 font-semibold">حركات التشكيل الفيكتور</h3>
+          <nav className="grid grid-cols-2 gap-2" aria-label="نوع العنصر المراد إضافته">
+            {([
+              ["harakat", "الحركات والتشكيل"],
+              ["decorations", "الزخارف والامتدادات"],
+            ] as const).map(([category, label]) => (
+              <button type="button" key={category} onClick={() => setMarkCategory(category)}
+                aria-pressed={markCategory === category}
+                className={`min-h-12 rounded-xl border px-2 text-xs font-semibold ${markCategory === category ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
+                {label}
+              </button>
+            ))}
+          </nav>
+          {markCategory === "harakat" && <div>
+            <h3 className="mb-2 font-semibold">اختر حركة لإضافتها</h3>
             <p className="mb-2 text-xs leading-5 text-muted-foreground">
               حدد حرفا أولا لربط الحركة به تلقائيا. ويمكن تغيير موضعها أو فك الارتباط من «تعديل».
             </p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {HARAKAT.map((mark) => (
-                <button key={mark.id} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background"
+                <button key={mark.id} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
                   type="button" title={mark.label} onClick={() => createMark(mark)}>
                   <svg viewBox="0 0 100 100" className="h-8 w-10" aria-hidden="true">
                     <path d={mark.path} fill="currentColor" fillRule="evenodd" />
-                  </svg><span className="text-[10px]">{mark.label}</span>
+                  </svg><span className="text-xs font-medium">{mark.label}</span>
                 </button>
               ))}
             </div>
           </div>
-          <div>
-            <h3 className="mb-2 font-semibold">الزخارف والنقوش</h3>
+          {markCategory === "decorations" && <div>
+            <h3 className="mb-2 font-semibold">الزخارف والامتدادات</h3>
             <div className="grid grid-cols-3 gap-2">
               {ORNAMENTS.map((shape) => (
-                <button key={shape.id} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background"
+                <button key={shape.id} className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
                   type="button" onClick={() => createDecoration(shape)}>
                   <svg viewBox="0 0 100 100" className="h-11 w-12" aria-hidden="true">
                     <path d={shape.path} fill="currentColor" stroke="currentColor" strokeWidth="1" fillRule="evenodd" />
@@ -219,8 +232,8 @@ export function LetteringPanel({ section, onCreated }: {
                 </button>
               ))}
             </div>
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">كل علامة أو زخرفة عنصر مستقل يمكن تحريكه وتحجيمه وتدويره وتغيير لونه.</p>
+          </div>}
+          <p className="text-xs leading-5 text-muted-foreground">بعد الإضافة حدّد الحركة أو الزخرفة ثم افتح «تعديل» للتحكم في مكانها وحجمها ولونها.</p>
         </section>
       )}
 
