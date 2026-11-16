@@ -1,12 +1,14 @@
 import { memo } from "react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { HARAKAT, ORNAMENTS, fontFamily, letteringTransform, safePath } from "../../calligraphy/model";
+import { buildRibbonPath } from "../../calligraphy/ribbonJoin";
 
-export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, offset, overridePath }: {
+export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, offset, overridePath, allItems }: {
   item: LetteringItem;
   selected: boolean;
   offset?: { x: number; y: number } | null;
   overridePath?: string | null;
+  allItems?: LetteringItem[];
 }) {
   const size = Math.max(1, Math.min(1000, item.size));
   const itemToDraw = offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y } : item;
@@ -16,6 +18,17 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
   const unit = item.unitsPerEm && item.unitsPerEm > 0 ? item.unitsPerEm : 1000;
   const scale = size / unit;
   const outline = item.kind === "outline" ? safePath(overridePath ?? item.pathData) : "";
+  if (item.kind === "bridge") {
+    const d = safePath(buildRibbonPath(item, allItems ?? []) ?? undefined);
+    if (!d) return null;
+    return (
+      <g data-lettering-id={item.id}>
+        <path d={d} fill={item.color}
+          stroke={selected ? "var(--color-primary)" : "none"} strokeWidth={selected ? 1.6 : 0} />
+        <path d={d} fill="none" stroke="transparent" strokeWidth={14} pointerEvents="stroke" />
+      </g>
+    );
+  }
   return (
     <g data-lettering-id={item.id} transform={transform}>
       {outline ? (
