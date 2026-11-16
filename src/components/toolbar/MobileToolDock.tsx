@@ -23,7 +23,7 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       onClick: () => { setSection("edit"); setTool("select"); openPanel(); } },
     { id: "layers", label: "الطبقات", icon: Layers3, active: section === "layers" && panelOpen,
       onClick: () => { setSection("layers"); setTool("select"); openPanel(); } },
-    { id: "draw", label: "رسم", icon: PenTool, active: section === "draw" && panelOpen,
+    { id: "draw", label: "رسم", icon: PenTool, active: (section === "draw" && panelOpen) || (selectedTool !== "select" && !panelOpen),
       onClick: () => { setSection("draw"); openPanel(); } },
   ];
   return (
