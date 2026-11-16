@@ -34,6 +34,8 @@ import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../cal
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
+import { touchPair, pinchView, type PinchSnapshot } from "./touchGestures";
+import { CanvasZoomControls } from "./CanvasZoomControls";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
@@ -141,11 +143,10 @@ export function StudioCanvas() {
   const panRef = useRef<{ x: number; y: number } | null>(null);
   // Multi-touch (Android/tablet): two fingers pinch-zoom and pan together.
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinchRef = useRef<{
-    dist: number;
-    mid: { x: number; y: number };
-    view: ViewTransform;
-  } | null>(null);
+  const pinchRef = useRef<PinchSnapshot | null>(null);
+  const activePointerRef = useRef<number | null>(null);
+  // After a two-finger gesture, the remaining finger must not resume a stroke.
+  const suppressSinglePointerRef = useRef(false);
   const [size, setSize] = useState({ width: 1200, height: 800 });
 
   /** Grid the cell brush paints on: the explicit choice, else the first paintable one. */
@@ -352,18 +353,7 @@ export function StudioCanvas() {
     [doc.objects, view.zoom, guideLayer],
   );
 
-  const beginPinch = () => {
-    const pts = [...pointersRef.current.values()];
-    const [a, b] = pts;
-    if (!a || !b) return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    pinchRef.current = {
-      dist: Math.hypot(b.x - a.x, b.y - a.y) || 1,
-      mid: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
-      view: viewRef.current,
-    };
-    // Cancel any in-progress single-finger interaction.
+  const cancelActiveInteraction = () => {
     panRef.current = null;
     dragRef.current = null;
     letterDragRef.current = null;
@@ -377,6 +367,23 @@ export function StudioCanvas() {
     setDragOffset(null);
     setBox(null);
     setHandleDrag(null);
+    penActiveRef.current = false;
+    setPen(null);
+    paintStrokeRef.current = null;
+    setPaintPreview([]);
+    setSnap(null);
+  };
+
+  const beginPinch = () => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const pair = touchPair(pointersRef.current, { x: rect.left, y: rect.top });
+    if (!pair) return;
+    pinchRef.current = { ...pair, view: viewRef.current };
+    suppressSinglePointerRef.current = true;
+    activePointerRef.current = null;
+    // Cancel rather than commit a pen stroke, brush stroke or glyph edit.
+    cancelActiveInteraction();
   };
 
   /** Turn a traced chain of grid intersections into a real path object. */
@@ -393,12 +400,15 @@ export function StudioCanvas() {
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    // Capture on the stable canvas, not an SVG glyph that can unmount while editing.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size >= 2) {
-      beginPinch();
+      if (!pinchRef.current) beginPinch();
       return;
     }
+    if (suppressSinglePointerRef.current) return;
+    activePointerRef.current = e.pointerId;
     const isPan = spaceDown || e.button === 1 || tool === "pan";
     if (isPan) {
       panRef.current = { x: e.clientX, y: e.clientY };
@@ -574,21 +584,14 @@ export function StudioCanvas() {
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
     if (pinchRef.current && pointersRef.current.size >= 2) {
-      const [a, b] = [...pointersRef.current.values()];
       const rect = containerRef.current?.getBoundingClientRect();
-      if (!a || !b || !rect) return;
-      const start = pinchRef.current;
-      const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const mid = { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top };
-      const zoom = Math.min(64, Math.max(0.02, start.view.zoom * (d / start.dist)));
-      const world = screenToWorld(pt(start.mid.x, start.mid.y), start.view);
-      setView({
-        ...start.view,
-        zoom,
-        pan: { x: mid.x - world.x * zoom, y: mid.y - world.y * zoom },
-      });
+      if (!rect) return;
+      const pair = touchPair(pointersRef.current, { x: rect.left, y: rect.top });
+      if (pair) setView(pinchView(pinchRef.current, pair));
       return;
     }
+    if (suppressSinglePointerRef.current) return;
+    if (activePointerRef.current !== null && e.pointerId !== activePointerRef.current) return;
     if (panRef.current) {
       const dx = e.clientX - panRef.current.x;
       const dy = e.clientY - panRef.current.y;
@@ -714,11 +717,22 @@ export function StudioCanvas() {
   };
 
   const onPointerUp = (e?: React.PointerEvent<HTMLDivElement>) => {
-    if (e) pointersRef.current.delete(e.pointerId);
-    if (pinchRef.current) {
+    if (e) {
+      pointersRef.current.delete(e.pointerId);
+      if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    }
+    if (pinchRef.current || suppressSinglePointerRef.current) {
       if (pointersRef.current.size < 2) pinchRef.current = null;
+      if (pointersRef.current.size === 0) {
+        activePointerRef.current = null;
+        suppressSinglePointerRef.current = false;
+      }
       return;
     }
+    if (e && activePointerRef.current !== null && e.pointerId !== activePointerRef.current) return;
+    activePointerRef.current = null;
     panRef.current = null;
     if (contourDragRef.current) {
       const { id, path: original } = contourDragRef.current;
@@ -827,6 +841,17 @@ export function StudioCanvas() {
     }
   };
 
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    activePointerRef.current = null;
+    pinchRef.current = null;
+    cancelActiveInteraction();
+    suppressSinglePointerRef.current = pointersRef.current.size > 0;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
   // What the freehand stroke will become once released.
   const penPreview = useMemo(
     () =>
@@ -891,21 +916,14 @@ export function StudioCanvas() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onPointerLeave={(e) => {
-        pointersRef.current.delete(e.pointerId);
-        if (pointersRef.current.size < 2) pinchRef.current = null;
-        panRef.current = null;
+        // A captured pointer may leave the canvas while dragging. Keep its
+        // gesture active until pointerup or pointercancel, not pointerleave.
+        if (pointersRef.current.has(e.pointerId)) return;
         setSnap(null);
         setCursor(null);
         setHoverCell(null);
-        // Don't lose a brush stroke when the pointer slips off the canvas.
-        if (paintStrokeRef.current) {
-          const cells = [...paintStrokeRef.current.values()];
-          paintStrokeRef.current = null;
-          setPaintPreview([]);
-          if (cells.length > 0) paintCells(cells, paintEraseRef.current);
-        }
       }}
       onDoubleClick={() => {
         setDraft(null);
@@ -1202,6 +1220,7 @@ export function StudioCanvas() {
           {snap && tool !== "select" && <SnapIndicator snap={snap} zoom={view.zoom} />}
         </g>
       </svg>
+      <CanvasZoomControls />
       {readout && (
         <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-border bg-card/90 px-3 py-1 font-mono text-[11px] text-foreground shadow-sm">
           {readout}
