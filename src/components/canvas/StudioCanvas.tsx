@@ -559,9 +559,13 @@ export function StudioCanvas() {
       if (letteringId && validIds.has(letteringId)) {
         selectLettering(letteringId);
         const letter = doc.lettering?.find((item) => item.id === letteringId);
-        letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
-          ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
-        setLetterOffset(pt(0, 0));
+        // Live joining ribbons are edited through their endpoints and
+        // inspector, never translated independently of attached glyphs.
+        if (letter?.kind !== "bridge") {
+          letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
+            ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
+          setLetterOffset(pt(0, 0));
+        }
         return;
       }
       // Handle editing takes priority over body dragging.
@@ -947,6 +951,25 @@ export function StudioCanvas() {
         )
       : null;
 
+  // Resolve a temporary set of glyphs for live link-following previews during
+  // touches, keyboard adjustments, and Bézier editing. This is never saved.
+  const sourceLettering = doc.lettering ?? [];
+  const draggingGlyph = sourceLettering.find((item) => item.id === letterDragRef.current?.id);
+  const wordDrag = letterDragRef.current?.scope === "word" && !!draggingGlyph?.groupId;
+  const renderedLettering = sourceLettering.map((item) => {
+    const previewed = letteringPreview?.id === item.id
+      ? { ...item, ...letteringPreview.patch } : item;
+    const owner = item.kind === "haraka" && item.attachedToGlyphId
+      ? sourceLettering.find((glyph) => glyph.id === item.attachedToGlyphId) : undefined;
+    const moving = item.id === letterDragRef.current?.id ||
+      (wordDrag && item.groupId === draggingGlyph?.groupId) ||
+      (owner && (owner.id === letterDragRef.current?.id ||
+        (wordDrag && owner.groupId === draggingGlyph?.groupId)));
+    return letterOffset && moving
+      ? { ...previewed, x: previewed.x + letterOffset.x, y: previewed.y + letterOffset.y }
+      : { ...previewed, ...(nodePreview?.id === item.id ? { pathData: nodePreview.path } : {}) };
+  });
+
   const transform = `translate(${view.pan.x} ${view.pan.y}) rotate(${view.rotation}) scale(${view.zoom})`;
   const cursorStyle =
     spaceDown || tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair";
@@ -1056,7 +1079,8 @@ export function StudioCanvas() {
           </g>
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
-            {(doc.lettering ?? []).map((item) => {
+            {[...sourceLettering.filter((item) => item.kind === "bridge"),
+              ...sourceLettering.filter((item) => item.kind !== "bridge")].map((item) => {
               const draggedId = letterDragRef.current?.id;
               const dragging = draggedId ? doc.lettering?.find((glyph) => glyph.id === draggedId) : undefined;
               const isWordDragged = letterDragRef.current?.scope === "word" && !!dragging?.groupId;
@@ -1068,6 +1092,7 @@ export function StudioCanvas() {
                 (isWordDragged && item.groupId === dragging?.groupId) || linkedToDragged;
               return <LetteringGlyph key={item.id}
                 item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+                allItems={renderedLettering}
                 selected={item.id === selectedLetteringId}
                 offset={letterOffset && moved ? letterOffset : null}
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;

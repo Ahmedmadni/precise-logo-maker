@@ -6,6 +6,7 @@ import {
   type ContourRole, type JoinSide,
 } from "../../calligraphy/contourComposer";
 import { alignJoinWithClearance, analyzeJoin } from "../../calligraphy/joinAssistant";
+import { createRibbonLink } from "../../calligraphy/ribbonJoin";
 import { useStudio } from "../../store/studioStore";
 
 const field = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground";
@@ -24,6 +25,7 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
   selected: LetteringItem; siblings: LetteringItem[]; part: "contours" | "joins";
 }) {
   const update = useStudio((s) => s.updateLettering);
+  const addLink = useStudio((s) => s.addLettering);
   const editContours = useStudio((s) => s.editGlyphContours);
   const setEditContours = useStudio((s) => s.setEditGlyphContours);
   const contourIndex = useStudio((s) => s.selectedContourIndex);
@@ -72,6 +74,16 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
     update(selected.id, { contourRoles: {
       ...selected.contourRoles, [String(contourIndex)]: role,
     } });
+  };
+  const createJoin = () => {
+    if (!target) return;
+    const ribbon = createRibbonLink(selected, target, mySide, targetSide);
+    if (!ribbon) {
+      setNotice("تعذر إنشاء الوصلة. يجب اختيار حرفين منفصلين ونقطتي اتصال بينهما فجوة لا تقل عن وحدتين.");
+      return;
+    }
+    addLink(ribbon);
+    setNotice("");
   };
   const moveToJoin = () => {
     if (!target) return;
@@ -242,9 +254,24 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
                 setOffsetX(0); setOffsetY(0);
               }}>إعادة الإزاحة إلى صفر</button>
             </details>
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+              <h4 className="text-xs font-semibold">إنشاء وصلة فيكتور بين الحرفين</h4>
+              <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                ينشئ شريطًا منحنيًا مستقلًا مرتبطًا بالحرفين، يمكن تعديل سمك بدايته
+                ونهايته وانحنائه ثم تصديره كمسار SVG حقيقي. يحتاج فراغًا بين النقطتين.
+              </p>
+              <button type="button" onClick={createJoin}
+                disabled={!analysis || analysis.distance < 2}
+                className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40">
+                <Link2 className="h-4 w-4" /> إنشاء وصلة منحنية قابلة للتعديل
+              </button>
+              {analysis && analysis.distance < 2 && <p className="mt-2 text-[11px] text-muted-foreground">
+                النقطتان متطابقتان تقريبًا. أبعد الحرفين قليلاً لإنشاء امتداد ظاهر.
+              </p>}
+            </div>
             <button type="button" onClick={moveToJoin} disabled={!analysis}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40">
-              <Link2 className="h-4 w-4" /> محاذاة الحرف المحدد
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-40">
+              <Link2 className="h-4 w-4" /> محاذاة النقطتين دون إنشاء وصلة
             </button>
           </div>}
           {targets.length === 0 && <p className="text-xs text-muted-foreground">
