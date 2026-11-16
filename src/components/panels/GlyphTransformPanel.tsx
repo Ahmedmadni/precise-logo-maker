@@ -32,6 +32,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const editNodes = useStudio((s) => s.editGlyphNodes);
   const setEditNodes = useStudio((s) => s.setEditGlyphNodes);
   const selectedNode = useStudio((s) => s.selectedGlyphNodeId);
+  const showAllNodes = useStudio((s) => s.showAllGlyphNodes);
+  const setShowAllNodes = useStudio((s) => s.setShowAllGlyphNodes);
   const setSelectedNode = useStudio((s) => s.setSelectedGlyphNodeId);
   const moveScope = useStudio((s) => s.letteringMoveScope);
   const setMoveScope = useStudio((s) => s.setLetteringMoveScope);
@@ -254,8 +256,14 @@ export function GlyphTransformPanel({ selected, siblings }: {
             {editNodes && (
               <div className="space-y-2 rounded-md border border-border p-2">
                 <p className="text-[11px] leading-5 text-muted-foreground">
-                  اضغط على نقطة الحرف في مساحة الرسم أو اخترها هنا. المقابض التركوازية تتحكم في انحناء الضربات.
+                  حدد نقطة من اللوحة أو من القائمة. يظهر افتراضيًا عدد أقل من المقابض لتسهيل اللمس.
+                  عند اختيار نقطة تظهر مقابض المنحنى القريبة منها.
                 </p>
+                <label className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-border px-2 text-xs">
+                  إظهار جميع النقاط والمقابض
+                  <input type="checkbox" checked={showAllNodes} onChange={(e) => setShowAllNodes(e.target.checked)}
+                    className="h-5 w-5 accent-[var(--color-primary)]" />
+                </label>
                 <select className={input} value={node?.id ?? ""}
                   onChange={(e) => setSelectedNode(e.target.value ? Number(e.target.value) : null)}>
                   <option value="">اختر نقطة المسار</option>

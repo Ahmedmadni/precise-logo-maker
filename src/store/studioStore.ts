@@ -152,6 +152,8 @@ export interface StudioState {
   commitLetteringPreview: () => void;
   editGlyphNodes: boolean;
   setEditGlyphNodes: (editing: boolean) => void;
+  showAllGlyphNodes: boolean;
+  setShowAllGlyphNodes: (show: boolean) => void;
   editGlyphContours: boolean;
   setEditGlyphContours: (editing: boolean) => void;
   selectedContourIndex: number | null;
@@ -348,6 +350,8 @@ export const useStudio = create<StudioState>()((set, get) => {
       }));
     },
     editGlyphNodes: false,
+    showAllGlyphNodes: false,
+    setShowAllGlyphNodes: (showAllGlyphNodes) => set({ showAllGlyphNodes }),
     setEditGlyphNodes: (editGlyphNodes) => set({
       editGlyphNodes, editGlyphContours: false, editJoinAnchors: false, selectedContourIndex: null, tool: "select",
     }),

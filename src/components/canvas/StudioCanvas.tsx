@@ -36,6 +36,8 @@ import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
 import { touchPair, pinchView, shouldIgnorePalmContact, type PinchSnapshot } from "./touchGestures";
 import { CanvasZoomControls } from "./CanvasZoomControls";
+import { GlyphOverlapPicker } from "./GlyphOverlapPicker";
+import { chooseOverlappingGlyph, uniqueGlyphStack, visibleBezierNodes, type OverlapTap } from "./glyphSelection";
 import { artboardWorldBounds, GUIDE_COLOR, useStudio } from "../../store/studioStore";
 import { GridLayer } from "./GridLayer";
 import { SnapIndicator } from "./SnapIndicator";
@@ -99,6 +101,7 @@ export function StudioCanvas() {
   const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
   const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
   const selectedGlyphNodeId = useStudio((s) => s.selectedGlyphNodeId);
+  const showAllGlyphNodes = useStudio((s) => s.showAllGlyphNodes);
   const letteringPreview = useStudio((s) => s.letteringPreview);
   const setLetteringPreview = useStudio((s) => s.setLetteringPreview);
   const commitLetteringPreview = useStudio((s) => s.commitLetteringPreview);
@@ -150,6 +153,18 @@ export function StudioCanvas() {
   // After a two-finger gesture, the remaining finger must not resume a stroke.
   const suppressSinglePointerRef = useRef(false);
   const [size, setSize] = useState({ width: 1200, height: 800 });
+  const overlapTapRef = useRef<OverlapTap | null>(null);
+  const [overlapIds, setOverlapIds] = useState<string[]>([]);
+
+  const cycleOverlap = () => {
+    const index = overlapIds.indexOf(useStudio.getState().selectedLetteringId ?? "");
+    const nextIndex = (index + 1) % overlapIds.length;
+    const id = overlapIds[nextIndex];
+    if (!id) return;
+    selectLettering(id);
+    const previous = overlapTapRef.current;
+    if (previous) overlapTapRef.current = { ...previous, index: nextIndex, time: performance.now() };
+  };
 
   /** Grid the cell brush paints on: the explicit choice, else the first paintable one. */
   const paintGrid = useMemo(() => {
@@ -526,8 +541,20 @@ export function StudioCanvas() {
         setNodePreview({ id: editItem.id, path: editItem.pathData });
         return;
       }
-      const letteringId = (e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
-      if (letteringId && (doc.lettering ?? []).some((item) => item.id === letteringId)) {
+      const validIds = new Set((doc.lettering ?? []).map((item) => item.id));
+      const stack = uniqueGlyphStack(
+        document.elementsFromPoint(e.clientX, e.clientY)
+          .map((element) => element.closest("[data-lettering-id]")?.getAttribute("data-lettering-id") ?? ""),
+        validIds,
+      );
+      // Repeated taps cycle through true hit-tested SVG glyphs, from top to bottom.
+      const tapped = chooseOverlappingGlyph(stack, { x: e.clientX, y: e.clientY },
+        performance.now(), overlapTapRef.current);
+      overlapTapRef.current = tapped;
+      setOverlapIds(stack.length > 1 ? stack : []);
+      const letteringId = tapped?.ids[tapped.index] ??
+        target.closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
+      if (letteringId && validIds.has(letteringId)) {
         selectLettering(letteringId);
         const letter = doc.lettering?.find((item) => item.id === letteringId);
         letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
@@ -775,6 +802,10 @@ export function StudioCanvas() {
       letterDragRef.current = null;
       const offset = letterOffset;
       setLetterOffset(null);
+      if (offset && Math.hypot(offset.x, offset.y) * view.zoom > 7) {
+        // A drag is not a repeat tap on the same stack.
+        overlapTapRef.current = null;
+      }
       if (offset) {
         if (scope === "word" && groupId) useStudio.getState().moveLetteringGroup(groupId, offset.x, offset.y);
         else moveLettering(id, offset.x, offset.y);
@@ -1060,7 +1091,8 @@ export function StudioCanvas() {
           {/* Editable font-outline anchor and Bézier handles. Kept out of SVG exports. */}
           {editGlyphNodes && tool === "select" && (doc.lettering ?? []).filter((item) => item.id === selectedLetteringId && item.kind === "outline").map((item) =>
             <g key={`handles-${item.id}`}>
-              {outlineNodes(nodePreview?.id === item.id ? nodePreview.path : item.pathData ?? "").slice(0, 350).map((n) => {
+              {visibleBezierNodes(outlineNodes(nodePreview?.id === item.id ? nodePreview.path : item.pathData ?? "").slice(0, 350),
+                selectedGlyphNodeId, item, view.zoom, showAllGlyphNodes).map((n) => {
                 const worldPoint = glyphPointToWorld(item, n.x, n.y);
                 return <g key={n.id} data-outline-node={n.id}
                   className="cursor-crosshair" aria-label={n.role === "anchor" ? "نقطة تثبيت الحرف" : "مقبض منحنى Bézier"}>
@@ -1238,6 +1270,15 @@ export function StudioCanvas() {
         </g>
       </svg>
       <CanvasZoomControls />
+      {tool === "select" && overlapIds.length > 1 && !editGlyphNodes && !editGlyphContours && !editJoinAnchors && (
+        <GlyphOverlapPicker
+          items={overlapIds.map((id) => (doc.lettering ?? []).find((item) => item.id === id)).filter(
+            (item): item is NonNullable<typeof item> => !!item)}
+          currentId={selectedLetteringId}
+          onNext={cycleOverlap}
+          onDismiss={() => { setOverlapIds([]); overlapTapRef.current = null; }}
+        />
+      )}
       {readout && (
         <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md border border-border bg-card/90 px-3 py-1 font-mono text-[11px] text-foreground shadow-sm">
           {readout}
