@@ -219,7 +219,7 @@ export function LetteringPanel({ section, onCreated }: {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           {markCategory === "decorations" && <div>
             <h3 className="mb-2 font-semibold">الزخارف والامتدادات</h3>
             <div className="grid grid-cols-3 gap-2">
