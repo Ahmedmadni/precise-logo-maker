@@ -1,6 +1,10 @@
 import { panBy, zoomAt, type ViewTransform } from "../../core/coordinates/view";
 import type { Point } from "../../core/geometry/types";
 
+/** A finger resting on the screen must not interrupt an in-progress stylus stroke. */
+export const shouldIgnorePalmContact = (activePointerType: string | null, incomingType: string) =>
+  activePointerType === "pen" && incomingType === "touch";
+
 export interface PinchSnapshot {
   distance: number;
   midpoint: Point;
