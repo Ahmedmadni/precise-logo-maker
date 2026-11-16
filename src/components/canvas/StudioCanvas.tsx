@@ -559,9 +559,13 @@ export function StudioCanvas() {
       if (letteringId && validIds.has(letteringId)) {
         selectLettering(letteringId);
         const letter = doc.lettering?.find((item) => item.id === letteringId);
-        letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
-          ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
-        setLetterOffset(pt(0, 0));
+        // Live joining ribbons are edited through their endpoints and
+        // inspector, never translated independently of attached glyphs.
+        if (letter?.kind !== "bridge") {
+          letterDragRef.current = { id: letteringId, start: world, scope: letteringMoveScope,
+            ...(letter?.groupId ? { groupId: letter.groupId } : {}) };
+          setLetterOffset(pt(0, 0));
+        }
         return;
       }
       // Handle editing takes priority over body dragging.
