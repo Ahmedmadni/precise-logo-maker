@@ -156,7 +156,7 @@ export function StudioLayersPanel() {
           return <button type="button" key={item.id} aria-current={glyphId === item.id ? "true" : undefined}
             className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}
             onClick={() => selectLetter(item.id)}>
-            {item.kind === "ornament" || item.kind === "haraka"
+            {item.kind === "ornament" || item.kind === "haraka" || item.kind === "bridge"
               ? <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               : <Type className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
             <span className="min-w-0 flex-1 text-start">
