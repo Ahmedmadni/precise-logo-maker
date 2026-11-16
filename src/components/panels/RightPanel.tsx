@@ -1920,7 +1920,12 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
         <div>
           <h2 className="text-sm font-bold">{title[section]}</h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {section === "edit" ? selected ? "اسحب الحرف أو عدّل خصائصه هنا" : "اختر عنصرا من مساحة التصميم" :
+            {section === "edit" ? selected
+              ? selected.kind === "haraka" ? "موضع الحركة وربطها بالحرف واللون والحجم" :
+                selected.kind === "ornament" ? "التحريك والتدوير وتنسيق الزخرفة" :
+                selected.kind === "outline" ? "تحرير الحرف: الأساسيات، المسارات، الوصلات والبدائل" :
+                "غيّر النص والموضع والحجم"
+              : selectedGeometry.length > 0 ? "تعديل الشكل الهندسي المحدد" : "اختر عنصرا من مساحة التصميم" :
              section === "text" ? "اكتب الكلمة، اختر الخط، ثم أضفها" :
              section === "ornaments" ? "اختر الحركات أو الزخارف من المجموعة المناسبة" :
              section === "layers" ? "رتب عملك وحدد العنصر الذي تريد تعديله" :

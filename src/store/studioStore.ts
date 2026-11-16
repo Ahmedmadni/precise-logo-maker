@@ -728,13 +728,25 @@ export const useStudio = create<StudioState>()((set, get) => {
         grids: doc.grids.filter((g) => g.id !== id),
       })),
 
-    setSelection: (ids) => set({ selection: ids, selectedLetteringId: null }),
-    toggleSelection: (id) =>
+    setSelection: (ids) => {
+      get().commitLetteringPreview();
+      set({
+        selection: ids, selectedLetteringId: null, selectedGlyphNodeId: null,
+        selectedContourIndex: null, editGlyphNodes: false,
+        editGlyphContours: false, editJoinAnchors: false,
+      });
+    },
+    toggleSelection: (id) => {
+      get().commitLetteringPreview();
       set((s) => ({
+        selectedLetteringId: null, selectedGlyphNodeId: null,
+        selectedContourIndex: null, editGlyphNodes: false,
+        editGlyphContours: false, editJoinAnchors: false,
         selection: s.selection.includes(id)
           ? s.selection.filter((x) => x !== id)
           : [...s.selection, id],
-      })),
+      }));
+    },
     clearSelection: () => set({ selection: [] }),
 
     translateSelection: (dx, dy) => {

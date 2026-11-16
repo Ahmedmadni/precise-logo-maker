@@ -23,11 +23,11 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       onClick: () => { setSection("edit"); setTool("select"); openPanel(); } },
     { id: "layers", label: "الطبقات", icon: Layers3, active: section === "layers" && panelOpen,
       onClick: () => { setSection("layers"); setTool("select"); openPanel(); } },
-    { id: "draw", label: "رسم", icon: PenTool, active: section === "draw" && panelOpen,
+    { id: "draw", label: "رسم", icon: PenTool, active: (section === "draw" && panelOpen) || (selectedTool !== "select" && !panelOpen),
       onClick: () => { setSection("draw"); openPanel(); } },
   ];
   return (
-    <nav aria-label="الأدوات الرئيسية" className="flex shrink-0 items-stretch gap-0.5 border-t border-border bg-card px-1 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] sm:hidden" dir="rtl">
+    <nav aria-label="الأدوات الرئيسية" className="relative z-50 flex shrink-0 items-stretch gap-0.5 border-t border-border bg-card px-1 pt-1 pb-[max(env(safe-area-inset-bottom),4px)] sm:hidden" dir="rtl">
       {actions.map(({ id, label, icon: Icon, active, onClick }) => (
         <button key={id} type="button" aria-label={label} aria-pressed={active} onClick={onClick}
           className={cn(
