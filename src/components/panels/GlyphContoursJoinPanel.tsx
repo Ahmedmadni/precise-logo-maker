@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Link2, Move, Waypoints } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import {
-  alignGlyphJoin, getJoinAnchor, moveOutlineContour, outlineContours,
+  getJoinAnchor, moveOutlineContour, outlineContours,
   type ContourRole, type JoinSide,
 } from "../../calligraphy/contourComposer";
+import { alignJoinWithClearance, analyzeJoin } from "../../calligraphy/joinAssistant";
 import { useStudio } from "../../store/studioStore";
 
 const field = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground";
@@ -29,19 +30,35 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
   const setContourIndex = useStudio((s) => s.setSelectedContourIndex);
   const editJoin = useStudio((s) => s.editJoinAnchors);
   const setEditJoin = useStudio((s) => s.setEditJoinAnchors);
+  const setJoinGuide = useStudio((s) => s.setJoinGuide);
   const [moveStep, setMoveStep] = useState(10);
   const [targetId, setTargetId] = useState("");
   const [mySide, setMySide] = useState<JoinSide>("entry");
   const [targetSide, setTargetSide] = useState<JoinSide>("exit");
   const [notice, setNotice] = useState("");
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
   const contours = outlineContours(selected.pathData ?? "");
   const selectedContour = contours.find((c) => c.index === contourIndex) ?? null;
   const targets = siblings.filter((item) => item.id !== selected.id && item.kind === "outline");
   const target = targets.find((item) => item.id === targetId) ?? targets[0];
+  const analysis = target ? analyzeJoin(selected, mySide, target, targetSide) : null;
 
   useEffect(() => {
     if (!targets.find((item) => item.id === targetId)) setTargetId(targets[0]?.id ?? "");
   }, [selected.id, siblings.map((item) => item.id).join("|")]);
+
+  useEffect(() => {
+    if (part !== "joins" || !editJoin || !target) {
+      setJoinGuide(null);
+      return;
+    }
+    setJoinGuide({
+      sourceId: selected.id, targetId: target.id,
+      sourceSide: mySide, targetSide,
+    });
+    return () => setJoinGuide(null);
+  }, [part, editJoin, selected.id, target?.id, mySide, targetSide, setJoinGuide]);
 
   if (selected.kind !== "outline" || !selected.pathData) return null;
 
@@ -58,13 +75,13 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
   };
   const moveToJoin = () => {
     if (!target) return;
-    const point = alignGlyphJoin(selected, mySide, target, targetSide);
+    const point = alignJoinWithClearance(selected, mySide, target, targetSide, offsetX, offsetY);
     if (!point) {
       setNotice("تعذر حساب المحاذاة بهذه النقاط");
       return;
     }
     update(selected.id, point);
-    setNotice("تمت محاذاة نقطتي الاتصال هندسيا. افحص شكل الوصلة بصريا قبل التصدير.");
+    setNotice("تمت المحاذاة مع الإزاحة المحددة. افحص شكل الضربات بصريا؛ لم يتم توليد وصلة تلقائية.");
   };
   const setAnchorNumber = (side: JoinSide, axis: "x" | "y", number: number) => {
     if (!Number.isFinite(number) || Math.abs(number) > 100000) return;
@@ -146,7 +163,7 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
           <button type="button" className={btn + (editJoin ? " w-full border-primary bg-primary/15" : " w-full")}
             aria-pressed={editJoin} onClick={() => setEditJoin(!editJoin)}>
             <Waypoints className="h-4 w-4" />
-            {editJoin ? "إنهاء تعديل نقاط الاتصال على الرسم" : "إظهار نقاط الاتصال وسحبها"}
+            {editJoin ? "إخفاء نقاط الاتصال ومعاينة الفجوة" : "إظهار نقاط الاتصال ومعاينة الفجوة"}
           </button>
           {(["entry", "exit"] as const).map((side) => {
             const anchor = getJoinAnchor(selected, side);
@@ -183,8 +200,51 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
                 </select>
               </label>
             </div>
-            <button type="button" onClick={moveToJoin} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
-              <Link2 className="h-4 w-4" /> محاذاة النقطتين ونقل الحرف
+            {analysis && <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <h4 className="text-xs font-semibold">قياس الفجوة الحالية بين النقطتين</h4>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {([
+                  ["أفقي", analysis.deltaX],
+                  ["رأسي", analysis.deltaY],
+                  ["إجمالي", analysis.distance],
+                ] as const).map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-lg bg-background p-2">
+                    <p className="text-[11px] text-muted-foreground">{label}</p>
+                    <p dir="ltr" className="mt-1 truncate font-mono text-xs font-semibold" title={value.toFixed(1)}>
+                      {value.toFixed(1)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] leading-5 text-muted-foreground">
+                القياسات بوحدات اللوحة. الإشارة الموجبة تعني أن النقطة المستهدفة جهة اليمين أو الأسفل.
+                إنها مسافة بين نقطتين اختارتهما، وليست قياسا لجودة الوصلة الخطية.
+              </p>
+            </div>}
+            <details className="rounded-lg border border-border px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold">ضبط إزاحة بعد المحاذاة (اختياري)</summary>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {([
+                  ["أفقي X", offsetX, setOffsetX],
+                  ["رأسي Y", offsetY, setOffsetY],
+                ] as const).map(([label, val, setter]) => (
+                  <label key={label} className="space-y-1 text-xs">
+                    {label}
+                    <input type="number" className={field} min={-200} max={200} step={1}
+                      value={val} onChange={(e) => {
+                        const next = Number(e.target.value);
+                        if (Number.isFinite(next) && Math.abs(next) <= 200) setter(next);
+                      }} />
+                  </label>
+                ))}
+              </div>
+              <button type="button" className={btn + " mt-3 w-full"} onClick={() => {
+                setOffsetX(0); setOffsetY(0);
+              }}>إعادة الإزاحة إلى صفر</button>
+            </details>
+            <button type="button" onClick={moveToJoin} disabled={!analysis}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-40">
+              <Link2 className="h-4 w-4" /> محاذاة الحرف المحدد
             </button>
           </div>}
           {targets.length === 0 && <p className="text-xs text-muted-foreground">

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
+import type { JoinGuideSelection } from "../calligraphy/joinAssistant";
 import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
@@ -160,6 +161,9 @@ export interface StudioState {
   setSelectedContourIndex: (index: number | null) => void;
   editJoinAnchors: boolean;
   setEditJoinAnchors: (editing: boolean) => void;
+  /** Editor-only join-gap guide. Never saved to .logo or exported. */
+  joinGuide: JoinGuideSelection | null;
+  setJoinGuide: (guide: JoinGuideSelection | null) => void;
   workspaceSection: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced";
   setWorkspaceSection: (section: "text" | "ornaments" | "edit" | "layers" | "draw" | "advanced") => void;
   letteringMode: "words" | "marks" | "layers";
@@ -362,8 +366,11 @@ export const useStudio = create<StudioState>()((set, get) => {
     selectedContourIndex: null,
     setSelectedContourIndex: (selectedContourIndex) => set({ selectedContourIndex }),
     editJoinAnchors: false,
+    joinGuide: null,
+    setJoinGuide: (joinGuide) => set({ joinGuide }),
     setEditJoinAnchors: (editJoinAnchors) => set({
       editJoinAnchors, editGlyphNodes: false, editGlyphContours: false, tool: "select",
+      ...(!editJoinAnchors ? { joinGuide: null } : {}),
     }),
     workspaceSection: "text",
     setWorkspaceSection: (workspaceSection) => {
@@ -371,7 +378,8 @@ export const useStudio = create<StudioState>()((set, get) => {
       get().commitLetteringPreview();
       set({
         workspaceSection, editGlyphNodes: false, editGlyphContours: false,
-        editJoinAnchors: false, selectedGlyphNodeId: null, selectedContourIndex: null,
+        editJoinAnchors: false, joinGuide: null,
+        selectedGlyphNodeId: null, selectedContourIndex: null,
       });
     },
     letteringMode: "words",
@@ -382,6 +390,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         selectedLetteringId: id, selection: [], selectedGlyphNodeId: null,
         selectedContourIndex: null, letteringPreview: null,
         editGlyphNodes: false, editGlyphContours: false, editJoinAnchors: false,
+        joinGuide: null,
         ...(id ? { workspaceSection: "edit" as const } : {}),
       });
     },

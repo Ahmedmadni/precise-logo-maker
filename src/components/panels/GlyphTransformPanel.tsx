@@ -58,7 +58,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
     commitPreview();
     useStudio.getState().setEditGlyphNodes(false);
     useStudio.getState().setEditGlyphContours(false);
-    useStudio.getState().setEditJoinAnchors(false);
+    useStudio.getState().setEditJoinAnchors(next === "joins");
     setActiveTab(next);
   };
   const pending = preview?.id === selected.id ? preview.patch : {};
