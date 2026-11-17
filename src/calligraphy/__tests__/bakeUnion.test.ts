@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createLettering, type LetteringItem } from "../model";
+import { createHaraka, createLettering, type LetteringItem } from "../model";
 import { createRibbonLink } from "../ribbonJoin";
 import { bakeRibbonAsOutline } from "../bakeUnion";
 import { outlineContours } from "../contourComposer";
 import { buildSvgDocument } from "../../objects/export";
 import { parseProject, serializeProject } from "../../objects/project";
-import type { DocumentState } from "../../store/studioStore";
+import { useStudio, type DocumentState } from "../../store/studioStore";
 
 const sourcePath = [
   "M0 0 L40 0 L40 30 L0 30 Z",
@@ -77,6 +77,43 @@ describe("non-destructive geometric Arabic outline merge", () => {
     const svg = buildSvgDocument(restored, { background: false });
     expect(svg).toContain('fill-rule="evenodd"');
     expect((svg.match(/<path /g) ?? [])).toHaveLength(1);
+  });
+
+  it("keeps attached harakat following the new baked glyph and restores the old anchor", () => {
+    const state = useStudio.getState();
+    const ribbon = bridge();
+    const mark = { ...createHaraka("shadda", 20, -44), id: "attached-mark",
+      attachedToGlyphId: source.id, anchorMode: "auto" as const };
+    try {
+      useStudio.setState({ doc: doc([source, target, ribbon, mark]), past: [], future: [],
+        selectedLetteringId: ribbon.id, letteringPreview: null });
+      const result = useStudio.getState().bakeLetteringJoin(ribbon.id);
+      expect(result.ok).toBe(true);
+      let items = useStudio.getState().doc.lettering!;
+      const baked = items.find((x) => x.kind === "outline" && x.bakedSourceIds)!;
+      const attached = items.find((x) => x.id === mark.id)!;
+      expect(attached.attachedToGlyphId).toBe(baked.id);
+      expect(attached.anchorMode).toBe("manual");
+      expect(attached.bakedOriginalAttachment?.glyphId).toBe(source.id);
+      expect(items.filter((x) => x.hidden)).toHaveLength(3);
+      const markX = attached.x;
+      useStudio.getState().moveLettering(baked.id, 12, 4);
+      items = useStudio.getState().doc.lettering!;
+      expect(items.find((x) => x.id === mark.id)?.x).toBe(markX + 12);
+      useStudio.getState().toggleBakedVersion(baked.id);
+      items = useStudio.getState().doc.lettering!;
+      const restored = items.find((x) => x.id === mark.id)!;
+      expect(restored.attachedToGlyphId).toBe(source.id);
+      expect(restored.anchorMode).toBe("auto");
+      expect(items.find((x) => x.id === baked.id)?.hidden).toBe(true);
+      expect(items.find((x) => x.id === source.id)?.hidden).toBe(false);
+      useStudio.getState().toggleBakedVersion(baked.id);
+      items = useStudio.getState().doc.lettering!;
+      expect(items.find((x) => x.id === mark.id)?.attachedToGlyphId).toBe(baked.id);
+    } finally {
+      useStudio.setState({ doc: state.doc, past: state.past, future: state.future,
+        selectedLetteringId: state.selectedLetteringId, letteringPreview: state.letteringPreview });
+    }
   });
 
   it("does not merge different colors or an outlined glyph with extra stroke", () => {
