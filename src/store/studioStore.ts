@@ -487,8 +487,20 @@ export const useStudio = create<StudioState>()((set, get) => {
       if (!result.ok) return { ok: false, reason: result.reason };
       commit("Bake unified Arabic outline (sources retained)", (doc) => ({
         ...doc, lettering: [
-          ...(doc.lettering ?? []).map((item) =>
-            result.sourceIds.includes(item.id) ? { ...item, hidden: true } : item),
+          ...(doc.lettering ?? []).map((item) => {
+            if (result.sourceIds.includes(item.id)) return { ...item, hidden: true };
+            if (item.kind === "haraka" && item.attachedToGlyphId &&
+              result.sourceIds.slice(0, 2).includes(item.attachedToGlyphId)) {
+              return {
+                ...item, attachedToGlyphId: result.outline.id, anchorMode: "manual" as const,
+                bakedOriginalAttachment: {
+                  glyphId: item.attachedToGlyphId,
+                  anchorMode: item.anchorMode ?? "auto" as const,
+                },
+              };
+            }
+            return item;
+          }),
           result.outline,
         ],
       }));
@@ -504,9 +516,19 @@ export const useStudio = create<StudioState>()((set, get) => {
       const showSources = !baked.hidden;
       const relevant = new Set(baked.bakedSourceIds);
       commit(showSources ? "Restore original Arabic curves" : "Show unified vector version",
-        (doc) => ({ ...doc, lettering: (doc.lettering ?? []).map((item) =>
-          item.id === baked.id ? { ...item, hidden: showSources } :
-          relevant.has(item.id) ? { ...item, hidden: !showSources } : item) }));
+        (doc) => ({ ...doc, lettering: (doc.lettering ?? []).map((item) => {
+          if (item.id === baked.id) return { ...item, hidden: showSources };
+          if (relevant.has(item.id)) return { ...item, hidden: !showSources };
+          if (item.kind === "haraka" && item.bakedOriginalAttachment &&
+            relevant.has(item.bakedOriginalAttachment.glyphId)) {
+            const origin = item.bakedOriginalAttachment;
+            return {
+              ...item, attachedToGlyphId: showSources ? origin.glyphId : baked.id,
+              anchorMode: showSources ? origin.anchorMode : "manual" as const,
+            };
+          }
+          return item;
+        }) }));
       set({ selectedLetteringId: showSources ? baked.bakedSourceIds[0] ?? null : id });
     },
     setCustomThuluthFont: (fontDataUrl) => commit("Import licensed Arabic font", (doc) => ({ ...doc, customThuluthFont: fontDataUrl })),
