@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronLeft, Circle, Layers3, MousePointer2, PenLine, Search, Sparkles, Type, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, Circle, Eye, EyeOff, Layers3, MousePointer2, PenLine, Search, Sparkles, Type, X } from "lucide-react";
 import { useStudio } from "../../store/studioStore";
 import {
   letteringLayerLabel, layerCategoryForItem, matchesLayerCategory, matchesLayerSearch,
@@ -22,6 +22,7 @@ export function StudioLayersPanel() {
   const selectGlyph = useStudio((s) => s.selectLettering);
   const selectShapes = useStudio((s) => s.setSelection);
   const setSection = useStudio((s) => s.setWorkspaceSection);
+  const setHidden = useStudio((s) => s.setLetteringHidden);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<LayerCategory>("all");
   const [opened, setOpened] = useState<Record<string, boolean>>({});
@@ -134,13 +135,23 @@ export function StudioLayersPanel() {
             </button>
             {expanded && <div className="space-y-1 border-t border-border p-2">
               {glyphs.map((item, i) => (
-                <button key={item.id} type="button" aria-current={glyphId === item.id ? "true" : undefined}
-                  className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}
-                  onClick={() => selectLetter(item.id)}>
-                  <MousePointer2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="flex-1 text-start">شكل حرفي {item.glyphIndex !== undefined ? item.glyphIndex + 1 : i + 1}</span>
-                  <span className="text-[11px] text-muted-foreground">تعديل</span>
-                </button>
+                <div key={item.id} className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}>
+                  <button type="button" aria-current={glyphId === item.id ? "true" : undefined}
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-start"
+                    onClick={() => selectLetter(item.id)}>
+                    <MousePointer2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className={`min-w-0 flex-1 truncate ${item.hidden ? "text-muted-foreground" : ""}`}>
+                      شكل حرفي {item.glyphIndex !== undefined ? item.glyphIndex + 1 : i + 1}
+                      {item.hidden ? " (مخفي)" : ""}
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => setHidden(item.id, !item.hidden)}
+                    aria-label={item.hidden ? "إظهار هذا الحرف" : "إخفاء هذا الحرف"}
+                    title={item.hidden ? "إظهار" : "إخفاء"}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent">
+                    {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               ))}
             </div>}
           </section>;
@@ -153,18 +164,26 @@ export function StudioLayersPanel() {
         </h4>
         {visibleStandalone.map((item) => {
           const owner = linkedWord(item.attachedToGlyphId);
-          return <button type="button" key={item.id} aria-current={glyphId === item.id ? "true" : undefined}
-            className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}
-            onClick={() => selectLetter(item.id)}>
-            {item.kind === "ornament" || item.kind === "haraka" || item.kind === "bridge"
-              ? <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              : <Type className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
-            <span className="min-w-0 flex-1 text-start">
-              <span className="block truncate">{letteringLayerLabel(item)}</span>
-              {owner && <span className="block truncate text-[11px] text-muted-foreground">مرتبطة بكلمة {owner}</span>}
-            </span>
-            <span className="text-[11px] text-muted-foreground">تعديل</span>
-          </button>;
+          return <div key={item.id}
+            className={row + (glyphId === item.id ? " border-primary/70 bg-primary/10" : "")}>
+            <button type="button" aria-current={glyphId === item.id ? "true" : undefined}
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-start"
+              onClick={() => selectLetter(item.id)}>
+              {item.kind === "ornament" || item.kind === "haraka" || item.kind === "bridge"
+                ? <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                : <Type className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+              <span className={`min-w-0 flex-1 text-start ${item.hidden ? "text-muted-foreground" : ""}`}>
+                <span className="block truncate">{letteringLayerLabel(item)}{item.hidden ? " (مخفي)" : ""}</span>
+                {owner && <span className="block truncate text-[11px] text-muted-foreground">مرتبطة بكلمة {owner}</span>}
+              </span>
+            </button>
+            <button type="button" onClick={() => setHidden(item.id, !item.hidden)}
+              aria-label={item.hidden ? "إظهار هذا العنصر" : "إخفاء هذا العنصر"}
+              title={item.hidden ? "إظهار" : "إخفاء"}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent">
+              {item.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>;
         })}
       </section>}
 
