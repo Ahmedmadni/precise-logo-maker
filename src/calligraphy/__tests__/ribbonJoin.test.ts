@@ -73,6 +73,72 @@ describe("editable SVG ribbon between calligraphy glyphs", () => {
     expect(samples[64]!.width - samples[63]!.width).toBeLessThan(0.1);
     expect(samples.every((s) => Number.isFinite(s.center.x) && Number.isFinite(s.normal.y))).toBe(true);
   });
+  it("simulates a broad nib only in the middle, keeping cap widths exact", () => {
+    const base = createRibbonLink(source, target)!;
+    const spec = { ...base.ribbon!,
+      startWidth: 9, endWidth: 36,
+      startAngle: 48, endAngle: -33, curvature: 0.3,
+      nibAngle: 22, nibContrast: 0.7 };
+    const withNib = { ...base, ribbon: spec };
+    const withoutNib = { ...base, ribbon: { ...spec, nibContrast: 0 } };
+    const textured = sampleRibbon(withNib, [source, target], 64)!;
+    const plain = sampleRibbon(withoutNib, [source, target], 64)!;
+    expect(textured[0]!.width).toBeCloseTo(9, 9);
+    expect(textured[64]!.width).toBeCloseTo(36, 9);
+    const differences = textured.slice(1, -1).map((s, i) =>
+      Math.abs(s.width - plain[i + 1]!.width));
+    expect(Math.max(...differences)).toBeGreaterThan(0.02);
+    expect(textured.every((s) => Number.isFinite(s.width) && s.width > 0)).toBe(true);
+  });
+  it("extends caps behind source/target without relocating their original outlines", () => {
+    const base = createRibbonLink(source, target)!;
+    const overlapped = { ...base, ribbon: { ...base.ribbon!,
+      startOverlap: 15, endOverlap: 24 } };
+    const original = sampleRibbon(base, [source, target])!;
+    const extended = sampleRibbon(overlapped, [source, target])!;
+    const originalLength = Math.hypot(
+      original[0]!.center.x - original.at(-1)!.center.x,
+      original[0]!.center.y - original.at(-1)!.center.y);
+    const extendedLength = Math.hypot(
+      extended[0]!.center.x - extended.at(-1)!.center.x,
+      extended[0]!.center.y - extended.at(-1)!.center.y);
+    expect(extendedLength).toBeGreaterThan(originalLength + 15);
+    expect(extended[0]!.width).toBe(base.ribbon!.startWidth);
+    expect(extended.at(-1)!.width).toBe(base.ribbon!.endWidth);
+    expect(source.pathData).toBe("M0 0 L100 0 L100 250 L0 250 Z");
+    expect(target.pathData).toBe("M0 0 L100 0 L100 250 L0 250 Z");
+    expect(buildRibbonPath(overlapped, [source, target])).toContain(" C ");
+  });
+  it("round-trips the nib settings and overlap through .logo and SVG export", () => {
+    const base = createRibbonLink(source, target)!;
+    const bridge = { ...base, ribbon: { ...base.ribbon!,
+      nibAngle: -45, nibContrast: 0.55, startOverlap: 12, endOverlap: 18 } };
+    const doc: DocumentState = { artboard: { width: 800, height: 600,
+      unit: "px", background: "#ffffff" }, grids: [], objects: [],
+      lettering: [source, target, bridge] };
+    const loaded = parseProject(serializeProject(doc))!;
+    const spec = loaded.lettering![2]!.ribbon!;
+    expect(spec.nibAngle).toBe(-45);
+    expect(spec.nibContrast).toBe(0.55);
+    expect(spec.startOverlap).toBe(12);
+    expect(spec.endOverlap).toBe(18);
+    expect(buildSvgDocument(loaded, { background: false })).toContain(
+      buildRibbonPath(bridge, loaded.lettering!)!);
+  });
+  it("defaults legacy nib and overlap fields to a neutral profile", () => {
+    const base = createRibbonLink(source, target)!;
+    const spec = { ...base.ribbon! };
+    delete spec.nibContrast;
+    delete spec.nibAngle;
+    delete spec.startOverlap;
+    delete spec.endOverlap;
+    const legacy = { ...base, ribbon: spec };
+    const explicit = { ...base, ribbon: { ...spec,
+      nibContrast: 0, nibAngle: 35, startOverlap: 0, endOverlap: 0 } };
+    expect(buildRibbonPath(legacy, [source, target])).toBe(
+      buildRibbonPath(explicit, [source, target]));
+    expect(buildRibbonPath(legacy, [source, target])).not.toBeNull();
+  });
   it("opens legacy .logo ribbons without tangent/width easing properties", () => {
     const base = createRibbonLink(source, target)!;
     const spec = { ...base.ribbon! };
@@ -102,6 +168,12 @@ describe("editable SVG ribbon between calligraphy glyphs", () => {
     expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, startAngle: 100 } },
       [source, target])).toBeNull();
     expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, widthEase: NaN } },
+      [source, target])).toBeNull();
+    expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, nibContrast: 2 } },
+      [source, target])).toBeNull();
+    expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, startOverlap: -1 } },
+      [source, target])).toBeNull();
+    expect(buildRibbonPath({ ...item, ribbon: { ...item.ribbon!, nibAngle: Infinity } },
       [source, target])).toBeNull();
     expect(createRibbonLink(source, source)).toBeNull();
     const identical = { ...target, x: source.x, y: source.y,
