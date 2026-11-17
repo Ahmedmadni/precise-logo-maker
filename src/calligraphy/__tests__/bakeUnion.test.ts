@@ -68,7 +68,7 @@ describe("non-destructive geometric Arabic outline merge", () => {
     const ribbon = bridge();
     const result = bakeRibbonAsOutline([source, target, ribbon], ribbon.id);
     if (!result.ok) throw new Error(result.reason);
-    const letters = [source, target, ribbon].map((item) => ({ ...item, hidden: true }));
+    const letters: LetteringItem[] = [source, target, ribbon].map((item) => ({ ...item, hidden: true }));
     letters.push(result.outline);
     const restored = parseProject(serializeProject(doc(letters)))!;
     expect(restored.lettering).toHaveLength(4);
