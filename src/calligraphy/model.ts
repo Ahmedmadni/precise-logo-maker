@@ -20,6 +20,8 @@ export interface LetteringItem {
   fillRule?: "evenodd" | "nonzero";
   /** Original source IDs preserved for reversible outline baking. */
   bakedSourceIds?: string[];
+  /** Tracks an attached haraka's original glyph while its owner is baked. */
+  bakedOriginalAttachment?: { glyphId: string; anchorMode: "auto" | "manual" };
   x: number;
   y: number;
   /** Pixel height (font size for an outline). */
