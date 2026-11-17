@@ -29,6 +29,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const remove = useStudio((s) => s.deleteLettering);
   const duplicate = useStudio((s) => s.duplicateLettering);
   const reorder = useStudio((s) => s.reorderLettering);
+  const toggleBakedVersion = useStudio((s) => s.toggleBakedVersion);
   const editNodes = useStudio((s) => s.editGlyphNodes);
   const setEditNodes = useStudio((s) => s.setEditGlyphNodes);
   const selectedNode = useStudio((s) => s.selectedGlyphNodeId);
@@ -116,6 +117,20 @@ export function GlyphTransformPanel({ selected, siblings }: {
         ))}
       </nav>
       {activeTab !== "basic" && <p className="text-xs leading-5 text-muted-foreground">{tabs.find((tab) => tab.id === activeTab)?.detail}</p>}
+      {selected.bakedSourceIds?.length ? (
+        <div className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3">
+          <p className="text-xs font-semibold">نسخة فيكتور موحدة</p>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            هذا شكل ناتج عن دمج الوصلة والحرفين. الأصول محفوظة في المشروع
+            ويمكن استعادتها لمتابعة تحرير نقاط Bézier والاتصالات.
+          </p>
+          <button type="button"
+            className="min-h-11 w-full rounded-lg border border-primary/40 bg-background px-3 text-xs font-semibold text-primary"
+            onClick={() => toggleBakedVersion(selected.id)}>
+            استعادة الحروف والوصلة الأصلية
+          </button>
+        </div>
+      ) : null}
       {activeTab === "basic" && <>
       <details open className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">تحريك العنصر والموضع</summary>
