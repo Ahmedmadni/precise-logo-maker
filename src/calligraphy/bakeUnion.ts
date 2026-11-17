@@ -96,7 +96,7 @@ function filledGlyph(item:LetteringItem): Geom | null {
   const rings:Ring[]=contours.map(points=>{
     const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
     return {points,area:area(points),
-      bbox:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)],
+      bbox:[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)] as [number,number,number,number],
       parent:-1,winding:0,depth:0};
   }).sort((a,b)=>Math.abs(b.area)-Math.abs(a.area));
   let result:Geom|null=null;
@@ -135,7 +135,7 @@ function filledRibbon(item: LetteringItem, all:LetteringItem[]):Geom|null {
 function polygonArea(geom:Geom):number{
   const polygons=geom as number[][][][];
   return polygons.reduce((sum,poly)=>sum+poly.reduce((part,ring,i)=>{
-    const points=ring.map(([x,y])=>({x,y}));
+    const points=ring.map((point)=>({x:point[0]!,y:point[1]!}));
     return part+(i===0?1:-1)*Math.abs(area(points));
   },0),0);
 }
