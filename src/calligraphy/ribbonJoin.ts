@@ -20,6 +20,13 @@ export interface RibbonLink {
   endAngle?: number;
   /** +1 shifts thickness change earlier; -1 delays it toward the end. */
   widthEase?: number;
+  /** Angle of a simulated broad nib against the artboard's positive X-axis. */
+  nibAngle?: number;
+  /** 0 disables nib modulation; 1 maximizes mid-stroke angle response. */
+  nibContrast?: number;
+  /** Optical overlap into the source/target glyph, in artboard pixels. */
+  startOverlap?: number;
+  endOverlap?: number;
 }
 
 export const DEFAULT_RIBBON = {
@@ -30,6 +37,10 @@ export const DEFAULT_RIBBON = {
   startAngle: 0,
   endAngle: 0,
   widthEase: 0,
+  nibAngle: 35,
+  nibContrast: 0.35,
+  startOverlap: 0,
+  endOverlap: 0,
 } as const;
 
 const fmt = (n: number) => Number(n.toFixed(3)).toString();
@@ -42,7 +53,13 @@ export function isValidRibbon(link: RibbonLink): boolean {
     (link.sourceSide === "entry" || link.sourceSide === "exit") &&
     (link.targetSide === "entry" || link.targetSide === "exit") &&
     finite(link.startWidth, link.endWidth, link.tension, link.curvature,
-      link.startAngle ?? 0, link.endAngle ?? 0, link.widthEase ?? 0) &&
+      link.startAngle ?? 0, link.endAngle ?? 0, link.widthEase ?? 0,
+      link.nibAngle ?? 35, link.nibContrast ?? 0,
+      link.startOverlap ?? 0, link.endOverlap ?? 0) &&
+    Math.abs(link.nibAngle ?? 35) <= 180 &&
+    (link.nibContrast ?? 0) >= 0 && (link.nibContrast ?? 0) <= 0.8 &&
+    (link.startOverlap ?? 0) >= 0 && (link.startOverlap ?? 0) <= 60 &&
+    (link.endOverlap ?? 0) >= 0 && (link.endOverlap ?? 0) <= 60 &&
     Math.abs(link.startAngle ?? 0) <= 70 &&
     Math.abs(link.endAngle ?? 0) <= 70 &&
     Math.abs(link.widthEase ?? 0) <= 1 &&
@@ -105,13 +122,14 @@ export function sampleRibbon(
   const start = all.find((s) => s.id === spec.sourceGlyphId && s.kind === "outline");
   const end = all.find((s) => s.id === spec.targetGlyphId && s.kind === "outline");
   if (!start || !end) return null;
-  const p0 = worldJoinAnchor(start, spec.sourceSide);
-  const p3 = worldJoinAnchor(end, spec.targetSide);
-  if (!p0 || !p3 || !finite(p0.x, p0.y, p3.x, p3.y)) return null;
-  const delta = minus(p3, p0);
-  const dist = Math.hypot(delta.x, delta.y);
-  if (dist < 2 || dist > 20_000) return null;
-  const forward = mul(delta, 1 / dist);
+  const sourceAnchor = worldJoinAnchor(start, spec.sourceSide);
+  const targetAnchor = worldJoinAnchor(end, spec.targetSide);
+  if (!sourceAnchor || !targetAnchor ||
+    !finite(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y)) return null;
+  const originalDelta = minus(targetAnchor, sourceAnchor);
+  const originalDistance = Math.hypot(originalDelta.x, originalDelta.y);
+  if (originalDistance < 2 || originalDistance > 20_000) return null;
+  const forward = mul(originalDelta, 1 / originalDistance);
   const perpendicular = { x: -forward.y, y: forward.x };
   const angleToVector = (degrees: number) => {
     const radians = degrees * Math.PI / 180;
@@ -119,12 +137,27 @@ export function sampleRibbon(
   };
   const tangent0 = angleToVector(spec.startAngle ?? 0);
   const tangent1 = angleToVector(spec.endAngle ?? 0);
+  // Move each cap a short distance INTO its glyph; the bridge is drawn behind
+  // the original outlines, concealing small seams without boolean-union edits.
+  const p0 = minus(sourceAnchor, mul(tangent0, spec.startOverlap ?? 0));
+  const p3 = add(targetAnchor, mul(tangent1, spec.endOverlap ?? 0));
+  const dist = Math.hypot(p3.x - p0.x, p3.y - p0.y);
+  if (dist > 20_000) return null;
   const handle = dist * spec.tension;
   const c1 = add(p0, mul(tangent0, handle));
   const c2 = minus(p3, mul(tangent1, handle));
   const bumpAmount = dist * spec.curvature;
   const easingBias = spec.widthEase ?? 0;
+  const nibAngle = (spec.nibAngle ?? 35) * Math.PI / 180;
+  // Older .logo projects without nibContrast keep exactly the old profile.
+  const nibContrast = spec.nibContrast ?? 0;
   const result: RibbonSample[] = [];
+  const nibScore = (tangent: { x: number; y: number }) => {
+    const theta = Math.atan2(tangent.y, tangent.x);
+    return 0.25 + 0.75 * Math.abs(Math.sin(theta - nibAngle));
+  };
+  const endpointNib0 = nibScore(tangent0);
+  const endpointNib1 = nibScore(tangent1);
 
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -146,7 +179,15 @@ export function sampleRibbon(
     const normal = { x: -derivative.y / length, y: derivative.x / length };
     const smooth = t * t * (3 - 2 * t);
     const adjusted = smooth + easingBias * smooth * (1 - smooth);
-    const width = spec.startWidth + (spec.endWidth - spec.startWidth) * adjusted;
+    const baseWidth = spec.startWidth + (spec.endWidth - spec.startWidth) * adjusted;
+    const orientation = nibScore(derivative);
+    const endpointBaseline = endpointNib0 * (1 - t) + endpointNib1 * t;
+    // The envelope vanishes at both caps to preserve the EXACT configured
+    // start/end widths for seam matching, whatever the nib angle.
+    const envelope = 4 * t * (1 - t);
+    const modulation = Math.max(0.25, Math.min(1.75,
+      1 + nibContrast * (orientation - endpointBaseline) * 1.6 * envelope));
+    const width = baseWidth * modulation;
     result.push({ t, center, normal, width });
   }
   return result;
