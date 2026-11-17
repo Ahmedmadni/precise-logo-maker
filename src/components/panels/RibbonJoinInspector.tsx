@@ -1,4 +1,5 @@
-import { Copy, Link2, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Copy, Link2, Merge, Trash2 } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { buildRibbonPath, DEFAULT_RIBBON, type RibbonLink } from "../../calligraphy/ribbonJoin";
 import { useStudio } from "../../store/studioStore";
@@ -20,6 +21,8 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const remove = useStudio((s) => s.deleteLettering);
   const duplicate = useStudio((s) => s.duplicateLettering);
   const choose = useStudio((s) => s.selectLettering);
+  const bake = useStudio((s) => s.bakeLetteringJoin);
+  const [bakeError, setBakeError] = useState("");
   if (!item.ribbon || item.kind !== "bridge") return null;
   const ribbon = preview?.id === item.id && preview.patch.ribbon
     ? preview.patch.ribbon : item.ribbon;
@@ -162,6 +165,26 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
             </label>
           ))}
         </div>
+      </details>
+      <details className="rounded-xl border border-border p-3">
+        <summary className="cursor-pointer text-xs font-semibold">إنشاء شكل فيكتور موحد (متقدم)</summary>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          يجمع الوصلة والحرفين بعملية Boolean Union فعلية في شكل واحد. تحتفظ
+          النسخة الجديدة بالفراغات الداخلية، ويمكنك العودة للأحرف الأصلية.
+          تُقرّب المنحنيات إلى مضلعات دقيقة، لذلك احتفظ بالأصول عند الحاجة لتحرير Bézier.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          يجب توحيد ألوان العناصر الثلاثة، وإزالة السُمك الإضافي من الحروف،
+          والتأكد أن الوصلة تتداخل فعلًا مع طرفي الحرفين.
+        </p>
+        <button type="button" disabled={!path} onClick={() => {
+          finish();
+          const result = bake(item.id);
+          setBakeError(result.ok ? "" : (result.reason ?? "تعذر دمج المسارات"));
+        }} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 text-xs font-semibold text-primary disabled:opacity-40">
+          <Merge className="h-4 w-4" /> إنشاء النسخة الموحّدة مع الاحتفاظ بالأصول
+        </button>
+        {bakeError && <p role="alert" className="mt-2 text-xs text-destructive">{bakeError}</p>}
       </details>
       <p className="text-[11px] leading-5 text-muted-foreground">
         يتم تطبيق تأثير عرض سن القلم على جسم الوصلة مع الحفاظ على السُمك المحدد عند طرفيها.
