@@ -141,6 +141,7 @@ export const letteringTransform = (item: LetteringItem): string => {
 };
 
 export const letteringSvg = (item: LetteringItem, allItems: LetteringItem[] = []): string => {
+  if (item.hidden) return "";
   if (item.kind === "bridge") {
     const path = safePath(buildRibbonPath(item, allItems) ?? undefined);
     return path ? `  <path d="${path}" fill="${safeColor(item.color)}" />` : "";
