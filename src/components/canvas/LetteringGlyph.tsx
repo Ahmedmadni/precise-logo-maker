@@ -10,6 +10,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
   overridePath?: string | null;
   allItems?: LetteringItem[];
 }) {
+  if (item.hidden) return null;
   const size = Math.max(1, Math.min(1000, item.size));
   const itemToDraw = offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y } : item;
   const transform = letteringTransform(itemToDraw);
@@ -34,7 +35,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
       {outline ? (
         <>
         <path d={outline} transform={`scale(${scale} ${-scale})`}
-          fill={item.color} stroke={item.color}
+          fill={item.color} fillRule={item.fillRule ?? "nonzero"} stroke={item.color}
           strokeWidth={Math.max(0, item.weight ?? 0) / scale}
           strokeLinejoin="round"
           style={selected ? { filter: "drop-shadow(0 0 1.8px var(--color-primary))" } : undefined} />

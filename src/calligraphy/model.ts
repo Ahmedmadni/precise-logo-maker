@@ -14,6 +14,14 @@ export type FontPreset = "Amiri" | "Aref Ruqaa" | "Scheherazade New" | "Gulzar" 
 export interface LetteringItem {
   id: string;
   kind: "text" | "haraka" | "outline" | "ornament" | "bridge";
+  /** Only false hides an item. Retained in .logo for non-destructive baking. */
+  hidden?: boolean;
+  /** Baked clipping geometry uses parity-aware compound contours. */
+  fillRule?: "evenodd" | "nonzero";
+  /** Original source IDs preserved for reversible outline baking. */
+  bakedSourceIds?: string[];
+  /** Tracks an attached haraka's original glyph while its owner is baked. */
+  bakedOriginalAttachment?: { glyphId: string; anchorMode: "auto" | "manual" };
   x: number;
   y: number;
   /** Pixel height (font size for an outline). */
@@ -135,6 +143,7 @@ export const letteringTransform = (item: LetteringItem): string => {
 };
 
 export const letteringSvg = (item: LetteringItem, allItems: LetteringItem[] = []): string => {
+  if (item.hidden) return "";
   if (item.kind === "bridge") {
     const path = safePath(buildRibbonPath(item, allItems) ?? undefined);
     return path ? `  <path d="${path}" fill="${safeColor(item.color)}" />` : "";
@@ -147,7 +156,7 @@ export const letteringSvg = (item: LetteringItem, allItems: LetteringItem[] = []
     if (!d) return "";
     const units = Number.isFinite(item.unitsPerEm) && (item.unitsPerEm ?? 0) > 0 ? item.unitsPerEm! : 1000;
     const s = size / units;
-    return `  <g ${attrs}><path d="${d}" transform="scale(${s} ${-s})" stroke="${safeColor(item.color)}" stroke-width="${outlineWidth ? outlineWidth / s : 0}" stroke-linejoin="round" /></g>`;
+    return `  <g ${attrs}><path d="${d}" transform="scale(${s} ${-s})" fill-rule="${item.fillRule === "evenodd" ? "evenodd" : "nonzero"}" stroke="${safeColor(item.color)}" stroke-width="${outlineWidth ? outlineWidth / s : 0}" stroke-linejoin="round" /></g>`;
   }
   if (item.kind === "haraka" || item.kind === "ornament") {
     const shape = item.kind === "haraka"

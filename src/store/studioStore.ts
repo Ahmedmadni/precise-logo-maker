@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
 import type { JoinGuideSelection } from "../calligraphy/joinAssistant";
 import { remapRibbons } from "../calligraphy/ribbonJoin";
+import { bakeRibbonAsOutline } from "../calligraphy/bakeUnion";
 import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
 import { toPx } from "../core/coordinates/units";
@@ -179,6 +180,10 @@ export interface StudioState {
   updateLettering: (id: string, patch: Partial<LetteringItem>) => void;
   moveLettering: (id: string, dx: number, dy: number) => void;
   deleteLettering: (id: string) => void;
+  /** Creates a separate flattened compound outline; the three source layers remain recoverable. */
+  bakeLetteringJoin: (id: string) => { ok: boolean; reason?: string };
+  setLetteringHidden: (id: string, hidden: boolean) => void;
+  toggleBakedVersion: (id: string) => void;
   setCustomThuluthFont: (fontDataUrl: string) => void;
   setCalligraphyGuides: (patch: Partial<CalligraphyGuideSettings>) => void;
   setLetteringBaselineOffset: (id: string, offset: number) => void;
@@ -475,6 +480,56 @@ export const useStudio = create<StudioState>()((set, get) => {
             item.ribbon?.targetGlyphId !== id)))),
       }));
       if (get().selectedLetteringId === id) set({ selectedLetteringId: null });
+    },
+    bakeLetteringJoin: (id) => {
+      get().commitLetteringPreview();
+      const result = bakeRibbonAsOutline(get().doc.lettering ?? [], id);
+      if (!result.ok) return { ok: false, reason: result.reason };
+      commit("Bake unified Arabic outline (sources retained)", (doc) => ({
+        ...doc, lettering: [
+          ...(doc.lettering ?? []).map((item) => {
+            if (result.sourceIds.includes(item.id)) return { ...item, hidden: true };
+            if (item.kind === "haraka" && item.attachedToGlyphId &&
+              result.sourceIds.slice(0, 2).includes(item.attachedToGlyphId)) {
+              return {
+                ...item, attachedToGlyphId: result.outline.id, anchorMode: "manual" as const,
+                bakedOriginalAttachment: {
+                  glyphId: item.attachedToGlyphId,
+                  anchorMode: item.anchorMode ?? "auto" as const,
+                },
+              };
+            }
+            return item;
+          }),
+          result.outline,
+        ],
+      }));
+      set({ selectedLetteringId: result.outline.id, tool: "select", workspaceSection: "edit" });
+      return { ok: true };
+    },
+    setLetteringHidden: (id, hidden) => commit(hidden ? "Hide lettering layer" : "Show lettering layer",
+      (doc) => ({ ...doc, lettering: (doc.lettering ?? []).map((item) =>
+        item.id === id ? { ...item, hidden } : item) })),
+    toggleBakedVersion: (id) => {
+      const baked = (get().doc.lettering ?? []).find((item) => item.id === id);
+      if (!baked?.bakedSourceIds?.length) return;
+      const showSources = !baked.hidden;
+      const relevant = new Set(baked.bakedSourceIds);
+      commit(showSources ? "Restore original Arabic curves" : "Show unified vector version",
+        (doc) => ({ ...doc, lettering: (doc.lettering ?? []).map((item) => {
+          if (item.id === baked.id) return { ...item, hidden: showSources };
+          if (relevant.has(item.id)) return { ...item, hidden: !showSources };
+          if (item.kind === "haraka" && item.bakedOriginalAttachment &&
+            relevant.has(item.bakedOriginalAttachment.glyphId)) {
+            const origin = item.bakedOriginalAttachment;
+            return {
+              ...item, attachedToGlyphId: showSources ? origin.glyphId : baked.id,
+              anchorMode: showSources ? origin.anchorMode : "manual" as const,
+            };
+          }
+          return item;
+        }) }));
+      set({ selectedLetteringId: showSources ? baked.bakedSourceIds[0] ?? null : id });
     },
     setCustomThuluthFont: (fontDataUrl) => commit("Import licensed Arabic font", (doc) => ({ ...doc, customThuluthFont: fontDataUrl })),
     setCalligraphyGuides: (patch) => commit("Update calligraphy guides", (doc) => ({
