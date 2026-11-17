@@ -42,8 +42,8 @@ export const buildSvgDocument = (
   // Place calligraphic joins behind glyph outlines so the joined endpoints
   // stay optically clean, independently of the layer insertion order.
   const orderedLettering = [
-    ...letteringItems.filter((item) => item.kind === "bridge"),
-    ...letteringItems.filter((item) => item.kind !== "bridge"),
+    ...letteringItems.filter((item) => item.kind === "bridge" && !item.hidden),
+    ...letteringItems.filter((item) => item.kind !== "bridge" && !item.hidden),
   ];
   const lettering = orderedLettering.map((item) => letteringSvg(item, letteringItems)).filter(Boolean).join("\n");
   const hasLiveCustomText = (doc.lettering ?? []).some((item) => item.kind === "text" && item.font === "Custom Thuluth");
