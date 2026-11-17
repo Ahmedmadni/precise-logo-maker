@@ -127,7 +127,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
           <button type="button"
             className="min-h-11 w-full rounded-lg border border-primary/40 bg-background px-3 text-xs font-semibold text-primary"
             onClick={() => toggleBakedVersion(selected.id)}>
-            استعادة الحروف والوصلة الأصلية
+            {selected.hidden ? "عرض النسخة الموحدة وإخفاء الأصول" : "استعادة الحروف والوصلة الأصلية"}
           </button>
         </div>
       ) : null}
