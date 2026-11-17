@@ -42,6 +42,14 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
       widthEase: DEFAULT_RIBBON.widthEase,
     } });
   };
+  const resetNib = () => {
+    finish();
+    update(item.id, { ribbon: {
+      ...ribbon, nibAngle: DEFAULT_RIBBON.nibAngle,
+      nibContrast: DEFAULT_RIBBON.nibContrast,
+      startOverlap: 0, endOverlap: 0,
+    } });
+  };
   return (
     <section className="space-y-4 rounded-xl border border-primary/40 bg-background p-3 text-sm" dir="rtl">
       <div>
@@ -111,6 +119,36 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
         </div>
       </details>
       <details className="rounded-xl border border-border p-3">
+        <summary className="cursor-pointer text-xs font-semibold">تأثير سن القلم وإخفاء فجوات الاتصال</summary>
+        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+          يحاكي تغير عرض الوصلة أثناء انحنائها حسب اتجاه سن القلم. ويمكن إدخال
+          طرف الوصلة قليلًا خلف الحروف لتقليل الفواصل الظاهرة. لا يدمج مسارات
+          الحروف هندسيًا ولا يحدد زاوية سن قلم الثلث تلقائيًا.
+        </p>
+        <div className="mt-3 space-y-4">
+          {([
+            ["nibAngle", "زاوية سن القلم", -180, 180, "°", 1],
+            ["nibContrast", "تأثير تفاوت عرض الضربة", 0, 80, "%", 100],
+            ["startOverlap", "تداخل البداية داخل الحرف", 0, 60, "px", 1],
+            ["endOverlap", "تداخل النهاية داخل الحرف", 0, 60, "px", 1],
+          ] as const).map(([key, label, min, max, unit, factor]) => {
+            const current = (ribbon[key] ?? (key === "nibAngle" ? 35 : 0)) * factor;
+            return <label key={key} className="block space-y-2">
+              <span className="flex items-center justify-between gap-2 text-xs">
+                <span>{label}</span>
+                <span dir="ltr" className="font-mono">{Math.round(current)}{unit}</span>
+              </span>
+              <input className="w-full accent-[var(--color-primary)]" type="range"
+                min={min} max={max} step={1} value={Math.round(current)}
+                onChange={(e) => change(key, Number(e.target.value) / factor)}
+                onPointerUp={finish} onPointerCancel={finish} onKeyUp={finish} onBlur={finish} />
+            </label>;
+          })}
+          <button type="button" className="min-h-11 w-full rounded-lg border border-border text-xs"
+            onClick={resetNib}>إعادة إعدادات القلم والتداخل</button>
+        </div>
+      </details>
+      <details className="rounded-xl border border-border p-3">
         <summary className="cursor-pointer text-xs font-semibold">إعدادات متقدمة للوصلة</summary>
         <div className="mt-3 space-y-2">
           {(["startWidth", "endWidth"] as const).map((key) => (
@@ -126,8 +164,8 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
         </div>
       </details>
       <p className="text-[11px] leading-5 text-muted-foreground">
-        الانحناء وحواف الشريط الآن أكثر نعومة، لكن الوصلة ما زالت مسارًا مستقلًا،
-        ولا تحقق اندماج مسارات الحروف الأصلية أو محاكاة سن القلم تلقائيًا. افحصها عند التكبير.
+        يتم تطبيق تأثير عرض سن القلم على جسم الوصلة مع الحفاظ على السُمك المحدد عند طرفيها.
+        التداخل البصري يخفي بعض الفواصل فقط؛ لا ينتج وصلًا هندسيًا تلقائيًا بين المسارات.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border text-xs"
