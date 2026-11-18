@@ -3,7 +3,7 @@ import { Buffer } from "buffer";
 import { Layers, LoaderCircle, RotateCcw, Sparkles, Type, WandSparkles } from "lucide-react";
 import {
   FONT_DESCRIPTIONS, HARAKAT, ORNAMENTS, createHaraka, createOrnament,
-  fontFamily, type FontPreset, type LetteringItem,
+  type FontPreset, type LetteringItem,
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
 import { letteringGroupBounds } from "../../calligraphy/morph";
@@ -191,7 +191,9 @@ export function LetteringPanel({ section, onCreated }: {
           <label className="block space-y-1">
             <span className="text-xs font-semibold">الخط المستخدم في تكوين الحروف</span>
             <select className={field} value={font} onChange={(e) => setFont(e.target.value as FontPreset)}>
-              {FONTS.map((value) => <option key={value} value={value}>{value} — {FONT_DESCRIPTIONS[value]}</option>)}
+              {FONTS.map((value) => <option key={value} value={value}>
+                {value === "Custom Thuluth" ? "خط عربي مستورد" : value} — {FONT_DESCRIPTIONS[value]}
+              </option>)}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-2">
