@@ -27,6 +27,22 @@ jobs:
         run: bunx tsc --noEmit
       - name: Build website
         run: bun run build
+      - name: Build standalone offline Android editor
+        run: bun run build:mobile
+      - name: Verify Android bundle contains offline editor and packaged fonts
+        run: |
+          test -s mobile-dist/index.html
+          test -d mobile-dist/assets
+          find mobile-dist/assets -type f \( -iname '*.woff' -o -iname '*.woff2' \) | grep -q .
+          grep -q 'assets/' mobile-dist/index.html
+          if grep -Eq 'server:.*https://|url:.*lovable.app' capacitor.config.ts; then
+            echo "Remote server URL is not permitted in offline Android config"
+            exit 1
+          fi
+          if grep -Eq 'https://precise-logo-maker\\.lovable\\.app' mobile-dist/index.html; then
+            echo "Android startup still depends on the hosted website"
+            exit 1
+          fi
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
