@@ -44,7 +44,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
           pointerEvents="stroke" aria-hidden="true" />
         </>
       ) : mark ? (
-        <path d={mark.path}
+        <path d={item.kind === "haraka" ? safePath(item.markPathData) || mark.path : mark.path}
           transform={`translate(${-size / 2} ${-size / 2}) scale(${size / 100})`}
           fill={item.color} fillRule="evenodd"
           stroke={selected ? "var(--color-primary)" : "none"}
