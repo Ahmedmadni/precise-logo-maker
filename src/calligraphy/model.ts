@@ -44,6 +44,8 @@ export interface LetteringItem {
   text?: string;
   font?: FontPreset;
   mark?: HarakaId;
+  /** Real vector diacritic contour from a licensed OpenType font, normalized to 100x100. */
+  markPathData?: string;
   ornament?: OrnamentId;
   /** Permanent outline produced from OpenType shaping; no live font needed. */
   pathData?: string;
@@ -163,7 +165,8 @@ export const letteringSvg = (item: LetteringItem, allItems: LetteringItem[] = []
       ? HARAKAT.find((m) => m.id === item.mark)
       : ORNAMENTS.find((m) => m.id === item.ornament);
     if (!shape) return "";
-    return `  <g ${attrs}><path d="${shape.path}" transform="translate(${-size / 2} ${-size / 2}) scale(${size / 100})" fill-rule="evenodd" /></g>`;
+    const path = item.kind === "haraka" ? safePath(item.markPathData) || shape.path : shape.path;
+    return `  <g ${attrs}><path d="${path}" transform="translate(${-size / 2} ${-size / 2}) scale(${size / 100})" fill-rule="evenodd" /></g>`;
   }
   const family = xmlEscape(fontFamily(item.font));
   return `  <g ${attrs}><text x="0" y="0" font-size="${size}" font-family="${family}" direction="rtl" unicode-bidi="plaintext" text-anchor="middle">${xmlEscape((item.text ?? "").slice(0, 300))}</text></g>`;

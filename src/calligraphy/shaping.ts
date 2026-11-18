@@ -12,7 +12,7 @@ const FONT_URLS: Partial<Record<FontPreset, () => Promise<string>>> = {
 };
 
 const rawFont = new Map<string, Promise<Uint8Array>>();
-async function getFont(font: FontPreset, custom?: string): Promise<Uint8Array> {
+export async function loadFontBytes(font: FontPreset, custom?: string): Promise<Uint8Array> {
   const loader = FONT_URLS[font];
   const source = font === "Custom Thuluth" ? custom : loader ? await loader() : undefined;
   if (!source) throw new Error("اختر أحد الخطوط المدمجة أو استورد خط ثلث مرخصا أولا.");
@@ -52,7 +52,7 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
   if (!Number.isFinite(options.size) || options.size < 10 || options.size > 600) {
     throw new Error("حجم الخط يجب أن يكون بين 10 و600.");
   }
-  const bytes = await getFont(options.font, options.customFontData);
+  const bytes = await loadFontBytes(options.font, options.customFontData);
   // Lazy-load the heavier font parser only when the user creates outlines.
   const fontkit = await import("fontkit");
   const font = fontkit.create(Buffer.from(bytes));
@@ -144,7 +144,7 @@ export async function listWordAlternates(
   customFontData?: string,
 ): Promise<OpenTypeAlternate[]> {
   if (!source.sourceText || !source.font || source.kind !== "outline" || !currentWord.length) return [];
-  const raw = await getFont(source.font, customFontData);
+  const raw = await loadFontBytes(source.font, customFontData);
   const kit = await import("fontkit");
   const font = kit.create(Buffer.from(raw));
   const tags = (font.availableFeatures ?? []).filter((tag) =>
