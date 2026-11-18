@@ -21,7 +21,7 @@ const previewBox = (glyphs: LetteringItem[]) => {
 };
 
 function GlyphPreview({ glyphs, label, highlightId }: {
-  glyphs: LetteringItem[]; label: string; highlightId?: string;
+  glyphs: LetteringItem[]; label: string; highlightId?: string | undefined;
 }) {
   return (
     <svg viewBox={previewBox(glyphs)} role="img" aria-label={label}
