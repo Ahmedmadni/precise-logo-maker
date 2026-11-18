@@ -97,8 +97,8 @@ export function findLocalGlyphAlternates(
     seen.add(shapeKey);
     const previewGlyphs = originalWord.map((item) =>
       item.id === selectedId
-        ? { ...item, pathData: replacement.pathData,
-          fontGlyphId: replacement.fontGlyphId,
+        ? { ...item, pathData: replacement.pathData!,
+          fontGlyphId: replacement.fontGlyphId!,
           alternateFeature: variant.featureTags.join("+") || undefined }
         : item);
     found.push({
