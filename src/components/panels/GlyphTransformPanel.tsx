@@ -5,6 +5,7 @@ import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
+import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
 import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 
@@ -317,7 +318,15 @@ export function GlyphTransformPanel({ selected, siblings }: {
       )}
 
       {isOutline && activeTab === "joins" && <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="joins" />}
-      {isOutline && activeTab === "alternates" && <AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} />}
+      {isOutline && activeTab === "alternates" && <>
+        <AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} />
+        <details className="rounded-xl border border-border bg-card p-3">
+          <summary className="cursor-pointer text-xs font-semibold">
+            مكتبتي الخاصة — حفظ المقاطع وإعادة استخدامها
+          </summary>
+          <div className="mt-3"><GlyphLibraryPanel /></div>
+        </details>
+      </>}
       {activeTab === "basic" && <details className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">إدارة العنصر: نسخ، ترتيب، حذف</summary>
         <div className="mt-3 grid grid-cols-3 gap-2">
