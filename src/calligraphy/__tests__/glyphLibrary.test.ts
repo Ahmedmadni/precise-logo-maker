@@ -69,8 +69,9 @@ describe("personal Arabic calligraphy glyph library", () => {
   it("blocks invalid embedded libraries in external .logo files, while allowing old projects without a library", () => {
     const source = makeGlyphLibraryEntry(glyph(), "شكل")!;
     const base = emptyDoc([glyph()]);
-    expect(parseProject(serializeProject({ ...base, glyphLibrary: undefined } as DocumentState)))
-      .not.toBeNull();
+    const legacy: DocumentState = { ...base };
+    delete legacy.glyphLibrary;
+    expect(parseProject(serializeProject(legacy))).not.toBeNull();
     const malformed = JSON.parse(serializeProject({ ...base, glyphLibrary: [source] })) as {
       document: { glyphLibrary: unknown };
     };
