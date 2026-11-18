@@ -1,4 +1,5 @@
 import type { DocumentState } from "../store/studioStore";
+import { combineGlyphLibrary } from "../calligraphy/glyphLibrary";
 
 export const PROJECT_FORMAT = "logo-grid-studio";
 export const PROJECT_VERSION = 2; // v1 projects remain readable
@@ -30,6 +31,12 @@ export const parseProject = (raw: string): DocumentState | null => {
     if (data.format !== PROJECT_FORMAT || !data.version || data.version > PROJECT_VERSION) return null;
     const doc = data.document;
     if (!doc || !doc.artboard || !Array.isArray(doc.objects) || !Array.isArray(doc.grids)) {
+      return null;
+    }
+    // Treat a .logo file as untrusted too. A malformed bundled library
+    // could otherwise enter the editor without the explicit JSON importer.
+    if (doc.glyphLibrary !== undefined &&
+      (!Array.isArray(doc.glyphLibrary) || !combineGlyphLibrary([], doc.glyphLibrary))) {
       return null;
     }
     return doc as DocumentState;
