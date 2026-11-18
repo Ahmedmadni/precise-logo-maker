@@ -4,12 +4,12 @@ import {
   ImagePlus, Languages, Maximize2, Redo2, RotateCcw, Save, Settings2,
   Undo2, X,
 } from "lucide-react";
-import { downloadSvg, downloadPng } from "../../objects/export";
-import { downloadProject, readProjectFile } from "../../objects/project";
-import { readReferenceImage } from "../../objects/reference";
-import { fitBounds } from "../../core/coordinates/view";
-import { artboardWorldBounds, useStudio } from "../../store/studioStore";
-import { useLangStore } from "../../i18n";
+import { downloadSvg, downloadPng } from "../objects/export";
+import { downloadProject, readProjectFile } from "../objects/project";
+import { readReferenceImage } from "../objects/reference";
+import { fitBounds } from "../core/coordinates/view";
+import { artboardWorldBounds, useStudio } from "../store/studioStore";
+import { useLangStore } from "../i18n";
 
 
 type Menu = "file" | "view" | "export" | null;
