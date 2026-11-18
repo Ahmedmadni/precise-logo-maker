@@ -7,6 +7,7 @@ import {
 import { outlineNodes } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 
+const EMPTY_ENTRIES: GlyphLibraryEntry[] = [];
 const button = "flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-semibold hover:bg-accent disabled:opacity-40";
 const field = "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm";
 
@@ -34,7 +35,8 @@ function GlyphThumbnail({ entry }: { entry: GlyphLibraryEntry }) {
  * Export/import lets users transfer their own licensed glyph contours between
  * separate design documents and devices. */
 export function GlyphLibraryPanel() {
-  const entries = useStudio((s) => s.doc.glyphLibrary ?? []);
+  const currentEntries = useStudio((s) => s.doc.glyphLibrary);
+  const entries = currentEntries ?? EMPTY_ENTRIES;
   const selectedId = useStudio((s) => s.selectedLetteringId);
   const selected = useStudio((s) => (s.doc.lettering ?? []).find((g) => g.id === s.selectedLetteringId));
   const add = useStudio((s) => s.saveGlyphVariant);
