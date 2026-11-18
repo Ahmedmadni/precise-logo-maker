@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Buffer } from "buffer";
 import { Layers, LoaderCircle, RotateCcw, Sparkles, Type, WandSparkles } from "lucide-react";
 import {
@@ -6,6 +6,8 @@ import {
   fontFamily, type FontPreset, type LetteringItem,
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
+import { letteringGroupBounds } from "../../calligraphy/morph";
+import { LetteringGlyph } from "../canvas/LetteringGlyph";
 import { useStudio } from "../../store/studioStore";
 import { placeAttachedHaraka } from "../../calligraphy/harakaAnchoring";
 /* Letter controls are deliberately located in the separate Edit workspace. */
@@ -43,9 +45,41 @@ export function LetteringPanel({ section, onCreated }: {
   const [fontSize, setFontSize] = useState(180);
   const [ink, setInk] = useState("#d1a95e");
   const [busy, setBusy] = useState(false);
+  const [previewGlyphs, setPreviewGlyphs] = useState<LetteringItem[]>([]);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [error, setError] = useState("");
   const [editRun, setEditRun] = useState<string | null>(null);
   const fontInput = useRef<HTMLInputElement>(null);
+
+  const previewBounds = useMemo(() => letteringGroupBounds(previewGlyphs), [previewGlyphs]);
+  useEffect(() => {
+    if (mode !== "words") return;
+    let cancelled = false;
+    if (!phrase.trim()) {
+      setPreviewGlyphs([]);
+      setPreviewError("");
+      setPreviewBusy(false);
+      return;
+    }
+    setPreviewBusy(true);
+    setPreviewError("");
+    const delay = setTimeout(() => {
+      void composeArabicOutlines({
+        phrase, font, size: fontSize, color: ink,
+        x: 0, y: 0, customFontData: doc.customThuluthFont,
+      }).then((glyphs) => {
+        if (!cancelled) { setPreviewGlyphs(glyphs); setPreviewBusy(false); }
+      }).catch((reason: unknown) => {
+        if (!cancelled) {
+          setPreviewGlyphs([]);
+          setPreviewBusy(false);
+          setPreviewError(reason instanceof Error ? reason.message : "تعذرت معاينة الخط.");
+        }
+      });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(delay); };
+  }, [mode, phrase, font, fontSize, ink, doc.customThuluthFont]);
 
   const items = doc.lettering ?? [];
   const selected = items.find((entry) => entry.id === selectedId);
@@ -155,7 +189,7 @@ export function LetteringPanel({ section, onCreated }: {
               onChange={(e) => setPhrase(e.target.value)} placeholder="اكتب الكلمة أو العبارة العربية هنا" />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold">الخط الأصلي</span>
+            <span className="text-xs font-semibold">الخط المستخدم في تكوين الحروف</span>
             <select className={field} value={font} onChange={(e) => setFont(e.target.value as FontPreset)}>
               {FONTS.map((value) => <option key={value} value={value}>{value} — {FONT_DESCRIPTIONS[value]}</option>)}
             </select>
@@ -170,10 +204,24 @@ export function LetteringPanel({ section, onCreated }: {
                 value={ink} onChange={(e) => setInk(e.target.value)} />
             </label>
           </div>
-          <div className="flex min-h-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-background px-2 text-center"
-            dir="rtl" style={{ fontFamily: fontFamily(font), fontSize: "36px", color: ink }}>
-            {phrase || "معاينة الخط"}
+          <div className="flex min-h-36 items-center justify-center overflow-hidden rounded-xl border border-border bg-background p-3 text-center">
+            {previewBusy ? <span className="text-xs text-muted-foreground">جار تشكيل مسارات الخط الفعلية...</span>
+              : previewError ? <span role="alert" className="text-xs leading-6 text-destructive">{previewError}</span>
+              : previewBounds && previewGlyphs.length ? (
+                <svg role="img" aria-label="معاينة مسارات الحروف الفعلية التي ستضاف للتصميم"
+                  viewBox={`${previewBounds.x - 15} ${previewBounds.y - 15} ${Math.max(60, previewBounds.width + 30)} ${Math.max(60, previewBounds.height + 30)}`}
+                  preserveAspectRatio="xMidYMid meet" className="h-36 w-full">
+                  {previewGlyphs.map((glyph) => (
+                    <LetteringGlyph item={glyph} selected={false} key={glyph.id} />
+                  ))}
+                </svg>
+              ) : <span className="text-xs text-muted-foreground">أدخل كلمة لمعاينة مساراتها.</span>}
           </div>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            المعاينة الآن من مسارات الخط التي ستضاف فعليًا، لا من خط CSS بديل.
+            الخطوط المدمجة الحالية ليست مكتبة ثلث خطاطية متخصصة.
+            للحصول على أسلوب ثلث مميز يجب استخدام ملف خط احترافي مرخّص يدعم بدائل الحروف.
+          </p>
           <button type="button" disabled={busy || !phrase.trim()} onClick={() => void compose()}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 font-semibold text-primary-foreground disabled:opacity-50">
             {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <WandSparkles className="h-5 w-5" />}
@@ -186,7 +234,11 @@ export function LetteringPanel({ section, onCreated }: {
           }} />
           <details className="rounded-xl border border-border p-3">
             <summary className="cursor-pointer text-xs font-semibold">خط خاص أو إعدادات متقدمة</summary>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">يمكنك تحميل خط عربي مرخص من جهازك. لتعديل تفاصيل الحروف لاحقًا استخدم تبويب «تعديل».</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              استورد خطًا عربيًا مرخصًا بصيغة TTF أو OTF أو WOFF.
+              الاستيراد لا يحول أي خط تلقائيًا إلى خط ثلث، ولا ينشئ بدائل خطاطية غير موجودة داخل الملف.
+              لتعديل تفاصيل الحروف لاحقًا استخدم «تعديل».
+            </p>
             <button className={button + " mt-3 w-full"} type="button" onClick={() => fontInput.current?.click()}>
               استيراد ملف خط (TTF / OTF / WOFF)
             </button>
