@@ -66,6 +66,22 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(parseGlyphLibrary("x".repeat(2_000_001))).toBeNull();
   });
 
+  it("blocks invalid embedded libraries in external .logo files, while allowing old projects without a library", () => {
+    const source = makeGlyphLibraryEntry(glyph(), "شكل")!;
+    const base = emptyDoc([glyph()]);
+    expect(parseProject(serializeProject({ ...base, glyphLibrary: undefined } as DocumentState)))
+      .not.toBeNull();
+    const malformed = JSON.parse(serializeProject({ ...base, glyphLibrary: [source] })) as {
+      document: { glyphLibrary: unknown };
+    };
+    malformed.document.glyphLibrary = [{
+      ...source, pathData: "M0 0 L200 0 Z <script>alert(1)</script>",
+    }];
+    expect(parseProject(JSON.stringify(malformed))).toBeNull();
+    malformed.document.glyphLibrary = "not-an-array";
+    expect(parseProject(JSON.stringify(malformed))).toBeNull();
+  });
+
   it("safely deduplicates imported entries, and handles an ID collision across projects", () => {
     const first = makeGlyphLibraryEntry(glyph(), "الأول")!;
     const second = makeGlyphLibraryEntry(glyph(), "النسخة")!;
