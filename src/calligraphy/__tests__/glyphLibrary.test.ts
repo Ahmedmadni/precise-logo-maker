@@ -54,6 +54,29 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(exported).not.toContain(saved.name);
   });
 
+  it("preserves evenodd counters, entry/exit anchors and named outline contours", () => {
+    const custom = { ...glyph(),
+      fillRule: "evenodd" as const,
+      joinAnchors: { entry: { x: 5, y: 20 }, exit: { x: 215, y: 20 } },
+      contourRoles: { "0": "head" as const, "1": "counter" as const },
+    };
+    const entry = makeGlyphLibraryEntry(custom, "وصلات الثلث")!;
+    expect(entry.fillRule).toBe("evenodd");
+    expect(entry.joinAnchors?.entry).toEqual({ x: 5, y: 20 });
+    expect(entry.contourRoles?.["1"]).toBe("counter");
+    const loaded = parseGlyphLibrary(serializeGlyphLibrary([entry])!)![0]!;
+    const independent = makeStandaloneLibraryGlyph(loaded, 200, 120)!;
+    expect(independent.fillRule).toBe("evenodd");
+    expect(independent.joinAnchors?.exit).toEqual({ x: 215, y: 20 });
+    expect(independent.contourRoles?.["0"]).toBe("head");
+    expect(validateGlyphLibraryEntry({
+      ...entry, joinAnchors: { entry: { x: Infinity, y: 0 } },
+    })).toBe(false);
+    expect(validateGlyphLibraryEntry({
+      ...entry, contourRoles: { "0": "script" },
+    })).toBe(false);
+  });
+
   it("rejects foreign files, script tags, SVG arc commands and invalid outlines", () => {
     const good = makeGlyphLibraryEntry(glyph(), "سليم")!;
     expect(parseGlyphLibrary('{"format":"fake","version":1,"entries":[]}')).toBeNull();
