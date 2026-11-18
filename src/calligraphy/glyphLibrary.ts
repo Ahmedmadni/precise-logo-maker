@@ -2,6 +2,16 @@ import type { LetteringItem } from "./model";
 import { safePath } from "./model";
 import { parseOutline } from "./pathEditor";
 
+export interface GlyphLibraryAppearance {
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  skewX: number;
+  skewY: number;
+  weight: number;
+  color: string;
+}
+
 export interface GlyphLibraryEntry {
   id: string;
   name: string;
@@ -12,6 +22,9 @@ export interface GlyphLibraryEntry {
   sourceFont?: string;
   savedSize: number;
   createdAt: string;
+  /** Preserve optical adjustments for standalone reuse, never impose them
+   * on an existing glyph position in a connected Arabic word. */
+  appearance?: GlyphLibraryAppearance;
 }
 
 export const GLYPH_LIBRARY_FORMAT = "logo-studio-calligraphy-library";
@@ -20,6 +33,18 @@ export const GLYPH_LIBRARY_LIMIT = 80;
 const MAX_PATH_BYTES = 150_000;
 const MAX_LIBRARY_BYTES = 1_800_000;
 const MAX_IMPORTED_BYTES = 2_000_000;
+
+const validAppearance = (value: unknown): value is GlyphLibraryAppearance => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const a = value as Partial<GlyphLibraryAppearance>;
+  return typeof a.rotation === "number" && Math.abs(a.rotation) <= 360 &&
+    typeof a.scaleX === "number" && Math.abs(a.scaleX) <= 20 &&
+    typeof a.scaleY === "number" && Math.abs(a.scaleY) <= 20 &&
+    typeof a.skewX === "number" && Math.abs(a.skewX) <= 60 &&
+    typeof a.skewY === "number" && Math.abs(a.skewY) <= 60 &&
+    typeof a.weight === "number" && a.weight >= 0 && a.weight <= 20 &&
+    typeof a.color === "string" && /^#[0-9a-fA-F]{6}$/.test(a.color);
+};
 
 function isValidOutlinePath(path: unknown): path is string {
   if (typeof path !== "string" || path.length < 10 ||
@@ -42,7 +67,8 @@ export function validateGlyphLibraryEntry(value: unknown): value is GlyphLibrary
     (e.sourceText === undefined || (typeof e.sourceText === "string" && e.sourceText.length <= 120)) &&
     (e.sourceFont === undefined || (typeof e.sourceFont === "string" && e.sourceFont.length <= 90)) &&
     (e.glyphIndex === undefined || (Number.isInteger(e.glyphIndex) &&
-      e.glyphIndex >= 0 && e.glyphIndex < 500));
+      e.glyphIndex >= 0 && e.glyphIndex < 500)) &&
+    (e.appearance === undefined || validAppearance(e.appearance));
 }
 
 export function makeGlyphLibraryEntry(item: LetteringItem, name: string): GlyphLibraryEntry | null {
@@ -57,6 +83,15 @@ export function makeGlyphLibraryEntry(item: LetteringItem, name: string): GlyphL
     unitsPerEm: item.unitsPerEm!,
     savedSize: item.size,
     createdAt: new Date().toISOString(),
+    appearance: {
+      rotation: item.rotation,
+      scaleX: item.scaleX ?? 1,
+      scaleY: item.scaleY ?? 1,
+      skewX: item.skewX ?? 0,
+      skewY: item.skewY ?? 0,
+      weight: item.weight ?? 0,
+      color: item.color,
+    },
     ...(item.sourceText ? { sourceText: item.sourceText.slice(0, 120) } : {}),
     ...(item.font ? { sourceFont: item.font } : {}),
     ...(item.glyphIndex !== undefined ? { glyphIndex: item.glyphIndex } : {}),
@@ -101,6 +136,8 @@ export function canReplaceWithLibraryEntry(
   return !!selected && selected.kind === "outline" && !selected.hidden &&
     !!selected.sourceText && selected.sourceText === entry.sourceText &&
     selected.glyphIndex !== undefined && selected.glyphIndex === entry.glyphIndex &&
+    selected.unitsPerEm === entry.unitsPerEm &&
+    (entry.sourceFont === undefined || selected.font === entry.sourceFont) &&
     !!selected.groupId;
 }
 
@@ -114,7 +151,13 @@ export function makeStandaloneLibraryGlyph(
   return {
     id: `custom-glyph-${crypto.randomUUID()}`,
     kind: "outline",
-    x, y, size, color, rotation: 0,
+    x, y, size, color: entry.appearance?.color ?? color,
+    rotation: entry.appearance?.rotation ?? 0,
+    scaleX: entry.appearance?.scaleX ?? 1,
+    scaleY: entry.appearance?.scaleY ?? 1,
+    skewX: entry.appearance?.skewX ?? 0,
+    skewY: entry.appearance?.skewY ?? 0,
+    weight: entry.appearance?.weight ?? 0,
     pathData: entry.pathData, unitsPerEm: entry.unitsPerEm,
     sourceText: entry.sourceText ?? entry.name,
     alternateFeature: "user-library",
