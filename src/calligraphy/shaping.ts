@@ -71,9 +71,9 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
   if (!words.length || words.length > 30) throw new Error("اكتب عبارة من كلمة واحدة إلى 30 كلمة.");
   const units = font.unitsPerEm || 1000;
   const s = options.size / units;
+  const features = options.alternateFeatures?.length
+    ? options.alternateFeatures : options.alternateFeature ? [options.alternateFeature] : undefined;
   const runs = words.map((word) => {
-    const features = options.alternateFeatures?.length
-      ? options.alternateFeatures : options.alternateFeature ? [options.alternateFeature] : undefined;
     const run = font.layout(word, features, "arab", "ARA", "rtl");
     if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
       throw new Error("تعذر تشكيل الكلمة بهذا الخط: " + word);
