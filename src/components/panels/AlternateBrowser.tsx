@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { listWordAlternates, type OpenTypeAlternate } from "../../calligraphy/shaping";
+import { findLocalGlyphAlternates } from "../../calligraphy/localGlyphAlternates";
 import { useStudio } from "../../store/studioStore";
 import { LetteringGlyph } from "../canvas/LetteringGlyph";
 
@@ -19,12 +20,14 @@ const previewBox = (glyphs: LetteringItem[]) => {
     : "0 0 400 200";
 };
 
-function GlyphPreview({ glyphs, label }: { glyphs: LetteringItem[]; label: string }) {
+function GlyphPreview({ glyphs, label, highlightId }: {
+  glyphs: LetteringItem[]; label: string; highlightId?: string | undefined;
+}) {
   return (
     <svg viewBox={previewBox(glyphs)} role="img" aria-label={label}
       className="h-24 w-full overflow-visible">
       {glyphs.filter((g) => !g.hidden).map((g) =>
-        <LetteringGlyph key={g.id} item={g} selected={false} />)}
+        <LetteringGlyph key={g.id} item={g} selected={g.id === highlightId} />)}
     </svg>
   );
 }
@@ -39,12 +42,14 @@ export function AlternateBrowser({ glyph, siblings }: {
   siblings: LetteringItem[];
 }) {
   const replaceGroup = useStudio((s) => s.replaceLetteringGroup);
+  const updateGlyph = useStudio((s) => s.updateLettering);
   const customFontData = useStudio((s) => s.doc.customThuluthFont);
   const [choices, setChoices] = useState<OpenTypeAlternate[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loadedFor, setLoadedFor] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [editScope, setEditScope] = useState<"word" | "segment">("word");
   const [candidateTag, setCandidateTag] = useState<string | null>(null);
   const key = [glyph.groupId, glyph.sourceText, glyph.font, glyph.size,
     glyph.rotation, glyph.color, customFontData?.length ?? 0,
@@ -57,7 +62,10 @@ export function AlternateBrowser({ glyph, siblings }: {
   const available = (visible ?? []).filter((v) =>
     v.kind !== "default" || currentUsesAlternate);
   const listed = filter === "all" ? available : available.filter((v) => v.kind === filter);
-  const candidate = available.find((v) => v.tag === candidateTag);
+  const candidate = editScope === "word" ? available.find((v) => v.tag === candidateTag) : undefined;
+  const localChoices = findLocalGlyphAlternates(glyph.id, current, visible ?? []);
+  const localCandidate = editScope === "segment" ?
+    localChoices.find((v) => v.tag === candidateTag) : undefined;
 
   const load = async () => {
     setError("");
@@ -86,20 +94,73 @@ export function AlternateBrowser({ glyph, siblings }: {
       </div>
       <div className="rounded-xl border border-border bg-background p-2">
         <p className="mb-2 text-xs font-semibold">الكلمة الحالية — {glyph.sourceText}</p>
-        <GlyphPreview glyphs={current} label="الشكل الحالي للكلمة قبل تطبيق أي بديل" />
+        <GlyphPreview glyphs={current} label="الشكل الحالي للكلمة قبل تطبيق أي بديل"
+          highlightId={editScope === "segment" ? glyph.id : undefined} />
       </div>
       <button type="button" onClick={() => void load()} disabled={busy}
         className="min-h-12 w-full rounded-lg border border-primary/50 bg-primary/10 px-3 text-xs font-semibold text-foreground disabled:opacity-50">
         {busy ? "جار فحص ميزات وتراكيب الخط..." : "استعراض التكوينات المدعومة"}
       </button>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      {visible && available.length === 0 && (
+      {visible && <div className="grid grid-cols-2 gap-2" aria-label="نطاق تعديل بدائل الخط">
+        <button type="button" aria-pressed={editScope === "word"}
+          onClick={() => { setEditScope("word"); setCandidateTag(null); }}
+          className={`min-h-12 rounded-lg border px-2 text-xs font-semibold
+            ${editScope === "word" ? "border-primary bg-primary/15 text-primary" :
+            "border-border bg-background"}`}>
+          الكلمة كاملة
+        </button>
+        <button type="button" aria-pressed={editScope === "segment"}
+          onClick={() => { setEditScope("segment"); setCandidateTag(null); }}
+          className={`min-h-12 rounded-lg border px-2 text-xs font-semibold
+            ${editScope === "segment" ? "border-primary bg-primary/15 text-primary" :
+            "border-border bg-background"}`}>
+          الجزء المحدد
+        </button>
+      </div>}
+      {visible && editScope === "segment" && <div className="space-y-3">
+        <p className="text-xs leading-5 text-muted-foreground">
+          الجزء المختار: <strong dir="ltr">#{glyph.glyphIndex !== undefined ? glyph.glyphIndex + 1 : "?"}</strong>.
+          هذا رقم الشكل الناتج من تشكيل OpenType، وقد يمثل حرفًا أو حركة أو تركيبًا،
+          وليس بالضرورة حرفًا واحدًا من النص.
+          يعرض المحرر فقط البدائل التي لا تغير مواضع الأجزاء المجاورة أو أشكالها.
+        </p>
+        {localChoices.length === 0 ? <div className="rounded-lg border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+          لا يوجد بديل موضعي آمن لهذا الجزء في الخط المختار. قد تتطلب البدائل الأخرى
+          إعادة تشكيل الكلمة كاملة للحفاظ على الوصلات؛ جرّب «الكلمة كاملة»
+          أو استخدم تحرير المنحنيات يدويًا.
+        </div> : <>
+          <p aria-live="polite" className="text-xs text-muted-foreground">
+            {localChoices.length} بديل موضعي مستخرج من OpenType
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {localChoices.map((choice) => (
+              <button type="button" key={choice.tag}
+                aria-pressed={candidateTag === choice.tag}
+                onClick={() => setCandidateTag(choice.tag)}
+                className={`flex min-h-40 flex-col justify-between gap-2 rounded-xl border bg-background p-2
+                  text-xs focus-visible:outline-2 focus-visible:outline-primary
+                  ${candidateTag === choice.tag ? "border-primary bg-primary/10" :
+                  "border-border hover:border-primary/50"}`}>
+                <GlyphPreview glyphs={choice.previewGlyphs}
+                  label={`معاينة البديل الموضعي: ${choice.label}`}
+                  highlightId={glyph.id} />
+                <span className="font-semibold">{choice.label}</span>
+                <span dir="ltr" className="text-[10px] text-muted-foreground">
+                  {choice.featureTags.join(" + ") || "default"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>}
+      </div>}
+      {visible && editScope === "word" && available.length === 0 && (
         <p className="rounded-lg border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
           لم نجد لهذه الكلمة بدائل تُغيّر شكلها فعليًا في الخط المحدد.
           يمكنك تحرير المنحنيات والإطالات يدويًا، أو استخدام خط مرخص يحتوي على بدائل OpenType.
         </p>
       )}
-      {visible && available.length > 0 && <>
+      {visible && editScope === "word" && available.length > 0 && <>
         <p aria-live="polite" className="text-xs text-muted-foreground">
           {available.length} تكوين مختلف فعليًا لهذه الكلمة
         </p>
@@ -134,6 +195,45 @@ export function AlternateBrowser({ glyph, siblings }: {
           ))}
         </div>
       </>}
+      {localCandidate && <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
+        <h5 className="text-xs font-semibold">مقارنة الجزء المحدد قبل الاعتماد</h5>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="min-w-0 rounded-lg bg-background p-2 text-center">
+            <p className="mb-2 text-[11px]">الكلمة الحالية</p>
+            <GlyphPreview glyphs={current} label="المسارات الأصلية قبل تعديل الجزء المحدد"
+              highlightId={glyph.id} />
+          </div>
+          <div className="min-w-0 rounded-lg bg-background p-2 text-center">
+            <p className="mb-2 text-[11px]">تغيير الجزء فقط</p>
+            <GlyphPreview glyphs={localCandidate.previewGlyphs}
+              label="المعاينة مع استبدال الجزء المحدد دون تبديل بقية الكلمة"
+              highlightId={glyph.id} />
+          </div>
+        </div>
+        <p className="text-[11px] leading-5 text-muted-foreground">
+          يُحفظ موقع الجزء المختار وهويته وحركاته المرتبطة كما هي، ولا تُستبدل
+          مسارات الأجزاء المجاورة. قد يتطلب الاتصال النهائي ضبطًا يدويًا
+          عند التكبير؛ تطبيق البديل لا يضمن اندماج المنحنيات تلقائيًا.
+          يمكنك التراجع عن التغيير من سجل التعديلات.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setCandidateTag(null)}
+            className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs font-semibold">
+            إلغاء
+          </button>
+          <button type="button" onClick={() => {
+            updateGlyph(glyph.id, {
+              pathData: localCandidate.pathData,
+              fontGlyphId: localCandidate.fontGlyphId,
+              alternateFeature: localCandidate.featureTags.join("+") || undefined,
+            });
+            setCandidateTag(null);
+            setChoices(null);
+          }} className="min-h-11 rounded-lg bg-primary px-2 text-xs font-semibold text-primary-foreground">
+            اعتماد بديل الجزء
+          </button>
+        </div>
+      </div>}
       {candidate && <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3">
         <h5 className="text-xs font-semibold">مقارنة التكوين قبل اعتماده</h5>
         <div className="grid grid-cols-2 gap-2">
