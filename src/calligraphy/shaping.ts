@@ -149,7 +149,7 @@ export function buildOpenTypeFeatureChoices(tags: string[]): FeatureChoice[] {
   const supported = [...new Set(tags)].filter((tag) =>
     /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag)).slice(0, 18);
   const choices: FeatureChoice[] = [{
-    tag: "default", label: "التشكيل الأساسي", featureTags: [], kind: "default",
+    tag: "default", label: "الشكل الافتراضي للخط", featureTags: [], kind: "default",
   }];
   for (const tag of supported) choices.push({
     tag, label: alternateLabel(tag), featureTags: [tag], kind: "single",
