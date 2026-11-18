@@ -82,7 +82,7 @@ describe("authentic OpenType word variant combinations", () => {
 
   it("shapes a word using a set of real supported features rather than splitting letters", () => {
     const permitted = (font.availableFeatures ?? []).filter((tag) =>
-      /^(?:aalt|salt|swsh|cswh|ss\\d\\d|cv\\d\\d)$/.test(tag));
+      /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag));
     if (!permitted.length) return;
     const single = shapeArabicWithFont(font, {
       ...opts, alternateFeatures: [permitted[0]!],
