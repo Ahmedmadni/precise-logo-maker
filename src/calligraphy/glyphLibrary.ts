@@ -69,7 +69,9 @@ export function makeGlyphLibraryEntry(item: LetteringItem, name: string): GlyphL
 export function combineGlyphLibrary(
   existing: GlyphLibraryEntry[], incoming: GlyphLibraryEntry[],
 ): GlyphLibraryEntry[] | null {
+  if (existing.length > GLYPH_LIBRARY_LIMIT || incoming.length > GLYPH_LIBRARY_LIMIT) return null;
   const result = [...existing];
+  const usedIds = new Set(existing.map((item) => item.id));
   const key = (item: GlyphLibraryEntry) =>
     [item.pathData, item.unitsPerEm, item.sourceText ?? "", item.glyphIndex ?? ""].join("|");
   const seen = new Set(result.map(key));
@@ -78,7 +80,11 @@ export function combineGlyphLibrary(
     if (!validateGlyphLibraryEntry(entry)) return null;
     if (seen.has(key(entry))) continue;
     if (result.length >= GLYPH_LIBRARY_LIMIT) return null;
-    result.push(entry);
+    const finalEntry = usedIds.has(entry.id) ? {
+      ...entry, id: `saved-glyph-${crypto.randomUUID()}`,
+    } : entry;
+    result.push(finalEntry);
+    usedIds.add(finalEntry.id);
     seen.add(key(entry));
   }
   const serializedLength = JSON.stringify(result).length;
