@@ -24,6 +24,7 @@ import { buildGridGeometry } from "../../grids";
 import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../grids/cells";
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
+import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
 import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
@@ -83,6 +84,7 @@ export function StudioCanvas() {
   const selection = useStudio((s) => s.selection);
   const paint = useStudio((s) => s.paint);
   const trace = useStudio((s) => s.trace);
+  const brush = useStudio((s) => s.brush);
   const paintCells = useStudio((s) => s.paintCells);
   const showGrids = useStudio((s) => s.showGrids);
   const guideLayer = useStudio((s) => s.guideLayer);
@@ -115,6 +117,8 @@ export function StudioCanvas() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
   const penActiveRef = useRef(false);
+  const [brushTrail, setBrushTrail] = useState<BrushSample[]>([]);
+  const brushTrailRef = useRef<BrushSample[] | null>(null);
   const [cellChain, setCellChain] = useState<Point[]>([]);
   const [hoverCell, setHoverCell] = useState<GridCell | null>(null);
   const [paintPreview, setPaintPreview] = useState<GridCell[]>([]);
@@ -388,6 +392,8 @@ export function StudioCanvas() {
     setHandleDrag(null);
     penActiveRef.current = false;
     setPen(null);
+    brushTrailRef.current = null;
+    setBrushTrail([]);
     paintStrokeRef.current = null;
     setPaintPreview([]);
     setSnap(null);
@@ -441,6 +447,14 @@ export function StudioCanvas() {
     if (e.button !== 0) return;
 
     const world = toWorld(e.clientX, e.clientY);
+
+    // A real pressure-sensitive, closed SVG brush stroke (not the grid-cell brush).
+    if (tool === "brush") {
+      const first: BrushSample = { ...world, pressure: brushPressure(e.pressure, e.pointerType) };
+      brushTrailRef.current = [first];
+      setBrushTrail([first]);
+      return;
+    }
 
     // Cell brush: press and drag to fill every cell the cursor crosses.
     if (tool === "cell") {
@@ -699,6 +713,23 @@ export function StudioCanvas() {
       return;
     }
 
+    if (brushTrailRef.current) {
+      const samples = e.nativeEvent.getCoalescedEvents?.() ?? [];
+      const events = samples.length ? samples : [e.nativeEvent];
+      const trail = [...brushTrailRef.current];
+      for (const event of events) {
+        const position = toWorld(event.clientX, event.clientY);
+        const pressure = brushPressure(event.pressure, e.pointerType);
+        const last = trail.at(-1);
+        if (last && dist(last, position) * view.zoom < 1.3) continue;
+        if (trail.length >= 2800) break;
+        trail.push({ ...position, pressure });
+      }
+      brushTrailRef.current = trail;
+      setBrushTrail(trail);
+      return;
+    }
+
     // The cell brush works off raw grid arithmetic — no snapping pass needed.
     if (tool === "cell") {
       setSnap(null);
@@ -825,6 +856,18 @@ export function StudioCanvas() {
       if (cells.length > 0) paintCells(cells, paintEraseRef.current);
       return;
     }
+    if (brushTrailRef.current) {
+      const points = brushTrailRef.current;
+      brushTrailRef.current = null;
+      setBrushTrail([]);
+      const shape = vectorBrushOutline(points, brush);
+      if (shape) {
+        const id = addObject(shape, "Calligraphy brush stroke",
+          { fill: brush.color, stroke: "none", strokeWidth: 0 });
+        setSelection([id]);
+      }
+      return;
+    }
     if (penActiveRef.current) {
       penActiveRef.current = false;
       const stroke = pen ?? [];
@@ -901,6 +944,10 @@ export function StudioCanvas() {
   };
 
   // What the freehand stroke will become once released.
+  const brushPreview = useMemo(
+    () => vectorBrushOutline(brushTrail, brush),
+    [brushTrail, brush],
+  );
   const penPreview = useMemo(
     () =>
       pen && pen.length >= 2 && trace.smoothing
@@ -1179,6 +1226,16 @@ export function StudioCanvas() {
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {/* The live stroke uses the exact vector outline committed on release. */}
+          {brushPreview && (
+            <path
+              d={geometryToPathData(brushPreview)}
+              fill={brush.color}
+              opacity={0.85}
+              stroke="none"
+              pointerEvents="none"
             />
           )}
           {/* Cell brush: hovered cell + cells collected in the current stroke */}

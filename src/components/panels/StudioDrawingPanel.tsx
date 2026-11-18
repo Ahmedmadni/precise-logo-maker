@@ -1,11 +1,12 @@
-import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, PenLine, Ruler, Shapes, Spline } from "lucide-react";
+import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 
 const tools: { id: ToolId; label: string; description: string; icon: typeof PenLine }[] = [
   { id: "select", label: "تحديد وتحريك", description: "حدد الأشكال أو الحروف واسحبها", icon: MousePointer2 },
   { id: "pan", label: "تحريك اللوحة", description: "حرّك مساحة الرسم", icon: Hand },
-  { id: "pen", label: "الرسم الحر", description: "ارسم الخطوط بلمسة واحدة", icon: PenLine },
+  { id: "pen", label: "قلم المسارات", description: "ارسم خطًا يمكن تنعيمه وتحويله إلى فيكتور", icon: PenLine },
+  { id: "brush", label: "الفرش الخطاطية", description: "فرش فيكتور بضغط القلم واتجاه سن القصبة", icon: Paintbrush },
   { id: "line", label: "خط مستقيم", description: "خطوط هندسية دقيقة", icon: Minus },
   { id: "circle", label: "دائرة", description: "أشكال دائرية", icon: Circle },
   { id: "arc", label: "قوس", description: "منحنيات وأقواس", icon: Spline },
@@ -17,6 +18,8 @@ const tools: { id: ToolId; label: string; description: string; icon: typeof PenL
 export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | undefined }) {
   const selected = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
+  const brush = useStudio((s) => s.brush);
+  const setBrush = useStudio((s) => s.setBrush);
   const showGrids = useStudio((s) => s.showGrids);
   const setShowGrids = useStudio((s) => s.setShowGrids);
   const guideDraw = useStudio((s) => s.guideDraw);
@@ -31,7 +34,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
       <div className="space-y-2">
         <p className="text-xs font-semibold text-foreground">الأدوات الأساسية</p>
         <div className="grid grid-cols-2 gap-2">
-          {tools.slice(0, 6).map(({ id, label, description, icon: Icon }) => (
+          {tools.slice(0, 7).map(({ id, label, description, icon: Icon }) => (
             <button key={id} type="button" aria-pressed={selected === id}
               className={`min-h-[84px] rounded-xl border p-3 text-right transition-colors ${selected === id ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/40"}`}
               onClick={() => { setTool(id); onChoose?.(); }}>
@@ -47,7 +50,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           أدوات رسم إضافية — مضلعات، خلايا وقياس
         </summary>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          {tools.slice(6).map(({ id, label, description, icon: Icon }) => (
+          {tools.slice(7).map(({ id, label, description, icon: Icon }) => (
             <button key={id} type="button" aria-pressed={selected === id}
               className={`min-h-[84px] rounded-xl border p-3 text-right ${selected === id ? "border-primary bg-primary/10" : "border-border bg-card"}`}
               onClick={() => { setTool(id); onChoose?.(); }}>
@@ -58,6 +61,60 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           ))}
         </div>
       </details>
+      {selected === "brush" && (
+        <section className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <h4 className="flex items-center gap-2 text-sm font-semibold">
+            <Paintbrush className="h-4 w-4" /> إعدادات الفرش الفيكتور
+          </h4>
+          <p className="text-xs leading-5 text-muted-foreground">
+            ارسم بالإصبع أو القلم. يتم حفظ كل ضربة كشكل فيكتور مغلق يمكن تغيير حجمه ولونه وتصديره.
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {([
+              ["round", "دائرية"],
+              ["qalam", "سن قصبة"],
+              ["taper", "مدببة"],
+            ] as const).map(([preset, label]) => (
+              <button key={preset} type="button" aria-pressed={brush.preset === preset}
+                onClick={() => setBrush({ preset })}
+                className={`min-h-12 rounded-lg border px-1 text-xs font-semibold ${brush.preset === preset
+                  ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="block space-y-1 text-xs">
+            <span className="flex justify-between"><span>عرض الفرشاة</span><span dir="ltr">{brush.size} px</span></span>
+            <input className="w-full accent-[var(--color-primary)]" type="range" min={1} max={100}
+              value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} />
+          </label>
+          <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 text-xs">
+            لون الحبر
+            <input className="h-10 w-20 rounded-lg border border-border bg-background p-1"
+              type="color" value={brush.color} onChange={(e) => setBrush({ color: e.target.value })} />
+          </label>
+          {brush.preset === "qalam" && <label className="block space-y-1 text-xs">
+            <span className="flex justify-between"><span>زاوية سن القصبة</span><span dir="ltr">{brush.angle}°</span></span>
+            <input className="w-full accent-[var(--color-primary)]" type="range" min={-90} max={90}
+              value={brush.angle} onChange={(e) => setBrush({ angle: Number(e.target.value) })} />
+          </label>}
+          <label className="block space-y-1 text-xs">
+            <span className="flex justify-between"><span>تنعيم حركة اليد</span><span dir="ltr">{Math.round(brush.smoothing * 100)}%</span></span>
+            <input className="w-full accent-[var(--color-primary)]" type="range" min={0} max={80}
+              value={Math.round(brush.smoothing * 100)}
+              onChange={(e) => setBrush({ smoothing: Number(e.target.value) / 100 })} />
+          </label>
+          <label className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-xs">
+            حساسية ضغط القلم الإلكتروني
+            <input type="checkbox" checked={brush.pressure}
+              onChange={(e) => setBrush({ pressure: e.target.checked })} className="h-5 w-5" />
+          </label>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            الضغط الفعلي يحتاج قلمًا وجهازًا يدعمان Pointer Events. الرسم بالإصبع يستخدم ضغطًا افتراضيًا ثابتًا.
+            هذه فرش فيكتور مبدئية وليست بديلًا عن مكتبة ضربات خط الثلث الأصيلة.
+          </p>
+        </section>
+      )}
       <details className="rounded-xl border border-border bg-background p-3">
         <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold"><Compass className="h-4 w-4 text-primary" /> إعدادات الرسم المساعدة</summary>
         <div className="mt-3 grid grid-cols-2 gap-2">

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
 import type { JoinGuideSelection } from "../calligraphy/joinAssistant";
 import { remapRibbons } from "../calligraphy/ribbonJoin";
+import { DEFAULT_BRUSH, type BrushSettings } from "../core/tracing/vectorBrush";
 import { bakeRibbonAsOutline } from "../calligraphy/bakeUnion";
 import { defaultCalligraphyGuides, relayoutHarakat, remapMarksAfterRecomposition, snapGlyphToBaseline, type CalligraphyGuideSettings } from "../calligraphy/harakaAnchoring";
 import type { Unit } from "../core/coordinates/units";
@@ -35,7 +36,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometry, type BooleanOp } from "../objects/boolean";
 
 export type ToolId =
-  "select" | "line" | "circle" | "arc" | "pen" | "cell" | "polygon" | "measure" | "pan" | "lettering";
+  "select" | "line" | "circle" | "arc" | "pen" | "brush" | "cell" | "polygon" | "measure" | "pan" | "lettering";
 
 export interface Artboard {
   width: number;
@@ -216,6 +217,8 @@ export interface StudioState {
 
   trace: TraceSettings;
   setTrace: (patch: Partial<TraceSettings>) => void;
+  brush: BrushSettings;
+  setBrush: (patch: Partial<BrushSettings>) => void;
   /** Re-runs the stroke cleanup over every selected freehand path. */
   smoothSelection: () => void;
 
@@ -549,6 +552,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     measurement: null,
     cursor: null,
 
+    brush: DEFAULT_BRUSH,
+    setBrush: (patch) => set((s) => ({ brush: { ...s.brush, ...patch } })),
     setView: (view) => set({ view }),
     setTool: (tool) => set({ tool }),
     setCursor: (cursor) => set({ cursor }),

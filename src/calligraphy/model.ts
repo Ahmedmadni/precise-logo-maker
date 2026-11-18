@@ -71,7 +71,7 @@ export const FONT_DESCRIPTIONS: Partial<Record<FontPreset, string>> = {
   "Aref Ruqaa": "رقعة",
   "Scheherazade New": "نسخ زخرفي",
   Gulzar: "نستعليق / فارسي",
-  "Custom Thuluth": "خط ثلث مستورد من جهازك",
+  "Custom Thuluth": "اختَر ملفك المرخص (لا يشترط أن يكون ثلثا)",
 };
 
 export const HARAKAT: { id: HarakaId; glyph: string; label: string; path: string }[] = [
