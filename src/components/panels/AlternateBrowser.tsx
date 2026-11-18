@@ -51,7 +51,11 @@ export function AlternateBrowser({ glyph, siblings }: {
     siblings.map((s) => `${s.id}:${s.pathData?.length}:${s.x}:${s.y}`).join("|")].join("|");
   const current = siblings.filter((item) => item.kind === "outline");
   const visible = loadedFor === key ? choices : null;
-  const available = (visible ?? []).filter((v) => v.kind !== "default");
+  const currentUsesAlternate = current.some((item) => !!item.alternateFeature);
+  // A word that already uses a stylistic alternate must be able to switch
+  // back to the genuine default OpenType shape without relying on Undo.
+  const available = (visible ?? []).filter((v) =>
+    v.kind !== "default" || currentUsesAlternate);
   const listed = filter === "all" ? available : available.filter((v) => v.kind === filter);
   const candidate = available.find((v) => v.tag === candidateTag);
 
