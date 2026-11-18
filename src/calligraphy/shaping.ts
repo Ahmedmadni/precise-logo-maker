@@ -39,6 +39,8 @@ export interface ComposeOptions {
   color: string;
   customFontData?: string | undefined;
   alternateFeature?: string | undefined;
+  /** A composable set of OpenType features; retained legacy single-tag support. */
+  alternateFeatures?: string[] | undefined;
 }
 
 /**
@@ -69,8 +71,9 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
   if (!words.length || words.length > 30) throw new Error("اكتب عبارة من كلمة واحدة إلى 30 كلمة.");
   const units = font.unitsPerEm || 1000;
   const s = options.size / units;
+  const features = options.alternateFeatures?.length
+    ? options.alternateFeatures : options.alternateFeature ? [options.alternateFeature] : undefined;
   const runs = words.map((word) => {
-    const features = options.alternateFeature ? [options.alternateFeature] : undefined;
     const run = font.layout(word, features, "arab", "ARA", "rtl");
     if (!run.glyphs?.length || run.glyphs.length !== run.positions?.length) {
       throw new Error("تعذر تشكيل الكلمة بهذا الخط: " + word);
@@ -100,7 +103,7 @@ export function shapeArabicWithFont(font: Font, options: ComposeOptions): Letter
           color: options.color,
           font: options.font,
           groupId, glyphIndex: index, sourceText: word,
-          fontGlyphId: glyph.id, alternateFeature: options.alternateFeature,
+          fontGlyphId: glyph.id, alternateFeature: features?.join("+"),
           pathData: d, unitsPerEm: units,
         });
       }
@@ -117,6 +120,8 @@ export interface OpenTypeAlternate {
   tag: string;
   label: string;
   glyphs: LetteringItem[];
+  featureTags: string[];
+  kind: "default" | "single" | "combination";
 }
 const TAG_LABELS: Record<string, string> = {
   default: "الشكل الأصلي",
@@ -129,6 +134,44 @@ const TAG_LABELS: Record<string, string> = {
 const alternateLabel = (tag: string) =>
   TAG_LABELS[tag] ?? (tag.startsWith("ss") ? `المجموعة الأسلوبية ${tag.slice(2)}` :
     tag.startsWith("cv") ? `بدائل الحروف ${tag.slice(2)}` : tag);
+
+export interface FeatureChoice {
+  tag: string;
+  label: string;
+  featureTags: string[];
+  kind: "default" | "single" | "combination";
+}
+
+/** Deliberately bounded for mobile: at most 18 individual OpenType
+ * alternatives and 6 pairs. A pair is offered only when the font really
+ * exposes both tags; visual deduplication removes no-op combinations. */
+export function buildOpenTypeFeatureChoices(tags: string[]): FeatureChoice[] {
+  const supported = [...new Set(tags)].filter((tag) =>
+    /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag)).slice(0, 18);
+  const choices: FeatureChoice[] = [{
+    tag: "default", label: "التشكيل الأساسي", featureTags: [], kind: "default",
+  }];
+  for (const tag of supported) choices.push({
+    tag, label: alternateLabel(tag), featureTags: [tag], kind: "single",
+  });
+  const pairable = supported.filter((tag) => tag !== "aalt");
+  let pairs = 0;
+  for (let i = 0; i < pairable.length && pairs < 6; i++) {
+    for (let j = i + 1; j < pairable.length && pairs < 6; j++) {
+      const a = pairable[i]!, b = pairable[j]!;
+      // Two stylistic sets or two character variants may be conflicting.
+      if (/^ss/.test(a) && /^ss/.test(b)) continue;
+      if (/^cv/.test(a) && /^cv/.test(b)) continue;
+      choices.push({
+        tag: a + "+" + b,
+        label: alternateLabel(a) + " + " + alternateLabel(b),
+        featureTags: [a, b], kind: "combination",
+      });
+      pairs++;
+    }
+  }
+  return choices;
+}
 
 const visualSignature = (items: LetteringItem[]) =>
   items.map((g) => `${g.fontGlyphId}|${g.pathData}|${Math.round(g.x * 100)}|${Math.round(g.y * 100)}`).join(";");
@@ -147,8 +190,7 @@ export async function listWordAlternates(
   const raw = await loadFontBytes(source.font, customFontData);
   const kit = await import("fontkit");
   const font = kit.create(Buffer.from(raw));
-  const tags = (font.availableFeatures ?? []).filter((tag) =>
-    /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag));
+  const tags = font.availableFeatures ?? [];
   const currentBounds = letteringGroupBounds(currentWord);
   if (!currentBounds) return [];
   const center = { x: currentBounds.x + currentBounds.width / 2, y: currentBounds.y + currentBounds.height / 2 };
@@ -156,18 +198,18 @@ export async function listWordAlternates(
     phrase: source.sourceText, font: source.font, size: source.size,
     x: center.x, y: center.y, color: source.color,
   };
-  const choices = [{ tag: "default", feature: undefined as string | undefined }, ...tags.slice(0, 24)
-    .map((tag) => ({ tag, feature: tag }))];
+  const choices = buildOpenTypeFeatureChoices(tags);
   const variants: OpenTypeAlternate[] = [];
   const seen = new Set<string>();
   for (const option of choices) {
     try {
-      const itemOptions: ComposeOptions = { ...options, alternateFeature: option.feature };
+      const itemOptions: ComposeOptions = { ...options, alternateFeatures: option.featureTags };
       const glyphs = centerLetteringAt(shapeArabicWithFont(font, itemOptions), center);
       const signature = visualSignature(glyphs);
       if (seen.has(signature)) continue;
       seen.add(signature);
-      variants.push({ tag: option.tag, label: alternateLabel(option.tag), glyphs });
+      variants.push({ tag: option.tag, label: option.label, glyphs,
+        featureTags: option.featureTags, kind: option.kind });
     } catch {
       // Some font features have unsupported inputs or fail to shape this word.
     }

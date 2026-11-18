@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { create } from "fontkit";
-import { shapeArabicWithFont } from "../shaping";
+import { buildOpenTypeFeatureChoices, shapeArabicWithFont } from "../shaping";
 import { letteringSvg } from "../model";
 
 const amiriPath = resolve(process.cwd(), "node_modules/@fontsource/amiri/files/amiri-arabic-400-normal.woff");
@@ -49,5 +49,46 @@ describe("real OpenType Arabic outlines", () => {
     const withoutMarks = shapeArabicWithFont(font, { ...opts, phrase: "سلام" });
     expect(withMarks.length).toBeGreaterThan(withoutMarks.length);
     expect(withMarks.some((g) => g.pathData && g.pathData.length > 5)).toBe(true);
+  });
+});
+
+describe("authentic OpenType word variant combinations", () => {
+  it("lists the default and only font-advertised feature tags", () => {
+    const choices = buildOpenTypeFeatureChoices([
+      "salt", "swsh", "ss01", "ss02", "cv01", "cv02", "liga", "evil", "salt",
+    ]);
+    expect(choices[0]).toEqual({
+      tag: "default", label: "التشكيل الأساسي",
+      featureTags: [], kind: "default",
+    });
+    expect(choices.map((choice) => choice.tag)).toContain("swsh+ss01");
+    expect(choices.some((choice) => choice.tag === "liga")).toBe(false);
+    expect(choices.some((choice) => choice.tag === "ss01+ss02")).toBe(false);
+    expect(choices.some((choice) => choice.tag === "cv01+cv02")).toBe(false);
+    const found = choices.find((choice) => choice.tag === "salt+swsh")!;
+    expect(found.featureTags).toEqual(["salt", "swsh"]);
+    expect(found.kind).toBe("combination");
+  });
+
+  it("bounds the number of alternatives so browsing remains usable on phones", () => {
+    const many = Array.from({ length: 70 }, (_, index) =>
+      "ss" + String(index).padStart(2, "0"));
+    const choices = buildOpenTypeFeatureChoices(many);
+    expect(choices.length).toBeLessThanOrEqual(25);
+    expect(choices.length).toBeGreaterThan(1);
+    expect(buildOpenTypeFeatureChoices([])).toHaveLength(1);
+    expect(buildOpenTypeFeatureChoices(["salt", "salt"])).toHaveLength(2);
+  });
+
+  it("shapes a word using a set of real supported features rather than splitting letters", () => {
+    const permitted = (font.availableFeatures ?? []).filter((tag) =>
+      /^(?:aalt|salt|swsh|cswh|ss\d\d|cv\d\d)$/.test(tag));
+    if (!permitted.length) return;
+    const single = shapeArabicWithFont(font, {
+      ...opts, alternateFeatures: [permitted[0]!],
+    });
+    expect(single.every((g) => g.kind === "outline" && g.pathData)).toBe(true);
+    expect(new Set(single.map((g) => g.groupId)).size).toBe(1);
+    expect(single[0]?.alternateFeature).toBe(permitted[0]);
   });
 });
