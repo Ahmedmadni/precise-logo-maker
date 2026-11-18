@@ -22,6 +22,12 @@ export interface GlyphLibraryEntry {
   sourceFont?: string;
   savedSize: number;
   createdAt: string;
+  /** Preserve compound-path counters in baked or imported Arabic outlines. */
+  fillRule?: "evenodd" | "nonzero";
+  /** Preserve manually chosen entry/exit points for later stroke joining. */
+  joinAnchors?: LetteringItem["joinAnchors"];
+  /** Preserve user-assigned contour roles for the path editor. */
+  contourRoles?: LetteringItem["contourRoles"];
   /** Preserve optical adjustments for standalone reuse, never impose them
    * on an existing glyph position in a connected Arabic word. */
   appearance?: GlyphLibraryAppearance;
@@ -46,6 +52,26 @@ const validAppearance = (value: unknown): value is GlyphLibraryAppearance => {
     typeof a.color === "string" && /^#[0-9a-fA-F]{6}$/.test(a.color);
 };
 
+const validPoint = (point: unknown): boolean => {
+  if (!point || typeof point !== "object" || Array.isArray(point)) return false;
+  const p = point as { x?: unknown; y?: unknown };
+  return typeof p.x === "number" && Number.isFinite(p.x) && Math.abs(p.x) <= 100000 &&
+    typeof p.y === "number" && Number.isFinite(p.y) && Math.abs(p.y) <= 100000;
+};
+const validJoinAnchors = (v: unknown): boolean => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const anchors = v as { entry?: unknown; exit?: unknown };
+  return (anchors.entry === undefined || validPoint(anchors.entry)) &&
+    (anchors.exit === undefined || validPoint(anchors.exit));
+};
+const validContourRoles = (v: unknown): boolean => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const allowed = new Set(["unassigned", "head", "body", "tail", "join", "dot", "counter"]);
+  const entries = Object.entries(v);
+  return entries.length <= 300 && entries.every(([key, role]) =>
+    /^\\d{1,4}$/.test(key) && allowed.has(role as string));
+};
+
 function isValidOutlinePath(path: unknown): path is string {
   if (typeof path !== "string" || path.length < 10 ||
       path.length > MAX_PATH_BYTES || safePath(path) !== path) return false;
@@ -68,7 +94,10 @@ export function validateGlyphLibraryEntry(value: unknown): value is GlyphLibrary
     (e.sourceFont === undefined || (typeof e.sourceFont === "string" && e.sourceFont.length <= 90)) &&
     (e.glyphIndex === undefined || (Number.isInteger(e.glyphIndex) &&
       e.glyphIndex >= 0 && e.glyphIndex < 500)) &&
-    (e.appearance === undefined || validAppearance(e.appearance));
+    (e.appearance === undefined || validAppearance(e.appearance)) &&
+    (e.fillRule === undefined || e.fillRule === "nonzero" || e.fillRule === "evenodd") &&
+    (e.joinAnchors === undefined || validJoinAnchors(e.joinAnchors)) &&
+    (e.contourRoles === undefined || validContourRoles(e.contourRoles));
 }
 
 export function makeGlyphLibraryEntry(item: LetteringItem, name: string): GlyphLibraryEntry | null {
@@ -92,6 +121,12 @@ export function makeGlyphLibraryEntry(item: LetteringItem, name: string): GlyphL
       weight: item.weight ?? 0,
       color: item.color,
     },
+    ...(item.fillRule ? { fillRule: item.fillRule } : {}),
+    ...(item.joinAnchors ? { joinAnchors: {
+      ...(item.joinAnchors.entry ? { entry: { ...item.joinAnchors.entry } } : {}),
+      ...(item.joinAnchors.exit ? { exit: { ...item.joinAnchors.exit } } : {}),
+    } } : {}),
+    ...(item.contourRoles ? { contourRoles: { ...item.contourRoles } } : {}),
     ...(item.sourceText ? { sourceText: item.sourceText.slice(0, 120) } : {}),
     ...(item.font ? { sourceFont: item.font } : {}),
     ...(item.glyphIndex !== undefined ? { glyphIndex: item.glyphIndex } : {}),
@@ -159,6 +194,12 @@ export function makeStandaloneLibraryGlyph(
     skewY: entry.appearance?.skewY ?? 0,
     weight: entry.appearance?.weight ?? 0,
     pathData: entry.pathData, unitsPerEm: entry.unitsPerEm,
+    fillRule: entry.fillRule ?? "nonzero",
+    ...(entry.joinAnchors ? { joinAnchors: {
+      ...(entry.joinAnchors.entry ? { entry: { ...entry.joinAnchors.entry } } : {}),
+      ...(entry.joinAnchors.exit ? { exit: { ...entry.joinAnchors.exit } } : {}),
+    } } : {}),
+    ...(entry.contourRoles ? { contourRoles: { ...entry.contourRoles } } : {}),
     sourceText: entry.sourceText ?? entry.name,
     alternateFeature: "user-library",
   };
