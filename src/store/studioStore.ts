@@ -1,5 +1,9 @@
 import { create } from "zustand";
 import type { LetteringItem } from "../calligraphy/model";
+import {
+  combineGlyphLibrary, makeGlyphLibraryEntry, makeStandaloneLibraryGlyph,
+  canReplaceWithLibraryEntry, type GlyphLibraryEntry,
+} from "../calligraphy/glyphLibrary";
 import type { JoinGuideSelection } from "../calligraphy/joinAssistant";
 import { remapRibbons } from "../calligraphy/ribbonJoin";
 import { DEFAULT_BRUSH, type BrushSettings } from "../core/tracing/vectorBrush";
@@ -51,6 +55,8 @@ export interface DocumentState {
   objects: VectorObject[];
   /** Editable lettering and independently positioned vector harakat. */
   lettering?: LetteringItem[];
+  /** Reusable user-curated vector glyphs, embedded in .logo without fonts or remote DB. */
+  glyphLibrary?: GlyphLibraryEntry[];
   /** Optional calligraphy guidelines, never included in SVG/PNG exports. */
   calligraphyGuides?: CalligraphyGuideSettings;
   /** Optional licensed user-supplied font, persisted with the .logo project. */
@@ -175,6 +181,11 @@ export interface StudioState {
   addLettering: (item: LetteringItem) => void;
   addLetteringBatch: (items: LetteringItem[]) => void;
   replaceLetteringGroup: (groupId: string, items: LetteringItem[]) => void;
+  saveGlyphVariant: (glyphId: string, name: string) => { ok: boolean; reason?: string };
+  applyGlyphVariant: (variantId: string, glyphId: string) => { ok: boolean; reason?: string };
+  insertGlyphVariant: (variantId: string) => { ok: boolean; reason?: string };
+  importGlyphVariants: (entries: GlyphLibraryEntry[]) => { ok: boolean; reason?: string };
+  removeGlyphVariant: (variantId: string) => void;
   moveLetteringGroup: (groupId: string, dx: number, dy: number) => void;
   duplicateLettering: (id: string) => void;
   reorderLettering: (id: string, direction: -1 | 1) => void;
@@ -291,6 +302,7 @@ const initialDoc = (): DocumentState => {
     grids: [createSquareGrid(center, artboard.width), createConcentricGrid(center, artboard.width)],
     objects: [],
     lettering: [],
+    glyphLibrary: [],
     calligraphyGuides: defaultCalligraphyGuides(artboard.height),
     reference: null,
   };
@@ -421,6 +433,72 @@ export const useStudio = create<StudioState>()((set, get) => {
           remapMarksAfterRecomposition(doc.lettering ?? [], items, groupId), groupId),
       }));
       set({ selectedLetteringId: items[0]!.id, letteringPreview: null, selectedGlyphNodeId: null });
+    },
+    saveGlyphVariant: (glyphId, name) => {
+      get().commitLetteringPreview();
+      const doc = get().doc;
+      const selected = (doc.lettering ?? []).find((item) => item.id === glyphId);
+      if (!selected) return { ok: false, reason: "حدد حرف فيكتور أولاً." };
+      const entry = makeGlyphLibraryEntry(selected, name);
+      if (!entry) return { ok: false, reason: "تعذر حفظ هذا الحرف؛ راجع الاسم وصحة مسارات الفيكتور." };
+      const merged = combineGlyphLibrary(doc.glyphLibrary ?? [], [entry]);
+      if (!merged) return { ok: false, reason: "المكتبة ممتلئة أو تتجاوز الحد المسموح." };
+      if (merged.length === (doc.glyphLibrary ?? []).length)
+        return { ok: false, reason: "هذا الشكل محفوظ بالفعل في المكتبة." };
+      commit("Save custom calligraphy glyph", (previous) => ({ ...previous, glyphLibrary: merged }));
+      return { ok: true };
+    },
+    applyGlyphVariant: (variantId, glyphId) => {
+      get().commitLetteringPreview();
+      const doc = get().doc;
+      const entry = (doc.glyphLibrary ?? []).find((item) => item.id === variantId);
+      const selected = (doc.lettering ?? []).find((item) => item.id === glyphId);
+      if (!entry || !canReplaceWithLibraryEntry(selected, entry)) return {
+        ok: false,
+        reason: "يمكن استبدال الجزء فقط عند تطابق الكلمة ورقم موضعه؛ أضف الشكل كعنصر مستقل خلاف ذلك.",
+      };
+      get().updateLettering(glyphId, {
+        pathData: entry.pathData,
+        unitsPerEm: entry.unitsPerEm,
+        fillRule: entry.fillRule ?? "nonzero",
+        ...(entry.joinAnchors ? { joinAnchors: {
+          ...(entry.joinAnchors.entry ? { entry: { ...entry.joinAnchors.entry } } : {}),
+          ...(entry.joinAnchors.exit ? { exit: { ...entry.joinAnchors.exit } } : {}),
+        } } : {}),
+        ...(entry.contourRoles ? { contourRoles: { ...entry.contourRoles } } : {}),
+        fontGlyphId: undefined,
+        alternateFeature: "user-library",
+      });
+      return { ok: true };
+    },
+    insertGlyphVariant: (variantId) => {
+      const doc = get().doc;
+      const entry = (doc.glyphLibrary ?? []).find((item) => item.id === variantId);
+      if (!entry) return { ok: false, reason: "لم نعثر على هذا الشكل في المكتبة." };
+      const selected = (doc.lettering ?? []).find((item) => item.id === get().selectedLetteringId);
+      const shape = makeStandaloneLibraryGlyph(entry,
+        selected ? selected.x + 26 : doc.artboard.width / 2,
+        selected ? selected.y + 26 : doc.artboard.height / 2,
+        selected?.size ?? entry.savedSize,
+        selected?.color ?? "#d1a95e");
+      if (!shape) return { ok: false, reason: "الشكل المخزن غير صالح للإضافة." };
+      get().addLettering(shape);
+      return { ok: true };
+    },
+    importGlyphVariants: (entries) => {
+      const doc = get().doc;
+      const merged = combineGlyphLibrary(doc.glyphLibrary ?? [], entries);
+      if (!merged) return { ok: false, reason: "ملف المكتبة غير صالح أو يتجاوز حد الحجم والعناصر." };
+      if (merged.length === (doc.glyphLibrary ?? []).length)
+        return { ok: false, reason: "كل الأشكال المستوردة موجودة بالفعل." };
+      commit("Import custom glyph library", (previous) => ({ ...previous, glyphLibrary: merged }));
+      return { ok: true };
+    },
+    removeGlyphVariant: (variantId) => {
+      if (!(get().doc.glyphLibrary ?? []).some((item) => item.id === variantId)) return;
+      commit("Remove custom glyph preset", (doc) => ({
+        ...doc, glyphLibrary: (doc.glyphLibrary ?? []).filter((item) => item.id !== variantId),
+      }));
     },
     moveLetteringGroup: (groupId, dx, dy) => {
       if (!groupId || (dx === 0 && dy === 0)) return;

@@ -9,6 +9,7 @@ import { composeArabicOutlines } from "../../calligraphy/shaping";
 import { markPathFromTypeface } from "../../calligraphy/markOutlines";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { LetteringGlyph } from "../canvas/LetteringGlyph";
+import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { useStudio } from "../../store/studioStore";
 import { placeAttachedHaraka } from "../../calligraphy/harakaAnchoring";
 /* Letter controls are deliberately located in the separate Edit workspace. */
@@ -260,6 +261,12 @@ export function LetteringPanel({ section, onCreated }: {
             <button className={button + " mt-3 w-full"} type="button" onClick={() => fontInput.current?.click()}>
               استيراد ملف خط (TTF / OTF / WOFF)
             </button>
+          </details>
+          <details className="rounded-xl border border-border p-3">
+            <summary className="cursor-pointer text-xs font-semibold">
+              مكتبة أشكالي الخطاطية المحفوظة
+            </summary>
+            <div className="mt-3"><GlyphLibraryPanel /></div>
           </details>
         </section>
       )}
