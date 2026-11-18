@@ -6,6 +6,7 @@ import {
   type FontPreset, type LetteringItem,
 } from "../../calligraphy/model";
 import { composeArabicOutlines } from "../../calligraphy/shaping";
+import { markPathFromTypeface } from "../../calligraphy/markOutlines";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { LetteringGlyph } from "../canvas/LetteringGlyph";
 import { useStudio } from "../../store/studioStore";
@@ -41,6 +42,8 @@ export function LetteringPanel({ section, onCreated }: {
   };
   const [phrase, setPhrase] = useState("المدني");
   const [markCategory, setMarkCategory] = useState<"harakat" | "decorations">("harakat");
+  const [markSource, setMarkSource] = useState<"typeface" | "simple">("typeface");
+  const [markLoading, setMarkLoading] = useState(false);
   const [font, setFont] = useState<FontPreset>("Amiri");
   const [fontSize, setFontSize] = useState(180);
   const [ink, setInk] = useState("#d1a95e");
@@ -145,15 +148,28 @@ export function LetteringPanel({ section, onCreated }: {
     }
   };
 
-  const createMark = (mark: (typeof HARAKAT)[number]) => {
+  const createMark = async (mark: (typeof HARAKAT)[number]) => {
+    setError("");
     const target = selected?.kind === "outline" ? selected :
       selected?.kind === "haraka" && selected.attachedToGlyphId
         ? items.find((item) => item.id === selected.attachedToGlyphId && item.kind === "outline")
         : undefined;
+    let markPathData: string | undefined;
+    if (markSource === "typeface") {
+      setMarkLoading(true);
+      try {
+        markPathData = await markPathFromTypeface(mark.id, target?.font ?? font, doc.customThuluthFont);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "تعذر تحميل الحركة من الخط المختار.");
+        setMarkLoading(false);
+        return;
+      }
+      setMarkLoading(false);
+    }
     const item = target
       ? placeAttachedHaraka(mark.id, target, items)
       : createHaraka(mark.id, doc.artboard.width / 2, doc.artboard.height / 2 - 65);
-    insert(item);
+    insert(markPathData ? { ...item, markPathData } : item);
     setWorkspaceSection("edit");
     onCreated?.();
   };
@@ -264,13 +280,32 @@ export function LetteringPanel({ section, onCreated }: {
           </nav>
           {markCategory === "harakat" && <div>
             <h3 className="mb-2 font-semibold">اختر حركة لإضافتها</h3>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button type="button" aria-pressed={markSource === "typeface"}
+                onClick={() => setMarkSource("typeface")}
+                className={`min-h-12 rounded-lg border px-2 text-xs font-semibold ${markSource === "typeface"
+                  ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
+                من رسم الخط الأصلي
+              </button>
+              <button type="button" aria-pressed={markSource === "simple"}
+                onClick={() => setMarkSource("simple")}
+                className={`min-h-12 rounded-lg border px-2 text-xs font-semibold ${markSource === "simple"
+                  ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
+                أشكال مبسطة
+              </button>
+            </div>
+            <p className="mb-3 text-[11px] leading-5 text-muted-foreground">
+              الخيار الأول يستخرج حدود الحركة الفعلية من الخط المحدد للحرف؛
+              وإذا لم يكن حرف محددًا يستخدم الخط المختار في قسم الكتابة.
+              الرموز داخل الأزرار أمثلة فقط؛ تظهر الحركة الفعلية بعد الإضافة على اللوحة.
+            </p>
             <p className="mb-2 text-xs leading-5 text-muted-foreground">
               حدد حرفا أولا لربط الحركة به تلقائيا. ويمكن تغيير موضعها أو فك الارتباط من «تعديل».
             </p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {HARAKAT.map((mark) => (
                 <button key={mark.id} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
-                  type="button" title={mark.label} onClick={() => createMark(mark)}>
+                  type="button" disabled={markLoading} title={mark.label} onClick={() => void createMark(mark)}>
                   <svg viewBox="0 0 100 100" className="h-8 w-10" aria-hidden="true">
                     <path d={mark.path} fill="currentColor" fillRule="evenodd" />
                   </svg><span className="text-xs font-medium">{mark.label}</span>
