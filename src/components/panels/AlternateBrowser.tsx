@@ -20,12 +20,14 @@ const previewBox = (glyphs: LetteringItem[]) => {
     : "0 0 400 200";
 };
 
-function GlyphPreview({ glyphs, label }: { glyphs: LetteringItem[]; label: string }) {
+function GlyphPreview({ glyphs, label, highlightId }: {
+  glyphs: LetteringItem[]; label: string; highlightId?: string;
+}) {
   return (
     <svg viewBox={previewBox(glyphs)} role="img" aria-label={label}
       className="h-24 w-full overflow-visible">
       {glyphs.filter((g) => !g.hidden).map((g) =>
-        <LetteringGlyph key={g.id} item={g} selected={false} />)}
+        <LetteringGlyph key={g.id} item={g} selected={g.id === highlightId} />)}
     </svg>
   );
 }
@@ -92,7 +94,8 @@ export function AlternateBrowser({ glyph, siblings }: {
       </div>
       <div className="rounded-xl border border-border bg-background p-2">
         <p className="mb-2 text-xs font-semibold">الكلمة الحالية — {glyph.sourceText}</p>
-        <GlyphPreview glyphs={current} label="الشكل الحالي للكلمة قبل تطبيق أي بديل" />
+        <GlyphPreview glyphs={current} label="الشكل الحالي للكلمة قبل تطبيق أي بديل"
+          highlightId={editScope === "segment" ? glyph.id : undefined} />
       </div>
       <button type="button" onClick={() => void load()} disabled={busy}
         className="min-h-12 w-full rounded-lg border border-primary/50 bg-primary/10 px-3 text-xs font-semibold text-foreground disabled:opacity-50">
@@ -140,7 +143,8 @@ export function AlternateBrowser({ glyph, siblings }: {
                   ${candidateTag === choice.tag ? "border-primary bg-primary/10" :
                   "border-border hover:border-primary/50"}`}>
                 <GlyphPreview glyphs={choice.previewGlyphs}
-                  label={`معاينة البديل الموضعي: ${choice.label}`} />
+                  label={`معاينة البديل الموضعي: ${choice.label}`}
+                  highlightId={glyph.id} />
                 <span className="font-semibold">{choice.label}</span>
                 <span dir="ltr" className="text-[10px] text-muted-foreground">
                   {choice.featureTags.join(" + ") || "default"}
@@ -196,12 +200,14 @@ export function AlternateBrowser({ glyph, siblings }: {
         <div className="grid grid-cols-2 gap-2">
           <div className="min-w-0 rounded-lg bg-background p-2 text-center">
             <p className="mb-2 text-[11px]">الكلمة الحالية</p>
-            <GlyphPreview glyphs={current} label="المسارات الأصلية قبل تعديل الجزء المحدد" />
+            <GlyphPreview glyphs={current} label="المسارات الأصلية قبل تعديل الجزء المحدد"
+              highlightId={glyph.id} />
           </div>
           <div className="min-w-0 rounded-lg bg-background p-2 text-center">
             <p className="mb-2 text-[11px]">تغيير الجزء فقط</p>
             <GlyphPreview glyphs={localCandidate.previewGlyphs}
-              label="المعاينة مع استبدال الجزء المحدد دون تبديل بقية الكلمة" />
+              label="المعاينة مع استبدال الجزء المحدد دون تبديل بقية الكلمة"
+              highlightId={glyph.id} />
           </div>
         </div>
         <p className="text-[11px] leading-5 text-muted-foreground">
