@@ -69,7 +69,7 @@ const validContourRoles = (v: unknown): boolean => {
   const allowed = new Set(["unassigned", "head", "body", "tail", "join", "dot", "counter"]);
   const entries = Object.entries(v);
   return entries.length <= 300 && entries.every(([key, role]) =>
-    /^\\d{1,4}$/.test(key) && allowed.has(role as string));
+    /^\d{1,4}$/.test(key) && allowed.has(role as string));
 };
 
 function isValidOutlinePath(path: unknown): path is string {
