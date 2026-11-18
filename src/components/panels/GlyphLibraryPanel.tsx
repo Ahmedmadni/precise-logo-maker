@@ -4,7 +4,9 @@ import {
   canReplaceWithLibraryEntry, parseGlyphLibrary, serializeGlyphLibrary,
   type GlyphLibraryEntry,
 } from "../../calligraphy/glyphLibrary";
-import { outlineNodes } from "../../calligraphy/pathEditor";
+import { letteringGroupBounds } from "../../calligraphy/morph";
+import type { LetteringItem } from "../../calligraphy/model";
+import { LetteringGlyph } from "../canvas/LetteringGlyph";
 import { useStudio } from "../../store/studioStore";
 
 const EMPTY_ENTRIES: GlyphLibraryEntry[] = [];
@@ -12,21 +14,28 @@ const button = "flex min-h-11 items-center justify-center gap-1.5 rounded-lg bor
 const field = "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm";
 
 function GlyphThumbnail({ entry }: { entry: GlyphLibraryEntry }) {
+  const item: LetteringItem = useMemo(() => ({
+    id: entry.id, kind: "outline" as const, x: 0, y: 0,
+    size: entry.savedSize, color: entry.appearance?.color ?? "#d1a95e",
+    rotation: entry.appearance?.rotation ?? 0,
+    scaleX: entry.appearance?.scaleX ?? 1,
+    scaleY: entry.appearance?.scaleY ?? 1,
+    skewX: entry.appearance?.skewX ?? 0,
+    skewY: entry.appearance?.skewY ?? 0,
+    weight: entry.appearance?.weight ?? 0,
+    pathData: entry.pathData, unitsPerEm: entry.unitsPerEm,
+  }), [entry]);
   const viewBox = useMemo(() => {
-    const points = outlineNodes(entry.pathData);
-    if (!points.length) return "0 -100 100 100";
-    const xs = points.map((p) => p.x);
-    const ys = points.map((p) => p.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const padding = Math.max(10, (maxX - minX + maxY - minY) * 0.04);
-    return `${minX - padding} ${-maxY - padding} ${Math.max(20, maxX - minX + 2 * padding)} ${Math.max(20, maxY - minY + 2 * padding)}`;
-  }, [entry.pathData]);
+    const bounds = letteringGroupBounds([item]);
+    if (!bounds) return "0 0 100 100";
+    const padding = Math.max(12, (bounds.width + bounds.height) * 0.04);
+    return `${bounds.x - padding} ${bounds.y - padding} ${Math.max(20, bounds.width + padding * 2)} ${Math.max(20, bounds.height + padding * 2)}`;
+  }, [item]);
   return (
     <svg role="img" aria-label={`معاينة فيكتور: ${entry.name}`}
       viewBox={viewBox} preserveAspectRatio="xMidYMid meet"
-      className="h-20 w-full rounded-lg bg-background/80 text-foreground">
-      <path d={entry.pathData} transform="scale(1 -1)" fill="currentColor" fillRule="nonzero" />
+      className="h-20 w-full rounded-lg bg-background/80">
+      <LetteringGlyph item={item} selected={false} />
     </svg>
   );
 }
@@ -170,7 +179,7 @@ export function GlyphLibraryPanel() {
                 <Plus className="h-3.5 w-3.5" /> إضافة مستقل
               </button>
               <button type="button" disabled={!compatible}
-                title={compatible ? "استبدال الموضع نفسه من الكلمة المطابقة" : "يتطلب تطابق الكلمة ورقم المقطع"}
+                title={compatible ? "استبدال موضع مطابق من الكلمة والخط نفسيهما" : "يتطلب تطابق الكلمة ورقم المقطع والخط"}
                 className={button + " w-full border-primary/40 text-primary"}
                 onClick={() => useEntry(entry.id, "replace")}>
                 استبدال الجزء
@@ -199,7 +208,7 @@ export function GlyphLibraryPanel() {
         {message}
       </p>}
       <p className="text-[11px] leading-5 text-muted-foreground">
-        استبدال المقطع متاح فقط لنفس الكلمة والموضع، حفاظًا على ترتيب الأجزاء المتصلة.
+        استبدال المقطع متاح فقط لنفس الكلمة وموضعها والخط الأصلي، حفاظًا على ترتيب الأجزاء المتصلة.
         الأشكال المستوردة يجب أن تكون من تصميمك أو لديك حق استخدامها؛ المكتبة لا تتضمن خطوطًا أو صورًا مملوكة للغير.
       </p>
     </section>
