@@ -23,6 +23,7 @@ function GlyphThumbnail({ entry }: { entry: GlyphLibraryEntry }) {
     skewX: entry.appearance?.skewX ?? 0,
     skewY: entry.appearance?.skewY ?? 0,
     weight: entry.appearance?.weight ?? 0,
+    fillRule: entry.fillRule ?? "nonzero",
     pathData: entry.pathData, unitsPerEm: entry.unitsPerEm,
   }), [entry]);
   const viewBox = useMemo(() => {
