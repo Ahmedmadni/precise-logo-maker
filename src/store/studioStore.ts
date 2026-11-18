@@ -460,6 +460,12 @@ export const useStudio = create<StudioState>()((set, get) => {
       get().updateLettering(glyphId, {
         pathData: entry.pathData,
         unitsPerEm: entry.unitsPerEm,
+        fillRule: entry.fillRule ?? "nonzero",
+        ...(entry.joinAnchors ? { joinAnchors: {
+          ...(entry.joinAnchors.entry ? { entry: { ...entry.joinAnchors.entry } } : {}),
+          ...(entry.joinAnchors.exit ? { exit: { ...entry.joinAnchors.exit } } : {}),
+        } } : {}),
+        ...(entry.contourRoles ? { contourRoles: { ...entry.contourRoles } } : {}),
         fontGlyphId: undefined,
         alternateFeature: "user-library",
       });
