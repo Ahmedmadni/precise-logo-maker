@@ -58,7 +58,7 @@ describe("authentic OpenType word variant combinations", () => {
       "salt", "swsh", "ss01", "ss02", "cv01", "cv02", "liga", "evil", "salt",
     ]);
     expect(choices[0]).toEqual({
-      tag: "default", label: "التشكيل الأساسي",
+      tag: "default", label: "الشكل الافتراضي للخط",
       featureTags: [], kind: "default",
     });
     expect(choices.map((choice) => choice.tag)).toContain("swsh+ss01");

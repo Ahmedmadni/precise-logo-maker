@@ -29,6 +29,52 @@ describe("intelligent Arabic diacritic attachment", () => {
     expect(kasra.y).toBeGreaterThan(b.maxY);
     expect(letteringSvg(fatha)).toContain("<path");
   });
+  it("stacks shadda nearest the glyph with fatha above it regardless of insertion order", () => {
+    const g = glyph();
+    const f = placeAttachedHaraka("fatha", g);
+    const s = placeAttachedHaraka("shadda", g, [f]);
+    const a = relayoutHarakat([g], [g, f, s]);
+    const b = relayoutHarakat([g], [g, s, f]);
+    const fa = a.find((item) => item.id === f.id)!;
+    const sa = a.find((item) => item.id === s.id)!;
+    const fb = b.find((item) => item.id === f.id)!;
+    const sb = b.find((item) => item.id === s.id)!;
+    expect(sa.stackOrder).toBe(0);
+    expect(fa.stackOrder).toBe(1);
+    expect(sa.y).toBeGreaterThan(fa.y);
+    expect(sa.y).toBeCloseTo(sb.y);
+    expect(fa.y).toBeCloseTo(fb.y);
+    expect(sb.stackOrder).toBe(0);
+  });
+
+  it("keeps kasra below the baseline while shadda and damma stack above", () => {
+    const g = glyph();
+    const s = placeAttachedHaraka("shadda", g);
+    const d = placeAttachedHaraka("damma", g, [s]);
+    const k = placeAttachedHaraka("kasra", g);
+    const arranged = relayoutHarakat([g], [g, k, d, s]);
+    const shadda = arranged.find((item) => item.id === s.id)!;
+    const damma = arranged.find((item) => item.id === d.id)!;
+    const kasra = arranged.find((item) => item.id === k.id)!;
+    expect(shadda.stackOrder).toBe(0);
+    expect(damma.stackOrder).toBe(1);
+    expect(kasra.stackOrder).toBe(0);
+    expect(shadda.y).toBeGreaterThan(damma.y);
+    expect(kasra.y).toBeGreaterThan(g.y);
+  });
+
+  it("never rearranges manually positioned diacritic marks", () => {
+    const g = glyph();
+    const mark = { ...placeAttachedHaraka("shadda", g),
+      x: 140, y: 20, anchorMode: "manual" as const };
+    const fatha = placeAttachedHaraka("fatha", g);
+    const positioned = relayoutHarakat([g, mark, fatha], [g, mark, fatha]);
+    const retained = positioned.find((x) => x.id === mark.id)!;
+    expect(retained.x).toBe(140);
+    expect(retained.y).toBe(20);
+    expect(positioned.find((x) => x.id === fatha.id)?.stackOrder).toBe(0);
+  });
+
   it("moves an attached manual mark by the glyph delta and preserves local offset", () => {
     const original = glyph();
     const mark = { ...createHaraka("fatha", 250, 175), id: "mark1",

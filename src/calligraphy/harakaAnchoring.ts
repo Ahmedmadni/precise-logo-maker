@@ -62,7 +62,29 @@ function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: numb
 export function relayoutHarakat(previous: LetteringItem[], current: LetteringItem[]): LetteringItem[] {
   const before = new Map(previous.map((item) => [item.id, item]));
   const glyphs = new Map(current.filter((item) => item.kind === "outline").map((item) => [item.id, item]));
-  const counts = new Map<string, number>();
+  // Arabic mark ordering must be independent of which toolbar button was
+  // pressed first. Put the shadda closest to the outline, then its vowel
+  // above it; below-base marks (kasra, tanween kasr) have a separate stack.
+  // Manually positioned marks are deliberately not repositioned.
+  const stacks = new Map<string, LetteringItem[]>();
+  const originalOrder = new Map(current.map((item, i) => [item.id, i]));
+  for (const item of current) {
+    if (item.kind !== "haraka" || !item.attachedToGlyphId ||
+      item.anchorMode === "manual" || !glyphs.has(item.attachedToGlyphId)) continue;
+    const side = item.mark && isBelowMark(item.mark) ? "below" : "above";
+    const key = item.attachedToGlyphId + ":" + side;
+    const stack = stacks.get(key) ?? [];
+    stack.push(item);
+    stacks.set(key, stack);
+  }
+  const tiers = new Map<string, number>();
+  for (const stack of stacks.values()) {
+    stack.sort((a, b) =>
+      Number(b.mark === "shadda") - Number(a.mark === "shadda") ||
+      (a.stackOrder ?? 0) - (b.stackOrder ?? 0) ||
+      (originalOrder.get(a.id) ?? 0) - (originalOrder.get(b.id) ?? 0));
+    stack.forEach((mark, tier) => tiers.set(mark.id, tier));
+  }
   const marks = [...current].map((item) => {
     if (item.kind !== "haraka" || !item.attachedToGlyphId) return item;
     const glyph = glyphs.get(item.attachedToGlyphId);
@@ -73,12 +95,9 @@ export function relayoutHarakat(previous: LetteringItem[], current: LetteringIte
       const dx = glyph.x - earlier.x, dy = glyph.y - earlier.y;
       return dx || dy ? { ...item, x: item.x + dx, y: item.y + dy } : item;
     }
-    const side = item.mark && isBelowMark(item.mark) ? "below" : "above";
-    const groupKey = glyph.id + ":" + side;
-    const tier = counts.get(groupKey) ?? 0;
-    counts.set(groupKey, tier + 1);
+    const tier = tiers.get(item.id) ?? 0;
     const at = smartMarkPosition(glyph, item, tier);
-    return { ...item, ...at };
+    return { ...item, ...at, stackOrder: tier };
   });
   return marks;
 }
