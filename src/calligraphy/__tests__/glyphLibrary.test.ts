@@ -32,6 +32,8 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(created.sourceText).toBe("المدني");
     expect(created.glyphIndex).toBe(2);
     expect(created.sourceFont).toBe(letter.font);
+    expect(created.appearance?.color).toBe(letter.color);
+    expect(created.appearance?.scaleX).toBe(1);
     expect(validateGlyphLibraryEntry(created)).toBe(true);
   });
 
@@ -63,6 +65,9 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(validateGlyphLibraryEntry({ ...good, pathData: "M0 0 A50 50 0 0 1 100 20 Z" }))
       .toBe(false);
     expect(validateGlyphLibraryEntry({ ...good, pathData: "M0 0 L0 0" })).toBe(false);
+    expect(validateGlyphLibraryEntry({
+      ...good, appearance: { ...good.appearance!, rotation: Infinity },
+    })).toBe(false);
     expect(parseGlyphLibrary("x".repeat(2_000_001))).toBeNull();
   });
 
@@ -102,6 +107,8 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(canReplaceWithLibraryEntry(glyph("different", "محمد"), source)).toBe(false);
     expect(canReplaceWithLibraryEntry(glyph("different", "المدني", 1), source)).toBe(false);
     expect(canReplaceWithLibraryEntry({ ...target, groupId: undefined }, source)).toBe(false);
+    expect(canReplaceWithLibraryEntry({ ...target, unitsPerEm: 2048 }, source)).toBe(false);
+    expect(canReplaceWithLibraryEntry({ ...target, font: "Gulzar" }, source)).toBe(false);
     expect(canReplaceWithLibraryEntry({ ...target, hidden: true }, source)).toBe(false);
   });
 
@@ -114,7 +121,18 @@ describe("personal Arabic calligraphy glyph library", () => {
     expect(independent.glyphIndex).toBeUndefined();
     expect(independent.fontGlyphId).toBeUndefined();
     expect(independent.size).toBe(120);
-    expect(independent.color).toBe("#123456");
+    expect(independent.color).toBe(source.appearance?.color);
+    expect(independent.rotation).toBe(0);
+    const styled = makeGlyphLibraryEntry({
+      ...glyph(), rotation: 32, skewX: -13, scaleX: 1.3,
+      weight: 2.4, color: "#345678",
+    }, "مقطع مزخرف")!;
+    const inserted = makeStandaloneLibraryGlyph(styled, 100, 100)!;
+    expect(inserted.rotation).toBe(32);
+    expect(inserted.skewX).toBe(-13);
+    expect(inserted.scaleX).toBe(1.3);
+    expect(inserted.weight).toBe(2.4);
+    expect(inserted.color).toBe("#345678");
     expect(independent.id).not.toBe(source.id);
   });
 
