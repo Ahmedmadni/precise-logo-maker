@@ -58,7 +58,7 @@ export interface LetteringItem {
   /** OpenType variant tag used when this word was shaped (if the font supports it). */
   alternateFeature?: string | undefined;
   /** Concrete font glyph ID, not a Unicode code point. */
-  fontGlyphId?: number;
+  fontGlyphId?: number | undefined;
   /** Manual SVG contour labels. No implicit anatomical identification. */
   contourRoles?: Record<string, "unassigned" | "head" | "body" | "tail" | "join" | "dot" | "counter">;
   /** Local font-unit entry and exit markers, NOT part of printed artwork. */
