@@ -30,7 +30,7 @@ describe("built-in Arabic calligraphy shape library", () => {
   });
 
   it("provides Arabic search with normalized diacritics and categories, including favorites", () => {
-    expect(normalizeCatalogSearch("إِطَالَة ـ")).toBe("اطاله ");
+    expect(normalizeCatalogSearch("إِطَالَة ـ")).toBe("اطاله");
     expect(filterCatalog("نُقْطة", "dots").length).toBeGreaterThan(1);
     expect(filterCatalog("شدة", "harakat").some((shape) => shape.id === "shadda-wide")).toBe(true);
     const favorite = SHAPE_CATALOG[0]!.id;
