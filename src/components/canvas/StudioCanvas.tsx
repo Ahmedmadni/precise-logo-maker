@@ -24,7 +24,7 @@ import { buildGridGeometry } from "../../grids";
 import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../grids/cells";
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
-import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
+import { appendBrushSamples, brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
@@ -744,17 +744,14 @@ export function StudioCanvas() {
     }
 
     if (brushTrailRef.current) {
-      const samples = e.nativeEvent.getCoalescedEvents?.() ?? [];
-      const events = samples.length ? samples : [e.nativeEvent];
-      const trail = [...brushTrailRef.current];
-      for (const event of events) {
-        const position = toWorld(event.clientX, event.clientY);
-        const pressure = brushPressure(event.pressure, e.pointerType);
-        const last = trail.at(-1);
-        if (last && dist(last, position) * view.zoom < 1.3) continue;
-        if (trail.length >= 2800) break;
-        trail.push({ ...position, pressure });
-      }
+      // Some WebViews omit the actual current pointer location from the
+      // coalesced batch. Append the dispatched event after the history.
+      const events = [...(e.nativeEvent.getCoalescedEvents?.() ?? []), e.nativeEvent];
+      const incoming = events.map((event): BrushSample => ({
+        ...toWorld(event.clientX, event.clientY),
+        pressure: brushPressure(event.pressure, e.pointerType),
+      }));
+      const trail = appendBrushSamples(brushTrailRef.current, incoming, view.zoom);
       brushTrailRef.current = trail;
       setBrushTrail(trail);
       return;
@@ -892,7 +889,17 @@ export function StudioCanvas() {
       return;
     }
     if (brushTrailRef.current) {
-      const points = brushTrailRef.current;
+      // A fast stroke may not emit a move event for its final few pixels.
+      // Pointer-up often reports zero pressure, so retain the last *actual*
+      // stylus pressure while capturing the physical release position.
+      const recorded = brushTrailRef.current;
+      const finalSample = e ? {
+        ...toWorld(e.clientX, e.clientY),
+        pressure: recorded.at(-1)?.pressure ?? brushPressure(e.pressure, e.pointerType),
+      } : null;
+      const points = finalSample
+        ? appendBrushSamples(recorded, [finalSample], view.zoom, true)
+        : recorded;
       brushTrailRef.current = null;
       setBrushTrail([]);
       const shape = vectorBrushOutline(points, brush);

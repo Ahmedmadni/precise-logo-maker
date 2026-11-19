@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Paintbrush, Settings2 } from "lucide-react";
 import { useStudio } from "../store/studioStore";
+import { BrushPresetPreview } from "../components/panels/BrushPresetPreview";
 
 /**
  * Small controls on the actual canvas when the brush is selected.
@@ -42,6 +43,10 @@ export function MobileBrushControls({ panelOpen }: { panelOpen: boolean }) {
       </div>
       {expanded && (
         <div className="space-y-2 border-t border-border pt-2">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-1.5">
+            <span className="text-[11px] font-semibold">معاينة الضربة الخطاطية</span>
+            <BrushPresetPreview preset={brush.preset} settings={brush} className="h-9 max-w-28 text-primary" />
+          </div>
           <label className="flex items-center gap-2 text-xs">
             <span className="w-20 shrink-0">الحجم</span>
             <input type="range" min={1} max={100} value={brush.size}
@@ -50,7 +55,7 @@ export function MobileBrushControls({ panelOpen }: { panelOpen: boolean }) {
             <output className="w-10 text-left tabular-nums" dir="ltr">{brush.size}px</output>
           </label>
           {brush.preset === "qalam" && <label className="flex items-center gap-2 text-xs">
-            <span className="w-20 shrink-0">زاوية السن</span>
+            <span className="w-20 shrink-0">زاوية الحافة</span>
             <input type="range" min={-90} max={90} value={brush.angle}
               onChange={(e) => setBrush({ angle: Number(e.target.value) })}
               className="min-w-0 flex-1 accent-[var(--color-primary)]" />
