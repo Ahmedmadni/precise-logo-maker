@@ -2,10 +2,12 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import type { DocumentState } from "../store/studioStore";
 import { buildSvgDocument, renderPng, type ExportOptions } from "../objects/export";
 import { parseProject, serializeProject } from "../objects/project";
+import { decodeReferencePayload } from "./referencePayload";
 
 interface NativeDocumentsBridge {
   saveFile(input: { filename: string; mimeType: string; base64: string }): Promise<{ saved?: boolean; cancelled?: boolean }>;
   openProject(): Promise<{ content?: string; cancelled?: boolean }>;
+  openReferenceImage(): Promise<{ mimeType?: string; base64?: string; cancelled?: boolean }>;
 }
 const documents = registerPlugin<NativeDocumentsBridge>("NativeDocuments");
 
@@ -60,4 +62,12 @@ export async function openAndroidProject(): Promise<DocumentState | null> {
   const doc = parseProject(result.content);
   if (!doc) throw new Error("Invalid .logo project");
   return doc;
+}
+
+/** Choose a local reference picture through the native Android Files provider. */
+export async function openAndroidReferenceImage(): Promise<File | null> {
+  requireAndroid();
+  const result = await documents.openReferenceImage();
+  if (result.cancelled) return null;
+  return decodeReferencePayload(result);
 }

@@ -6,6 +6,7 @@ import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { StudioHeaderOffline } from "./StudioHeaderOffline";
+import { MobileBrushControls } from "./MobileBrushControls";
 import { StudioEmptyGuide } from "../components/canvas/StudioEmptyGuide";
 import { useAutosave } from "../hooks/useAutosave";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
@@ -42,6 +43,7 @@ export function OfflineStudioPage() {
             <CanvasWithShortcuts />
           </ClientOnly>
           <StudioEmptyGuide openPanel={() => setPanelOpen(true)} />
+          <MobileBrushControls panelOpen={panelOpen} />
           <ClientOnly fallback={null}>
             <SelectionQuickEdit panelOpen={panelOpen} openPanel={() => setPanelOpen(true)} />
           </ClientOnly>

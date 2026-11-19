@@ -20,6 +20,8 @@ export interface ReferenceImage {
 
 /** Longest edge kept when re-encoding, so autosave stays inside local storage limits. */
 export const MAX_REFERENCE_PX = 1600;
+export const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
+const SAFE_RASTER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const readAsDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -69,7 +71,7 @@ export const readReferenceImage = async (
   file: File,
   artboard: Pick<Artboard, "width" | "height">,
 ): Promise<ReferenceImage | null> => {
-  if (!file.type.startsWith("image/")) return null;
+  if (!SAFE_RASTER_TYPES.has(file.type) || file.size === 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) return null;
   const raw = await readAsDataUrl(file);
   const image = await loadImage(raw);
   const longest = Math.max(image.naturalWidth, image.naturalHeight);

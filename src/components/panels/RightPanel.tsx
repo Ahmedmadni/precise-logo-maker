@@ -44,6 +44,7 @@ import { describeGeometry, formatAngle, formatLength } from "../../core/precisio
 import type { Grid, GuideShapeKind } from "../../grids";
 import { gridSupportsCells } from "../../grids/cells";
 import { fitToArtboard, readReferenceImage } from "../../objects/reference";
+import { nativeDocumentsAvailable, openAndroidReferenceImage } from "../../mobile/nativeDocuments";
 import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
@@ -1007,6 +1008,7 @@ function ReferenceImageSection() {
   const setReference = useStudio((s) => s.setReference);
   const updateReference = useStudio((s) => s.updateReference);
   const input = useRef<HTMLInputElement>(null);
+  const [loadingReference, setLoadingReference] = useState(false);
   const btn =
     "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
 
@@ -1015,9 +1017,22 @@ function ReferenceImageSection() {
     try {
       const next = await readReferenceImage(file, artboard);
       if (next) setReference(next);
-      else window.alert(t("Pick an image file (PNG, JPG, SVG, WebP)."));
+      else window.alert("اختر صورة PNG أو JPG أو WebP بحجم لا يتجاوز 12 MB");
     } catch {
       window.alert(t("Could not load that image."));
+    }
+  };
+
+  const pickFromDevice = async () => {
+    if (!nativeDocumentsAvailable()) { input.current?.click(); return; }
+    setLoadingReference(true);
+    try {
+      const imageFile = await openAndroidReferenceImage();
+      if (imageFile) await pick(imageFile);
+    } catch (cause) {
+      window.alert(cause instanceof Error ? cause.message : t("Could not load that image."));
+    } finally {
+      setLoadingReference(false);
     }
   };
 
@@ -1028,14 +1043,14 @@ function ReferenceImageSection() {
         {t("Sits under the grids so you can draw on top of it. It is never part of the export.")}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        <button type="button" className={btn} onClick={() => input.current?.click()}>
+        <button type="button" className={btn} disabled={loadingReference} onClick={() => void pickFromDevice()}>
           <ImagePlus className="h-3 w-3" aria-hidden />{" "}
           {reference ? t("Replace image") : t("Insert image")}
         </button>
         <input
           ref={input}
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/webp"
           className="hidden"
           aria-label={t("Reference image")}
           onChange={(e) => {
