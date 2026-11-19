@@ -26,7 +26,7 @@ import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/traci
 import { cleanStroke } from "../../core/tracing/simplify";
 import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
-import { createLettering } from "../../calligraphy/model";
+import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
