@@ -7,6 +7,7 @@ import { ToolRail } from "../components/toolbar/ToolRail";
 import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { StudioHeaderOffline } from "./StudioHeaderOffline";
 import { MobileBrushControls } from "./MobileBrushControls";
+import { MobileNodeControls } from "./MobileNodeControls";
 import { StudioEmptyGuide } from "../components/canvas/StudioEmptyGuide";
 import { useAutosave } from "../hooks/useAutosave";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
@@ -44,6 +45,7 @@ export function OfflineStudioPage() {
           </ClientOnly>
           <StudioEmptyGuide openPanel={() => setPanelOpen(true)} />
           <MobileBrushControls panelOpen={panelOpen} />
+          <MobileNodeControls panelOpen={panelOpen} />
           <ClientOnly fallback={null}>
             <SelectionQuickEdit panelOpen={panelOpen} openPanel={() => setPanelOpen(true)} />
           </ClientOnly>
@@ -79,8 +81,10 @@ export function OfflineStudioPage() {
 function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; openPanel: () => void }) {
   const glyph = useStudio((s) => s.selectedLetteringId);
   const geometryCount = useStudio((s) => s.selection.length);
+  const editNodes = useStudio((s) => s.editGlyphNodes);
+  const tool = useStudio((s) => s.tool);
   const setSection = useStudio((s) => s.setWorkspaceSection);
-  if (panelOpen || (!glyph && geometryCount === 0)) return null;
+  if (panelOpen || editNodes || tool !== "select" || (!glyph && geometryCount === 0)) return null;
   return (
     <button type="button" onClick={() => { setSection("edit"); openPanel(); }}
       aria-label="تحرير العنصر المحدد"

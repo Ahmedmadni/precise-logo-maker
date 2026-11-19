@@ -98,6 +98,51 @@ describe("outline node editor", () => {
     expect(result[2]).toMatchObject({ x: 10, y: 6 });
     expect(result.slice(4)).toEqual(outlineNodes(source).slice(4));
   });
+  it("keeps a closed cubic contour seam intact when moving its start anchor", () => {
+    const d = "M0 0 C5 10 10 10 0 0 Z M50 50 C55 60 60 60 70 50 Z";
+    const result = outlineNodes(moveOutlineNodeWithHandles(d, 0, 4, 6)!);
+    expect(result[0]).toMatchObject({ x: 4, y: 6 });
+    expect(result[1]).toMatchObject({ x: 9, y: 16 });
+    expect(result[2]).toMatchObject({ x: 14, y: 16 });
+    expect(result[3]).toMatchObject({ x: 4, y: 6 });
+    expect(result.slice(4)).toEqual(outlineNodes(d).slice(4));
+  });
+
+  it("moves the duplicate last anchor and its first outgoing handle as one closed seam", () => {
+    const d = "M0 0 C5 10 10 10 0 0 Z M50 50 L70 50 Z";
+    const result = outlineNodes(moveOutlineNodeWithHandles(d, 3, 4, 6)!);
+    expect(result[0]).toMatchObject({ x: 4, y: 6 });
+    expect(result[1]).toMatchObject({ x: 9, y: 16 });
+    expect(result[2]).toMatchObject({ x: 14, y: 16 });
+    expect(result[3]).toMatchObject({ x: 4, y: 6 });
+    expect(result.slice(4)).toEqual(outlineNodes(d).slice(4));
+  });
+
+  it("smooths a true closed cubic seam from either endpoint without touching other contours", () => {
+    const d = "M0 0 C5 10 10 10 0 0 Z M40 0 C45 10 50 10 60 0 Z";
+    for (const anchorId of [0, 3]) {
+      const updated = smoothOutlineAnchor(d, anchorId);
+      expect(updated).not.toBeNull();
+      const nodes = outlineNodes(updated!);
+      const incoming = nodes[2]!, outgoing = nodes[1]!, anchor = nodes[0]!;
+      const inDx = anchor.x - incoming.x, inDy = anchor.y - incoming.y;
+      const outDx = outgoing.x - anchor.x, outDy = outgoing.y - anchor.y;
+      expect(inDx * outDy - inDy * outDx).toBeCloseTo(0, 7);
+      expect(nodes[3]).toMatchObject({ x: 0, y: 0 });
+      expect(nodes.slice(4)).toEqual(outlineNodes(d).slice(4));
+    }
+  });
+
+  it("does not smooth across a straight Z closing edge or into another disconnected mark", () => {
+    const d = "M0 0 C5 10 10 10 20 0 Z M40 0 C45 10 50 10 60 0 Z";
+    expect(smoothOutlineAnchor(d, 0)).toBeNull();
+    expect(smoothOutlineAnchor(d, 3)).toBeNull();
+    expect(smoothOutlineAnchor(d, 4)).toBeNull();
+    const moved = outlineNodes(moveOutlineNodeWithHandles(d, 0, 2, 3)!);
+    expect(moved[3]).toMatchObject({ x: 20, y: 0 });
+    expect(moved.slice(4)).toEqual(outlineNodes(d).slice(4));
+  });
+
   it("exports ornaments as SVG paths without HTML text", () => {
     const ornament = createOrnament("star8", 100, 100);
     const svg = letteringSvg(ornament);
