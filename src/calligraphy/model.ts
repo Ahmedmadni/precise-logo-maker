@@ -47,6 +47,8 @@ export interface LetteringItem {
   /** Real vector diacritic contour from a licensed OpenType font, normalized to 100x100. */
   markPathData?: string;
   ornament?: OrnamentId;
+  /** Built-in independent catalog symbol, not a contextual OpenType glyph. */
+  catalogShapeId?: string;
   /** Permanent outline produced from OpenType shaping; no live font needed. */
   pathData?: string;
   /** Editable, dynamically rendered connection between two other outlined glyphs. */

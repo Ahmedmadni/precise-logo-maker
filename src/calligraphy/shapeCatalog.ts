@@ -455,6 +455,7 @@ export function createCatalogShape(
   return {
     id: "catalog-" + crypto.randomUUID(),
     kind: "outline",
+    catalogShapeId: shape.id,
     x: centerX - shape.size / 2,
     y: centerY + shape.size / 2,
     size: shape.size,
