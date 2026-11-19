@@ -271,7 +271,7 @@ export function smoothOutlineAnchor(d: string, anchorId: number): string | null 
   if (!isAnchor) return null;
 
   const anchor = { x: segment.values[pair * 2]!, y: segment.values[pair * 2 + 1]! };
-  let incoming = segment;
+  let incoming: (typeof segments)[number] = segment;
   let next = segments[index + 1];
   const contour = closedContour(segments, index);
   if (segment.cmd === "M") {
