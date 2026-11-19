@@ -1,6 +1,7 @@
 import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
+import { BrushPresetPreview } from "./BrushPresetPreview";
 
 const tools: { id: ToolId; label: string; description: string; icon: typeof PenLine }[] = [
   { id: "select", label: "تحديد وتحريك", description: "حدد الأشكال أو الحروف واسحبها", icon: MousePointer2 },
@@ -69,17 +70,18 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           <p className="text-xs leading-5 text-muted-foreground">
             ارسم بالإصبع أو القلم. يتم حفظ كل ضربة كشكل فيكتور مغلق يمكن تغيير حجمه ولونه وتصديره.
           </p>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="شكل سن القلم">
             {([
-              ["round", "دائرية"],
-              ["qalam", "سن قصبة"],
-              ["taper", "مدببة"],
+              ["round", "دائرية"], ["qalam", "سن قصبة"], ["taper", "مدببة"],
             ] as const).map(([preset, label]) => (
               <button key={preset} type="button" aria-pressed={brush.preset === preset}
-                onClick={() => setBrush({ preset })}
-                className={`min-h-12 rounded-lg border px-1 text-xs font-semibold ${brush.preset === preset
-                  ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
-                {label}
+                onClick={() => setBrush({ preset })} title={"معاينة: " + label}
+                className={"flex min-h-[92px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border p-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary " +
+                  (brush.preset === preset
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border bg-background hover:border-primary/40")}>
+                <BrushPresetPreview preset={preset} settings={brush} />
+                <span className="text-center leading-4">{label}</span>
               </button>
             ))}
           </div>
@@ -93,11 +95,28 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <input className="h-10 w-20 rounded-lg border border-border bg-background p-1"
               type="color" value={brush.color} onChange={(e) => setBrush({ color: e.target.value })} />
           </label>
-          {brush.preset === "qalam" && <label className="block space-y-1 text-xs">
-            <span className="flex justify-between"><span>زاوية سن القصبة</span><span dir="ltr">{brush.angle}°</span></span>
-            <input className="w-full accent-[var(--color-primary)]" type="range" min={-90} max={90}
-              value={brush.angle} onChange={(e) => setBrush({ angle: Number(e.target.value) })} />
-          </label>}
+          {brush.preset === "qalam" && <div className="space-y-2">
+            <label className="block space-y-1 text-xs">
+              <span className="flex justify-between">
+                <span>زاوية حافة سن القصبة</span><span dir="ltr">{brush.angle}°</span>
+              </span>
+              <input className="min-h-11 w-full accent-[var(--color-primary)]" type="range" min={-90} max={90}
+                value={brush.angle} onChange={(e) => setBrush({ angle: Number(e.target.value) })} />
+            </label>
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+              <svg viewBox="0 0 70 48" className="h-12 w-20 shrink-0" role="img"
+                aria-label={"شكل حافة سن القصبة بزاوية " + brush.angle + " درجة"}>
+                <g transform={"translate(35 24) rotate(" + brush.angle + ")"}>
+                  <rect x="-26" y="-4" width="52" height="8" rx="2"
+                    fill="currentColor" className="text-primary" />
+                </g>
+              </svg>
+              <p className="text-[11px] leading-5 text-muted-foreground">
+                عرض الضربة أكبر عند الحركة عموديًا على حافة السن،
+                وأنحف عند الحركة في اتجاه الحافة.
+              </p>
+            </div>
+          </div>}
           <label className="block space-y-1 text-xs">
             <span className="flex justify-between"><span>تنعيم حركة اليد</span><span dir="ltr">{Math.round(brush.smoothing * 100)}%</span></span>
             <input className="w-full accent-[var(--color-primary)]" type="range" min={0} max={80}
@@ -111,7 +130,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           </label>
           <p className="text-[11px] leading-5 text-muted-foreground">
             الضغط الفعلي يحتاج قلمًا وجهازًا يدعمان Pointer Events. الرسم بالإصبع يستخدم ضغطًا افتراضيًا ثابتًا.
-            هذه فرش فيكتور مبدئية وليست بديلًا عن مكتبة ضربات خط الثلث الأصيلة.
+            نقرة القصبة المفردة تترك بصمة سن مائلة بدل دائرة. الأطراف المدببة تعتمد على المسافة لا سرعة العينات. هذه فرش فيكتور وليست ضربات ثلث أصيلة جاهزة.
           </p>
         </section>
       )}
