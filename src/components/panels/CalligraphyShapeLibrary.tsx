@@ -97,7 +97,7 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
       <label className="relative block">
         <span className="sr-only">ابحث في الأشكال العربية</span>
         <Search className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-muted-foreground" aria-hidden />
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+        <input type="search" value={query} onChange={(e) => { setQuery(e.target.value); setPreviewId(null); }}
           placeholder="ابحث: شدة، نقطة، كشيدة، قطرة..."
           className="min-h-11 w-full rounded-xl border border-border bg-background py-2 pe-10 ps-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary" />
       </label>
@@ -106,7 +106,7 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
         className="flex max-w-full gap-1.5 overflow-x-auto pb-2 [scrollbar-width:thin]">
         {CATEGORY_LABELS.map((tab) => (
           <button key={tab.id} type="button" aria-pressed={category === tab.id}
-            onClick={() => setCategory(tab.id)}
+            onClick={() => { setCategory(tab.id); setPreviewId(null); }}
             className={"min-h-10 shrink-0 rounded-xl border px-3 text-[11px] font-semibold transition-colors " +
               (category === tab.id ? "border-primary bg-primary/15 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground")}>
             {tab.label}
@@ -180,59 +180,65 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
               لا توجد عناصر مطابقة. جرّب كلمة أخرى أو افتح تصنيف «الكل».
             </p>
           )}
-          <div className={view === "grid" ? "grid grid-cols-2 gap-2 min-[460px]:grid-cols-3" : "flex flex-col gap-2"}>
+          <div className={view === "grid"
+            ? "grid grid-cols-2 gap-2 min-[460px]:grid-cols-3"
+            : "flex flex-col gap-2"}>
             {filtered.map((shape) => {
               const favored = favorites.includes(shape.id);
               return (
                 <article key={shape.id}
-                  className={"group min-w-0 rounded-2xl border border-border bg-background p-2 transition-colors hover:border-primary/50 " +
-                    (view === "list" ? "flex items-center gap-2" : "space-y-1.5")}>
+                  className={"min-w-0 rounded-2xl border border-border bg-background p-2 transition-colors hover:border-primary/50 " +
+                    (view === "list" ? "flex items-center gap-2.5" : "flex flex-col gap-2")}>
                   <button type="button" draggable
-                    title="اضغط للإضافة أو اسحب الشكل إلى لوحة الرسم على الكمبيوتر"
+                    title="اضغط لإدراج الشكل أو اسحبه إلى لوحة الرسم على الكمبيوتر"
                     aria-label={"إضافة " + shape.label + " إلى اللوحة"}
                     onClick={() => insert(shape)}
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = "copy";
-                      e.dataTransfer.setData(CATALOG_DRAG_MIME, shape.id);
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "copy";
+                      event.dataTransfer.setData(CATALOG_DRAG_MIME, shape.id);
                     }}
-                    className={"flex min-w-0 items-center justify-center rounded-xl bg-card focus-visible:outline-2 focus-visible:outline-primary " +
-                      (view === "list" ? "h-16 w-20 shrink-0" : "h-[88px] w-full")}>
-                    <div className="flex h-full w-full max-w-[148px] items-center justify-center px-3 py-2">
+                    className={"flex min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-transparent bg-card focus-visible:outline-2 focus-visible:outline-primary " +
+                      (view === "list" ? "h-[88px] w-20" : "h-24 w-full")}>
+                    <div className="flex h-full w-full max-w-[148px] items-center justify-center p-2">
                       <ShapePreview shape={shape} />
                     </div>
                   </button>
-                  <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
-                    <div className="min-w-0">
-                      <h4 title={shape.label} className="line-clamp-2 text-[11px] font-semibold leading-5">{shape.label}</h4>
+                  <div className={"min-w-0 flex-1 space-y-2 " + (view === "list" ? "self-stretch" : "")}>
+                    <div className="min-h-10 space-y-0.5">
+                      <h4 title={shape.label} className="line-clamp-2 text-[11px] font-semibold leading-5">
+                        {shape.label}
+                      </h4>
                       <p className="truncate text-[10px] text-muted-foreground">
-                        {CATEGORY_LABELS.find((c) => c.id === shape.category)?.label} • Vector
+                        {CATEGORY_LABELS.find((item) => item.id === shape.category)?.label} · SVG
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="grid grid-cols-3 gap-1" role="group"
+                      aria-label={"أوامر " + shape.label}>
+                      <button type="button" title={"إدراج " + shape.label}
+                        aria-label={"إدراج " + shape.label}
+                        onClick={() => insert(shape)}
+                        className="flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary">
+                        <Plus className="h-4 w-4" aria-hidden />
+                      </button>
                       <button type="button" title={"معاينة " + shape.label}
                         aria-label={"معاينة مكبرة " + shape.label}
                         aria-pressed={previewId === shape.id}
                         onClick={() => setPreviewId(previewId === shape.id ? null : shape.id)}
-                        className={"flex h-11 w-11 items-center justify-center rounded-xl border " +
-                          (previewId === shape.id ? "border-primary bg-primary/10 text-primary" : "border-border")}>
+                        className={"flex min-h-11 min-w-0 items-center justify-center rounded-xl border focus-visible:outline-2 focus-visible:outline-primary " +
+                          (previewId === shape.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
                         <Eye className="h-4 w-4" aria-hidden />
                       </button>
-                    <button type="button" aria-label={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
-                      aria-pressed={favored}
-                      title={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
-                      onClick={() => toggleFavorite(shape.id)}
-                      className={"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border " +
-                        (favored ? "text-primary" : "text-muted-foreground")}>
-                      {favored ? <Heart className="h-4 w-4" fill="currentColor" /> : <Heart className="h-4 w-4" />}
-                    </button>
+                      <button type="button"
+                        aria-label={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+                        aria-pressed={favored}
+                        title={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+                        onClick={() => toggleFavorite(shape.id)}
+                        className={"flex min-h-11 min-w-0 items-center justify-center rounded-xl border border-border focus-visible:outline-2 focus-visible:outline-primary " +
+                          (favored ? "text-primary" : "text-muted-foreground")}>
+                        <Heart className="h-4 w-4" fill={favored ? "currentColor" : "none"} aria-hidden />
+                      </button>
                     </div>
                   </div>
-                  {view === "grid" && (
-                    <button type="button" onClick={() => insert(shape)}
-                      className="flex min-h-10 w-full items-center justify-center gap-1 rounded-xl border border-primary/35 text-[11px] font-semibold text-primary hover:bg-primary/10">
-                      <Plus className="h-3.5 w-3.5" /> إدراج
-                    </button>
-                  )}
                 </article>
               );
             })}
