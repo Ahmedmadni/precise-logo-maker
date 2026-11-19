@@ -1,6 +1,7 @@
 import type { LetteringItem } from "./model";
 import { safePath } from "./model";
 import { parseOutline } from "./pathEditor";
+import { outlineBounds } from "./catalogGeometry";
 
 /**
  * Original, editable SVG marks inspired by the visual vocabulary of Arabic
@@ -440,24 +441,27 @@ export function findCatalogShape(id: string): CatalogShape | undefined {
 }
 
 /**
- * Insert each catalog entry as a completely independent outlined SVG glyph.
- * The source path uses 100 font units and centers on the specified artboard
- * coordinate. This yields the same preview, on-canvas and SVG export geometry.
+ * Insert independent editable SVG glyphs, centered by *real* quadratic and
+ * cubic curve bounds (not a nominal 100x100 viewBox). Glyph local Y points up
+ * whereas screen coordinates point down; the y offset therefore has opposite
+ * sign. Identical contours are used for preview, project and SVG export.
  */
 export function createCatalogShape(
   id: string, centerX: number, centerY: number, color = "#d1a95e",
 ): LetteringItem | null {
   const shape = findCatalogShape(id);
-  if (!shape || !Number.isFinite(centerX) || !Number.isFinite(centerY) ||
+  const bounds = shape ? outlineBounds(shape.path) : null;
+  if (!bounds || !Number.isFinite(centerX) || !Number.isFinite(centerY) ||
       Math.abs(centerX) > 100000 || Math.abs(centerY) > 100000 ||
       !/^#[0-9a-fA-F]{6}$/.test(color)) return null;
   if (safePath(shape.path) !== shape.path || !parseOutline(shape.path)) return null;
+  const scale = shape.size / 100;
   return {
     id: "catalog-" + crypto.randomUUID(),
     kind: "outline",
     catalogShapeId: shape.id,
-    x: centerX - shape.size / 2,
-    y: centerY + shape.size / 2,
+    x: centerX - bounds.midX * scale,
+    y: centerY + bounds.midY * scale,
     size: shape.size,
     rotation: 0,
     color,
