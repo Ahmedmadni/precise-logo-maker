@@ -10,6 +10,7 @@ import { markPathFromTypeface } from "../../calligraphy/markOutlines";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { LetteringGlyph } from "../canvas/LetteringGlyph";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
+import { CalligraphyShapeLibrary } from "./CalligraphyShapeLibrary";
 import { useStudio } from "../../store/studioStore";
 import { placeAttachedHaraka } from "../../calligraphy/harakaAnchoring";
 import { insertAtSelection, removeArabicMarks } from "../../calligraphy/textEditing";
@@ -44,7 +45,7 @@ export function LetteringPanel({ section, onCreated }: {
     if (section) setWorkspaceSection(next === "words" ? "text" : next === "marks" ? "ornaments" : "layers");
   };
   const [phrase, setPhrase] = useState("المدني");
-  const [markCategory, setMarkCategory] = useState<"harakat" | "decorations">("harakat");
+  const [markCategory, setMarkCategory] = useState<"catalog" | "harakat" | "decorations">("catalog");
   const [markSource, setMarkSource] = useState<"typeface" | "simple">("typeface");
   const [markLoading, setMarkLoading] = useState(false);
   const [font, setFont] = useState<FontPreset>("Amiri");
@@ -308,10 +309,11 @@ export function LetteringPanel({ section, onCreated }: {
 
       {mode === "marks" && (
         <section className="space-y-4">
-          <nav className="grid grid-cols-2 gap-2" aria-label="نوع العنصر المراد إضافته">
+          <nav className="grid grid-cols-3 gap-1.5" aria-label="نوع العنصر المراد إضافته">
             {([
-              ["harakat", "الحركات والتشكيل"],
-              ["decorations", "الزخارف والامتدادات"],
+              ["catalog", "مكتبة الأشكال"],
+              ["harakat", "حركات الخط"],
+              ["decorations", "الزخارف"],
             ] as const).map(([category, label]) => (
               <button type="button" key={category} onClick={() => setMarkCategory(category)}
                 aria-pressed={markCategory === category}
@@ -320,6 +322,7 @@ export function LetteringPanel({ section, onCreated }: {
               </button>
             ))}
           </nav>
+          {markCategory === "catalog" && <CalligraphyShapeLibrary onCreated={onCreated} />}
           {markCategory === "harakat" && <div>
             <h3 className="mb-2 font-semibold">اختر حركة لإضافتها</h3>
             <input className={field + " mb-3"} type="search" aria-label="البحث في التشكيل" placeholder="ابحث عن حركة أو علامة" value={markSearch} onChange={(e) => setMarkSearch(e.target.value)} />

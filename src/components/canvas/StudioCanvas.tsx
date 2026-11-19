@@ -27,6 +27,7 @@ import { cleanStroke } from "../../core/tracing/simplify";
 import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
+import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
@@ -1065,6 +1066,23 @@ export function StudioCanvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes(CATALOG_DRAG_MIME)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }
+      }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.types.includes(CATALOG_DRAG_MIME)) return;
+        event.preventDefault();
+        const id = event.dataTransfer.getData(CATALOG_DRAG_MIME);
+        const droppedAt = toWorld(event.clientX, event.clientY);
+        const selected = (doc.lettering ?? []).find((item) => item.id === selectedLetteringId);
+        const color = selected?.color && /^#[0-9a-fA-F]{6}$/.test(selected.color)
+          ? selected.color : "#d1a95e";
+        const added = createCatalogShape(id, droppedAt.x, droppedAt.y, color);
+        if (added) addLettering(added);
+      }}
       onPointerLeave={(e) => {
         // A captured pointer may leave the canvas while dragging. Keep its
         // gesture active until pointerup or pointercancel, not pointerleave.

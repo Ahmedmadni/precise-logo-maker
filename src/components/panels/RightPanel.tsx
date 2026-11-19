@@ -1897,7 +1897,7 @@ function HistoryTab() {
 
 const MAIN_SECTIONS = [
   { id: "text", label: "كتابة", icon: Type },
-  { id: "ornaments", label: "تشكيل", icon: Sparkles },
+  { id: "ornaments", label: "المكتبة", icon: Sparkles },
   { id: "edit", label: "تعديل", icon: SlidersHorizontal },
   { id: "layers", label: "العناصر", icon: Layers3 },
   { id: "draw", label: "رسم", icon: PenTool },
@@ -1926,7 +1926,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
     : selected ? [selected] : [];
   const [tab, setTab] = useState<Tab>("Properties");
   const title: Record<typeof section, string> = {
-    text: "إضافة كتابة", ornaments: "التشكيل والزخارف",
+    text: "إضافة كتابة", ornaments: "مكتبة التشكيل العربي",
     edit: "تعديل العنصر", layers: "عناصر التصميم",
     draw: "أدوات الرسم", advanced: "الإعدادات المتقدمة",
   };
@@ -1944,7 +1944,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
                 "غيّر النص والموضع والحجم"
               : selectedGeometry.length > 0 ? "تعديل الشكل الهندسي المحدد" : "اختر عنصرا من مساحة التصميم" :
              section === "text" ? "اكتب الكلمة، اختر الخط، ثم أضفها" :
-             section === "ornaments" ? "اختر الحركات أو الزخارف من المجموعة المناسبة" :
+             section === "ornaments" ? "حركات ونقاط وكشائد ومقاطع خطاطية أصلية قابلة لتحرير مساراتها" :
              section === "layers" ? "رتب عملك وحدد العنصر الذي تريد تعديله" :
              section === "draw" ? "اختر الأداة ثم استخدم مساحة الرسم" :
              "خيارات متخصصة للرسم الهندسي"}
