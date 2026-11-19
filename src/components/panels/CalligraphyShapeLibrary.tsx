@@ -22,7 +22,7 @@ function readFavorites(): string[] {
  * Indexed offline calligraphic vectors. The thumbnails are the same underlying
  * paths inserted as editable outline items, never bitmap image stickers.
  */
-export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: () => void }) {
+export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void) | undefined }) {
   const [category, setCategory] = useState<LibraryView>("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
