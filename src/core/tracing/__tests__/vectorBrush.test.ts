@@ -39,8 +39,8 @@ describe("pressure-aware editable vector brushes", () => {
     expect(geometryToPathData(responsive)).not.toEqual(geometryToPathData(uniform));
   });
 
-  it("creates a printable SVG dot from a single pen tap", () => {
-    const dot = vectorBrushOutline([samples[0]!], DEFAULT_BRUSH)!;
+  it("creates a printable round SVG dot from a single round-brush tap", () => {
+    const dot = vectorBrushOutline([samples[0]!], { ...DEFAULT_BRUSH, preset: "round" })!;
     expect(dot.points).toHaveLength(20);
     expect(dot.closed).toBe(true);
   });
