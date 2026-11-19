@@ -214,6 +214,7 @@ export function moveOutlineNodeWithHandles(
   if (!location) return null;
   const { index, pair } = location;
   const segment = segments[index]!;
+  const closed = closedContour(segments, index);
   const control = segment.cmd === "C" && pair < 2 || segment.cmd === "Q" && pair === 0;
   if (control) return editOutlineNode(d, nodeId, x, y);
   const offset = pair * 2;
@@ -234,7 +235,6 @@ export function moveOutlineNodeWithHandles(
   const next = segments[index + 1];
   if (next?.cmd === "C" || next?.cmd === "Q") movePair(next, 0);
 
-  const closed = closedContour(segments, index);
   if (closed?.coincident) {
     if (index === closed.start) {
       // Moving M of an explicitly coincident closed path also moves the final
@@ -273,11 +273,14 @@ export function smoothOutlineAnchor(d: string, anchorId: number): string | null 
   const anchor = { x: segment.values[pair * 2]!, y: segment.values[pair * 2 + 1]! };
   let incoming = segment;
   let next = segments[index + 1];
+  const contour = closedContour(segments, index);
   if (segment.cmd === "M") {
-    const contour = closedContour(segments, index);
     if (!contour?.coincident || index !== contour.start) return null;
     incoming = segments[contour.lastIndex]!;
     next = segments[index + 1];
+  } else if (contour?.coincident && index === contour.lastIndex) {
+    // The final explicit curve endpoint is the same anchor as M.
+    next = segments[contour.start + 1];
   }
   if (incoming.cmd !== "C" && incoming.cmd !== "Q") return null;
   if (next?.cmd !== "C" && next?.cmd !== "Q") return null;
