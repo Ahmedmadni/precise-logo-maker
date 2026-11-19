@@ -85,3 +85,9 @@
 Run `node scripts/install-native-documents.mjs` after `bunx cap add android` and before `bunx cap sync android`. GitHub CI now does this automatically. The bundled first-party Android `NativeDocuments` plugin uses Storage Access Framework `ACTION_CREATE_DOCUMENT` and `ACTION_OPEN_DOCUMENT` to save `.logo`, SVG and PNG directly to a user-chosen location (without broad storage permissions). Cancelled pickers preserve the current design. The web editor retains its existing browser download implementation.
 
 Exports larger than 32 MiB and imported projects larger than 24 MiB are rejected. The `.logo` parser validates the selected file. Other picker/export operations elsewhere in panels still require native-device verification; this change does not prove end-to-end phone behavior. Test in airplane mode on an Android device: reopen `.logo`, view exported SVG/PNG in other apps, cancel dialogs, repeat saves, switch background/foreground, and check small displays. No physical-device QA has yet been performed.
+
+## مرجع الصورة والتحكم السريع بالفرشاة
+
+أصبح إدراج الصور المرجعية من قائمة المشروع أو لوحة المراجع في أندرويد يستخدم منتقي الملفات الأصلي لصور PNG/JPEG/WebP فقط (حد 12 MiB قبل تصغير الضلع الأكبر إلى 1600px). لا تُستخدم الصور المرجعية في تصدير الشعار، ولكنها تحفظ محليًا داخل المشروع. أُبقيت واجهة الموقع على اختيار الملفات من المتصفح. أُضيف شريط فرشاة مختصر على مساحة الرسم في شاشات الهاتف للتبديل بين أنواع الفرش وضبط الحجم وزاوية سن القصبة وضغط القلم دون فتح لوحة الأدوات. لا يعني هذا إضافة خطوط ثلث جديدة أو استبدال المحرك الهندسي.
+
+فحوص الاختبارات الآلية تتأكد من البناء والتحقق من نوع وحجم الصور، لكن يجب اختبار فتح الصور، استعمال القلم، الاستيراد، التصدير والعودة من الخلفية على جهاز أندرويد حقيقي.

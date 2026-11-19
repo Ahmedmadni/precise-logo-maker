@@ -71,6 +71,56 @@ public class NativeDocumentsPlugin extends Plugin {
         }
     }
 
+    private static final int MAX_REFERENCE_BYTES = 12 * 1024 * 1024;
+
+    @PluginMethod
+    public void openReferenceImage(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/png", "image/jpeg", "image/webp"});
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(call, intent, "onOpenReferenceImage");
+    }
+
+    @ActivityCallback
+    private void onOpenReferenceImage(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null
+                || result.getData().getData() == null) {
+            JSObject response = new JSObject();
+            response.put("cancelled", true);
+            call.resolve(response);
+            return;
+        }
+        Uri uri = result.getData().getData();
+        String mimeType = getContext().getContentResolver().getType(uri);
+        if (!("image/png".equals(mimeType) || "image/jpeg".equals(mimeType)
+                || "image/webp".equals(mimeType))) {
+            call.reject("Only PNG, JPEG and WebP reference images are supported");
+            return;
+        }
+        try (InputStream stream = getContext().getContentResolver().openInputStream(uri);
+             ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            if (stream == null) throw new java.io.IOException("Image is not readable");
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = stream.read(buffer)) != -1) {
+                if (bytes.size() + n > MAX_REFERENCE_BYTES) {
+                    call.reject("Reference image exceeds 12 MiB limit");
+                    return;
+                }
+                bytes.write(buffer, 0, n);
+            }
+            JSObject response = new JSObject();
+            response.put("mimeType", mimeType);
+            response.put("base64", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP));
+            call.resolve(response);
+        } catch (Exception error) {
+            call.reject("Could not read selected reference image", error);
+        }
+    }
+
     @PluginMethod
     public void openProject(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);

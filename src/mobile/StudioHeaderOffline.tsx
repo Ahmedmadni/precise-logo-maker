@@ -10,7 +10,7 @@ import { readReferenceImage } from "../objects/reference";
 import { fitBounds } from "../core/coordinates/view";
 import { artboardWorldBounds, useStudio } from "../store/studioStore";
 import { useLangStore } from "../i18n";
-import { nativeDocumentsAvailable, saveAndroidProject, exportAndroidSvg, exportAndroidPng, openAndroidProject } from "./nativeDocuments";
+import { nativeDocumentsAvailable, saveAndroidProject, exportAndroidSvg, exportAndroidPng, openAndroidProject, openAndroidReferenceImage } from "./nativeDocuments";
 
 
 type Menu = "file" | "view" | "export" | null;
@@ -72,6 +72,15 @@ export function StudioHeaderOffline() {
       setReference(image);
       close();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "تعذر فتح الصورة"); }
+  };
+  const openReference = async () => {
+    if (!nativeFiles) { referenceFile.current?.click(); return; }
+    setBusy(true); setError("");
+    try {
+      const file = await openAndroidReferenceImage();
+      if (file) await loadImage(file);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : tr("تعذر استيراد الصورة", "Image import failed")); }
+    finally { setBusy(false); }
   };
   const exportImage = async () => {
     setBusy(true); setError("");
@@ -158,7 +167,7 @@ export function StudioHeaderOffline() {
         aria-label={tr("فتح مشروع", "Open project")} onChange={(e) => {
           void loadFile(e.target.files?.[0]); e.target.value = "";
         }} />
-      <input ref={referenceFile} type="file" accept="image/*" className="hidden"
+      <input ref={referenceFile} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
         aria-label={tr("إضافة صورة مرجعية", "Add reference image")} onChange={(e) => {
           void loadImage(e.target.files?.[0]); e.target.value = "";
         }} />
@@ -181,7 +190,7 @@ export function StudioHeaderOffline() {
             <button type="button" className={action} onClick={() => setMenu("view")}><Settings2 className="h-5 w-5 text-primary" />{tr("خيارات العرض والشبكات", "View & grid options")}</button>
             <button type="button" className={action} disabled={busy} onClick={() => void openProject()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
             <button type="button" className={action} disabled={busy} onClick={() => void saveBackup()}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
-            <button type="button" className={action} onClick={() => referenceFile.current?.click()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
+            <button type="button" className={action} disabled={busy} onClick={() => void openReference()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
             <button type="button" className={action} onClick={() => { setLang(lang === "ar" ? "en" : "ar"); close(); }}>
               <Languages className="h-5 w-5 text-primary" />{tr("اللغة: العربية", "Language: English")}</button>
             <p className="p-2 text-[11px] leading-5 text-muted-foreground">{nativeFiles ? tr("اختر مكان الحفظ من ملفات أندرويد؛ إلغاء الاختيار لا يحذف مشروعك.", "Choose a destination in Android Files; cancelling keeps your work.") : tr("يُحفظ عملك تلقائيا على هذا الجهاز. احتفظ بملف .logo للاستخدام على جهاز آخر.", "Your work is autosaved locally. Export a .logo file as backup.")}</p>
