@@ -17,7 +17,7 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       onClick: () => { setTool("select"); closePanel(); } },
     { id: "text", label: "كتابة", icon: Type, active: section === "text" && panelOpen,
       onClick: () => { setSection("text"); setTool("select"); openPanel(); } },
-    { id: "ornaments", label: "تشكيل", icon: Sparkles, active: section === "ornaments" && panelOpen,
+    { id: "ornaments", label: "المكتبة", icon: Sparkles, active: section === "ornaments" && panelOpen,
       onClick: () => { setSection("ornaments"); setTool("select"); openPanel(); } },
     { id: "edit", label: "تعديل", icon: SlidersHorizontal, active: section === "edit" && panelOpen,
       onClick: () => { setSection("edit"); setTool("select"); openPanel(); } },
