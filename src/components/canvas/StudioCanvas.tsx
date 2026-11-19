@@ -26,12 +26,14 @@ import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/traci
 import { cleanStroke } from "../../core/tracing/simplify";
 import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
-import { createLettering } from "../../calligraphy/model";
+import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
 import { GlyphJoinDistanceGuide } from "./GlyphJoinDistanceGuide";
+import { RibbonEditHandles } from "./RibbonEditHandles";
+import { ribbonHandleDragPatch, ribbonHandleGeometry, type RibbonHandleId } from "../../calligraphy/ribbonHandles";
 import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../calligraphy/contourComposer";
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
@@ -138,6 +140,12 @@ export function StudioCanvas() {
     id: string; index: number; path: string; localStart: Point;
   } | null>(null);
   const joinDragRef = useRef<{ id: string; side: JoinSide } | null>(null);
+  const ribbonDragRef = useRef<{
+    id: string;
+    handle: RibbonHandleId;
+    original: NonNullable<LetteringItem["ribbon"]>;
+    geometry: NonNullable<ReturnType<typeof ribbonHandleGeometry>>;
+  } | null>(null);
   const scaleDragRef = useRef<{
     id: string; start: Point; axis: "scaleX" | "scaleY" | "rotation"; side: number;
     value: number; dimension: number; rotation: number; pivot: Point;
@@ -384,6 +392,7 @@ export function StudioCanvas() {
     nodeDragRef.current = null;
     contourDragRef.current = null;
     joinDragRef.current = null;
+    ribbonDragRef.current = null;
     scaleDragRef.current = null;
     useStudio.setState({ letteringPreview: null });
     setNodePreview(null);
@@ -510,6 +519,19 @@ export function StudioCanvas() {
 
     if (tool === "select") {
       const target = e.target as Element;
+      const hitRibbonHandle = target.closest("[data-ribbon-handle]");
+      const selectedBridge = doc.lettering?.find((item) => item.id === selectedLetteringId && item.kind === "bridge");
+      const handleId = hitRibbonHandle?.getAttribute("data-ribbon-handle");
+      if (selectedBridge?.ribbon && (handleId === "start" || handleId === "end" || handleId === "bend")) {
+        const geometry = ribbonHandleGeometry(selectedBridge, doc.lettering ?? []);
+        if (geometry) {
+          ribbonDragRef.current = {
+            id: selectedBridge.id, handle: handleId, original: { ...selectedBridge.ribbon }, geometry,
+          };
+          setOverlapIds([]);
+          return;
+        }
+      }
       const outline = doc.lettering?.find((item) => item.id === selectedLetteringId);
       const clickedContour = editGlyphContours ? target.closest("[data-contour-index]") : null;
       const rawContourIndex = clickedContour?.getAttribute("data-contour-index");
@@ -668,6 +690,12 @@ export function StudioCanvas() {
       }
       return;
     }
+    if (ribbonDragRef.current) {
+      const dragging = ribbonDragRef.current;
+      const patch = ribbonHandleDragPatch(dragging.original, dragging.geometry, dragging.handle, world);
+      if (patch) setLetteringPreview(dragging.id, { ribbon: { ...dragging.original, ...patch } });
+      return;
+    }
     if (joinDragRef.current) {
       const dragging = joinDragRef.current;
       const item = (doc.lettering ?? []).find((entry) => entry.id === dragging.id);
@@ -814,6 +842,11 @@ export function StudioCanvas() {
       const changed = nodePreview?.id === id && nodePreview.path !== original ? nodePreview.path : null;
       setNodePreview(null);
       if (changed) updateLettering(id, { pathData: changed });
+      return;
+    }
+    if (ribbonDragRef.current) {
+      ribbonDragRef.current = null;
+      commitLetteringPreview();
       return;
     }
     if (joinDragRef.current) {
@@ -1146,6 +1179,12 @@ export function StudioCanvas() {
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
             })}
           </g>
+          {/* Live ribbon controls: direct touch editing only while selected. Not exported. */}
+          {tool === "select" && (doc.lettering ?? [])
+            .filter((item) => item.id === selectedLetteringId && item.kind === "bridge" && !item.hidden)
+            .map((item) => <RibbonEditHandles key={item.id}
+              item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+              glyphs={renderedLettering} zoom={view.zoom} />)}
           {/* Live join measurement and target anchors are editor-only overlays. */}
           {editJoinAnchors && joinGuide && selectedLetteringId === joinGuide.sourceId && (() => {
             const items = doc.lettering ?? [];

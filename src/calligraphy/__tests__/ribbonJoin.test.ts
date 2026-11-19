@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createLettering, letteringSvg, type LetteringItem } from "../model";
 import { buildRibbonPath, createRibbonLink, remapRibbons, sampleRibbon } from "../ribbonJoin";
+import { ribbonHandleDragPatch, ribbonHandleGeometry, isRibbonWidthRisk } from "../ribbonHandles";
 import { buildSvgDocument } from "../../objects/export";
 import { parseProject, serializeProject } from "../../objects/project";
 import type { DocumentState } from "../../store/studioStore";
@@ -15,6 +16,62 @@ const glyph = (id: string, x: number, y: number, groupId = "w1"): LetteringItem 
 
 const source = glyph("a", 100, 220);
 const target = glyph("b", 390, 255);
+
+describe("direct ribbon canvas handles", () => {
+  it("tracks the actual exported centerline for the bend handle and both end caps", () => {
+    const bridge = createRibbonLink(source, target)!;
+    const geo = ribbonHandleGeometry(bridge, [source, target])!;
+    const samples = sampleRibbon(bridge, [source, target], 16)!;
+    expect(geo.bend.x).toBeCloseTo(samples[8]!.center.x, 7);
+    expect(geo.bend.y).toBeCloseTo(samples[8]!.center.y, 7);
+    expect(geo.startCap).toEqual(samples[0]!.center);
+    expect(geo.endCap).toEqual(samples[16]!.center);
+  });
+  it("changes outgoing and incoming tangent angles by dragging each handle", () => {
+    const bridge = createRibbonLink(source, target)!;
+    const geo = ribbonHandleGeometry(bridge, [source, target])!;
+    const start = ribbonHandleDragPatch(bridge.ribbon!, geo, "start", geo.start)!;
+    const end = ribbonHandleDragPatch(bridge.ribbon!, geo, "end", geo.end)!;
+    expect(start.startAngle).toBeCloseTo(0, 7);
+    expect(end.endAngle).toBeCloseTo(0, 7);
+    const point = (cap: {x:number;y:number}, theta: number, flip = 1) => ({
+      x: cap.x + Math.cos(geo.chordAngle + theta) * 45 * flip,
+      y: cap.y + Math.sin(geo.chordAngle + theta) * 45 * flip,
+    });
+    const left = ribbonHandleDragPatch(bridge.ribbon!, geo, "start", point(geo.startCap, Math.PI / 6))!;
+    const right = ribbonHandleDragPatch(bridge.ribbon!, geo, "end", point(geo.endCap, -Math.PI / 4, -1))!;
+    expect(left.startAngle).toBeCloseTo(30, 5);
+    expect(right.endAngle).toBeCloseTo(-45, 5);
+    const altered = { ...bridge, ribbon: { ...bridge.ribbon!, ...left, ...right } };
+    expect(buildRibbonPath(altered, [source, target])).not.toBe(buildRibbonPath(bridge, [source, target]));
+  });
+  it("maps a dragged bend point onto the signed curvature normal and respects limits", () => {
+    const bridge = createRibbonLink(source, target)!;
+    const geo = ribbonHandleGeometry(bridge, [source, target])!;
+    const pointer = {
+      x: geo.bend.x + geo.normal.x * geo.capDistance * 0.2,
+      y: geo.bend.y + geo.normal.y * geo.capDistance * 0.2,
+    };
+    const patch = ribbonHandleDragPatch(bridge.ribbon!, geo, "bend", pointer)!;
+    expect(patch.curvature).toBeCloseTo(0.2, 4);
+    const changed = { ...bridge, ribbon: { ...bridge.ribbon!, ...patch } };
+    const next = ribbonHandleGeometry(changed, [source, target])!;
+    expect(next.bend.x).toBeCloseTo(pointer.x, 2);
+    expect(next.bend.y).toBeCloseTo(pointer.y, 2);
+    const far = ribbonHandleDragPatch(bridge.ribbon!, geo, "bend", {
+      x: geo.bend.x + geo.normal.x * 1e5, y: geo.bend.y + geo.normal.y * 1e5,
+    });
+    expect(far?.curvature).toBe(0.5);
+  });
+  it("shows a warning for overly thick short bridges without destroying original artwork", () => {
+    const bridge = createRibbonLink(source, target)!;
+    const geo = ribbonHandleGeometry(bridge, [source, target])!;
+    expect(isRibbonWidthRisk(bridge.ribbon!, geo)).toBe(false);
+    expect(isRibbonWidthRisk({ ...bridge.ribbon!, startWidth: geo.anchorDistance }, geo)).toBe(true);
+    expect(ribbonHandleDragPatch(bridge.ribbon!, geo, "start", { x: Infinity, y: 0 })).toBeNull();
+    expect(ribbonHandleGeometry(bridge, [source])).toBeNull();
+  });
+});
 
 describe("editable SVG ribbon between calligraphy glyphs", () => {
   it("creates one closed cubic outline, rendered consistently in web and export", () => {

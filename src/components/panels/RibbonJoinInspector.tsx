@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, Link2, Merge, Trash2 } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { buildRibbonPath, DEFAULT_RIBBON, type RibbonLink } from "../../calligraphy/ribbonJoin";
+import { isRibbonWidthRisk, ribbonHandleGeometry } from "../../calligraphy/ribbonHandles";
 import { useStudio } from "../../store/studioStore";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
@@ -30,6 +31,8 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const source = (doc.lettering ?? []).find((x) => x.id === ribbon.sourceGlyphId);
   const target = (doc.lettering ?? []).find((x) => x.id === ribbon.targetGlyphId);
   const path = buildRibbonPath(shown, doc.lettering ?? []);
+  const handleGeometry = ribbonHandleGeometry(shown, doc.lettering ?? []);
+  const widthRisk = !!handleGeometry && isRibbonWidthRisk(ribbon, handleGeometry);
   // Preview live while dragging, then keep exactly one Undo entry per gesture.
   const change = (key: keyof RibbonLink, value: number) => {
     if (!Number.isFinite(value)) return;
@@ -63,6 +66,19 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
       </div>
       {!path && <p role="alert" className="rounded-lg border border-destructive/50 p-3 text-xs text-destructive">
         لا يمكن رسم الوصلة حاليًا. تأكد من وجود الحرفين وأن المسافة بينهما مناسبة.
+      </p>}
+      {handleGeometry && (
+        <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
+          <p className="text-xs font-semibold">التحرير المباشر على اللوحة</p>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            اختر الوصلة ثم اسحب المقبض الأخضر لتغيير اتجاه بدايتها، والذهبي لاتجاه نهايتها،
+            والأزرق لضبط الانحناء في المنتصف. تظهر المقابض فوق الرسم فقط، وليست جزءًا من الشعار.
+          </p>
+        </div>
+      )}
+      {widthRisk && <p role="status" className="rounded-lg border border-amber-500/40 p-3 text-xs leading-5 text-foreground">
+        تنبيه هندسي: سُمك الوصلة كبير مقارنة بالمسافة بين النقطتين؛ قد تتداخل الحواف.
+        قلل السُمك أو أبعد نقطتي الاتصال وراجع المعاينة قبل الدمج.
       </p>}
       <div className="grid grid-cols-2 gap-2">
         <button className="min-h-11 rounded-lg border border-border px-2 text-xs" type="button"
