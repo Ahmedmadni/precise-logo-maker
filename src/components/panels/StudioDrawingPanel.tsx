@@ -85,6 +85,24 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               </button>
             ))}
           </div>
+          <div className="space-y-2 rounded-xl border border-border bg-background p-2">
+            <p className="text-[11px] font-semibold">شكل بداية الضربة ونهايتها</p>
+            <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="نوع أطراف الضربة">
+              {([
+                ["flat", "مسطحة"], ["soft", "ناعمة"], ["sharp", "مدببة"],
+              ] as const).map(([style, label]) => (
+                <button key={style} type="button" aria-pressed={(brush.endStyle ?? "flat") === style}
+                  onClick={() => setBrush({ endStyle: style })}
+                  className={"min-h-11 min-w-0 rounded-lg border px-1 text-[11px] font-semibold focus-visible:outline-2 focus-visible:outline-primary " +
+                    ((brush.endStyle ?? "flat") === style ? "border-primary bg-primary/15 text-primary" : "border-border hover:border-primary/40")}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              يؤثر التدرج على أول الضربة وآخرها فقط؛ ويظل شكل سن القصبة وزاويته تحت تحكمك.
+            </p>
+          </div>
           <label className="block space-y-1 text-xs">
             <span className="flex justify-between"><span>عرض الفرشاة</span><span dir="ltr">{brush.size} px</span></span>
             <input className="w-full accent-[var(--color-primary)]" type="range" min={1} max={100}

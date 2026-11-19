@@ -127,6 +127,58 @@ describe("pressure-aware editable vector brushes", () => {
     expect(appendBrushSamples(first, [{ x: 8, y: 0, pressure: 0.6 }], 1, true, 1)[0]!.x).toBe(8);
   });
 
+  it("provides flat, soft and sharply pointed start/end profiles without changing the main body", () => {
+    const line = [0, 15, 30, 45, 60, 75, 90].map((x) => ({ x, y: 25, pressure: 1 }));
+    const geometry = (endStyle: "flat" | "soft" | "sharp") =>
+      vectorBrushOutline(line, { ...DEFAULT_BRUSH, preset: "round", pressure: false, smoothing: 0, size: 20, endStyle })!;
+    const flat = geometry("flat");
+    const soft = geometry("soft");
+    const sharp = geometry("sharp");
+    const half = (shape: typeof flat, index: number) => Math.abs(shape.points[index]!.y - 25);
+    expect(half(flat, 0)).toBeCloseTo(10, 5);
+    expect(half(soft, 0)).toBeCloseTo(3.8, 5);
+    expect(half(sharp, 0)).toBeCloseTo(0.8, 5);
+    expect(half(sharp, 3)).toBeCloseTo(half(flat, 3), 5);
+    expect(half(soft, 3)).toBeCloseTo(half(flat, 3), 5);
+    expect(half(sharp, 6)).toBeCloseTo(half(sharp, 0), 5);
+    expect(geometryToPathData(flat)).not.toBe(geometryToPathData(sharp));
+  });
+
+  it("handles sharp changes of direction with a bounded miter and finite corners", () => {
+    const line = [
+      { x: 0, y: 0, pressure: 1 },
+      { x: 40, y: 0, pressure: 1 },
+      { x: 40, y: 40, pressure: 1 },
+    ];
+    const stroke = vectorBrushOutline(line, {
+      ...DEFAULT_BRUSH, preset: "round", pressure: false, smoothing: 0, size: 20,
+    })!;
+    expect(stroke.points).toHaveLength(6);
+    expect(stroke.points[1]).toMatchObject({ x: 30, y: 10 });
+    expect(stroke.points[4]).toMatchObject({ x: 50, y: -10 });
+    const center = line[1]!;
+    expect(Math.hypot(stroke.points[1]!.x - center.x, stroke.points[1]!.y - center.y))
+      .toBeLessThanOrEqual(16.5001);
+    for (const tail of [{ x: 10, y: 0 }, { x: 0.1, y: 0.01 }, { x: 43, y: -4 }]) {
+      const folded = vectorBrushOutline([line[0]!, line[1]!, { ...tail, pressure: 1 }], {
+        ...DEFAULT_BRUSH, preset: "round", pressure: false, smoothing: 0, size: 20,
+      })!;
+      expect(folded.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+      expect(Math.hypot(folded.points[1]!.x - center.x, folded.points[1]!.y - center.y))
+        .toBeLessThanOrEqual(16.5001);
+    }
+  });
+
+  it("keeps legacy settings valid and rejects unsupported endpoint styles", () => {
+    const legacy = { ...DEFAULT_BRUSH };
+    delete legacy.endStyle;
+    const restored = vectorBrushOutline(samples, legacy);
+    const flat = vectorBrushOutline(samples, { ...DEFAULT_BRUSH, endStyle: "flat" });
+    expect(geometryToPathData(restored!)).toBe(geometryToPathData(flat!));
+    expect(vectorBrushOutline(samples, { ...DEFAULT_BRUSH, endStyle: "triangle" as "flat" }))
+      .toBeNull();
+  });
+
   it("rejects malformed configurations and oversized or nonfinite paths safely", () => {
     expect(vectorBrushOutline(samples, { ...DEFAULT_BRUSH, size: NaN })).toBeNull();
     expect(vectorBrushOutline([{ x: Infinity, y: 0, pressure: 1 }], DEFAULT_BRUSH)).toBeNull();

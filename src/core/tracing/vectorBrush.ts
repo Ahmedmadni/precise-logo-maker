@@ -1,6 +1,7 @@
 import type { Point, PathGeometry } from "../geometry/types";
 
 export type BrushPreset = "round" | "qalam" | "taper";
+export type BrushEndStyle = "flat" | "soft" | "sharp";
 export interface BrushSettings {
   preset: BrushPreset;
   size: number;
@@ -8,12 +9,14 @@ export interface BrushSettings {
   angle: number;
   pressure: boolean;
   smoothing: number;
+  /** Optional to preserve compatibility with older brush presets. */
+  endStyle?: BrushEndStyle;
 }
 export interface BrushSample extends Point { pressure: number }
 
 export const DEFAULT_BRUSH: BrushSettings = {
   preset: "qalam", size: 18, color: "#d1a95e",
-  angle: 40, pressure: true, smoothing: 0.28,
+  angle: 40, pressure: true, smoothing: 0.28, endStyle: "flat",
 };
 
 const clamp = (x: number, low: number, high: number) => Math.max(low, Math.min(high, x));
@@ -65,6 +68,7 @@ export function brushIsValid(config: BrushSettings): boolean {
     Number.isFinite(config.size) && config.size >= 1 && config.size <= 200 &&
     Number.isFinite(config.angle) && Math.abs(config.angle) <= 180 &&
     Number.isFinite(config.smoothing) && config.smoothing >= 0 && config.smoothing <= 0.9 &&
+    (config.endStyle === undefined || ["flat", "soft", "sharp"].includes(config.endStyle)) &&
     /^#[0-9a-fA-F]{6}$/.test(config.color);
 }
 
@@ -149,18 +153,57 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     const b = samples[Math.min(i + 1, last)]!;
     const dx = b.x - a.x, dy = b.y - a.y;
     const len = Math.hypot(dx, dy) || 1;
-    const normal = { x: -dy / len, y: dx / len };
+    // At corners, intersect the incoming and outgoing offset lines.
+    // Limit the miter to 1.65× the local radius to prevent sharp spikes.
+    // A near-180° reversal uses the forward normal instead of dividing by
+    // an almost-zero bisector; complicated self-crossings still need review.
+    let normal = { x: -dy / len, y: dx / len };
+    if (i > 0 && i < last) {
+      const prev = samples[i - 1]!;
+      const next = samples[i + 1]!;
+      const ax = sample.x - prev.x, ay = sample.y - prev.y;
+      const bx = next.x - sample.x, by = next.y - sample.y;
+      const al = Math.hypot(ax, ay), bl = Math.hypot(bx, by);
+      if (al > 1e-6 && bl > 1e-6) {
+        const n0 = { x: -ay / al, y: ax / al };
+        const n1 = { x: -by / bl, y: bx / bl };
+        const sum = { x: n0.x + n1.x, y: n0.y + n1.y };
+        const sumLen = Math.hypot(sum.x, sum.y);
+        if (sumLen > 1e-4) {
+          const mid = { x: sum.x / sumLen, y: sum.y / sumLen };
+          const divisor = Math.abs(mid.x * n1.x + mid.y * n1.y);
+          const miter = Math.min(1.65, 1 / Math.max(0.001, divisor));
+          normal = { x: mid.x * miter, y: mid.y * miter };
+        } else {
+          normal = { ...n1 };
+        }
+      }
+    }
     let halfWidth = settings.size * pressed(sample) / 2;
     if (settings.preset === "qalam") {
       // The flat nib EDGE (not its normal) determines the cross-section:
       // moving perpendicular to the edge creates a thick stroke; moving
       // parallel creates a hairline. Previously the directions were reversed.
-      halfWidth *= 0.18 + 0.82 * Math.abs(normal.x * nibEdge.x + normal.y * nibEdge.y);
+      const mag = Math.hypot(normal.x, normal.y) || 1;
+      halfWidth *= 0.18 + 0.82 * Math.abs((normal.x * nibEdge.x + normal.y * nibEdge.y) / mag);
     } else if (settings.preset === "taper") {
       const t = cumulative[i]! / strokeLength;
       halfWidth *= 0.16 + 0.84 * Math.pow(Math.sin(Math.PI * t), 0.5);
     }
-    halfWidth = Math.max(0.22, halfWidth);
+    const ends = settings.endStyle ?? "flat";
+    if (ends !== "flat") {
+      // Distance-based fade keeps caps independent of pointer sampling rates.
+      // Fades are capped at half the stroke to protect very short strokes.
+      const fadeLength = Math.min(strokeLength / 2, settings.size * 1.45);
+      if (fadeLength > 1e-6) {
+        const fromTip = Math.min(cumulative[i]!, strokeLength - cumulative[i]!);
+        const normalized = clamp(fromTip / fadeLength, 0, 1);
+        const smoothstep = normalized * normalized * (3 - 2 * normalized);
+        halfWidth *= (ends === "sharp" ? 0.08 : 0.38) +
+          (ends === "sharp" ? 0.92 : 0.62) * smoothstep;
+      }
+    }
+    halfWidth = Math.max(0.14, halfWidth);
     left.push({ x: sample.x + normal.x * halfWidth, y: sample.y + normal.y * halfWidth });
     right.push({ x: sample.x - normal.x * halfWidth, y: sample.y - normal.y * halfWidth });
   });
