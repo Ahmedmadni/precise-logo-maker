@@ -160,15 +160,47 @@ export function worldToGlyphPoint(item: LetteringItem, wx: number, wy: number): 
 }
 
 
+/** A contour is one M...Z sequence; other marks and dots are separate. */
+function nodeLocation(segments: NonNullable<ReturnType<typeof parseOutline>>, nodeId: number) {
+  if (!Number.isInteger(nodeId) || nodeId < 0) return null;
+  let offset = 0;
+  for (let index = 0; index < segments.length; index++) {
+    const count = segments[index]!.values.length / 2;
+    if (nodeId < offset + count) return { index, pair: nodeId - offset };
+    offset += count;
+  }
+  return null;
+}
+
+function closedContour(segments: NonNullable<ReturnType<typeof parseOutline>>, index: number) {
+  let start = index;
+  while (start > 0 && segments[start]!.cmd !== "M") start--;
+  if (segments[start]?.cmd !== "M") return null;
+  let end = start + 1;
+  while (end < segments.length && segments[end]!.cmd !== "M" && segments[end]!.cmd !== "Z") end++;
+  if (segments[end]?.cmd !== "Z" || end <= start + 1) return null;
+  const first = segments[start]!;
+  const lastIndex = end - 1;
+  const last = segments[lastIndex]!;
+  const lastX = last.values.at(-2);
+  const lastY = last.values.at(-1);
+  // A trailing Z alone may be a straight closing edge. Only a coincident
+  // explicit end point represents the *same* anchor at the seam.
+  const coincident = lastX !== undefined && lastY !== undefined &&
+    Math.hypot(lastX - first.values[0]!, lastY - first.values[1]!) < 0.001;
+  return { start, lastIndex, coincident };
+}
+
+function serializeOutline(segments: NonNullable<ReturnType<typeof parseOutline>>) {
+  const value = segments.map((s) => s.cmd + (s.values.length ? s.values.map(f).join(" ") : "")).join(" ");
+  return value.length <= 500_000 ? value : null;
+}
+
 /**
- * Move one outline node without arbitrarily destroying the curve tangents.
- *
- * When a true anchor is moved, shift its incoming and outgoing Bézier control
- * points by the same delta. Preserve the entire remaining glyph, including
- * disconnected contours/dots and the opposite handles on adjacent curves.
- * Control handles themselves always remain directly editable on their own.
- *
- * The option is deliberately reversible via the existing document Undo.
+ * Preserve the tangent handles attached to the edited anchor and, when a
+ * closed contour duplicates its first point at the end, preserve that seam.
+ * Nothing in another contour may move (dots and detached strokes are safe).
+ * Independent control-handle editing and free-anchor mode are unchanged.
  */
 export function moveOutlineNodeWithHandles(
   d: string, nodeId: number, x: number, y: number, preserveHandles = true,
@@ -178,64 +210,87 @@ export function moveOutlineNodeWithHandles(
   if (!preserveHandles) return editOutlineNode(d, nodeId, x, y);
   const segments = parseOutline(d);
   if (!segments) return null;
-
-  let startId = 0;
-  let segmentIndex = -1;
-  let localPair = -1;
-  for (let i = 0; i < segments.length; i++) {
-    const pairs = segments[i]!.values.length / 2;
-    if (nodeId >= startId && nodeId < startId + pairs) {
-      segmentIndex = i;
-      localPair = nodeId - startId;
-      break;
-    }
-    startId += pairs;
-  }
-  if (segmentIndex < 0) return null;
-  const segment = segments[segmentIndex]!;
-  const offset = localPair * 2;
-  const isControl = segment.cmd === "C" && localPair < 2 ||
-    segment.cmd === "Q" && localPair === 0;
-  if (isControl) return editOutlineNode(d, nodeId, x, y);
-
+  const location = nodeLocation(segments, nodeId);
+  if (!location) return null;
+  const { index, pair } = location;
+  const segment = segments[index]!;
+  const closed = closedContour(segments, index);
+  const control = segment.cmd === "C" && pair < 2 || segment.cmd === "Q" && pair === 0;
+  if (control) return editOutlineNode(d, nodeId, x, y);
+  const offset = pair * 2;
   const dx = x - segment.values[offset]!;
   const dy = y - segment.values[offset + 1]!;
-  const shiftControl = (values: number[], index: number) => {
-    values[index] = values[index]! + dx;
-    values[index + 1] = values[index + 1]! + dy;
+  const movePair = (target: typeof segment, at: number) => {
+    target.values[at] = target.values[at]! + dx;
+    target.values[at + 1] = target.values[at + 1]! + dy;
   };
   segment.values[offset] = x;
   segment.values[offset + 1] = y;
 
-  // Incoming handle belongs to the curve whose endpoint is this anchor.
-  if (segment.cmd === "C") shiftControl(segment.values, 2);
-  if (segment.cmd === "Q") shiftControl(segment.values, 0);
+  // Incoming control belongs to a curve ending at this anchor.
+  if (segment.cmd === "C") movePair(segment, 2);
+  if (segment.cmd === "Q") movePair(segment, 0);
 
-  // Outgoing handle belongs to the next segment, but *never* a new subpath.
-  const next = segments[segmentIndex + 1];
-  if (next?.cmd === "C" || next?.cmd === "Q") shiftControl(next.values, 0);
+  // Outgoing control belongs to the next curve, and never a new subpath.
+  const next = segments[index + 1];
+  if (next?.cmd === "C" || next?.cmd === "Q") movePair(next, 0);
 
-  const result = segments.map((s) => s.cmd + (s.values.length ? s.values.map(f).join(" ") : "")).join(" ");
-  return result.length <= 500_000 ? result : null;
+  if (closed?.coincident) {
+    if (index === closed.start) {
+      // Moving M of an explicitly coincident closed path also moves the final
+      // duplicate endpoint and its incoming handle, avoiding a seam/crack.
+      const last = segments[closed.lastIndex]!;
+      movePair(last, last.values.length - 2);
+      if (last.cmd === "C") movePair(last, 2);
+      if (last.cmd === "Q") movePair(last, 0);
+    } else if (index === closed.lastIndex) {
+      // Moving the duplicate end also moves M and the first outgoing handle.
+      const first = segments[closed.start]!;
+      movePair(first, 0);
+      const firstCurve = segments[closed.start + 1];
+      if (firstCurve?.cmd === "C" || firstCurve?.cmd === "Q") movePair(firstCurve, 0);
+    }
+  }
+  return serializeOutline(segments);
 }
 
 /**
- * Align the outgoing Bézier handle with the incoming handle at an anchor.
- * This adjusts the actual SVG control point; it is not a visual filter.
+ * Match the tangent of a curve entering an anchor to the curve leaving it.
+ * Handles may be connected through a genuinely coincident closed seam, but
+ * NEVER across an M, Z, or a straight closing line.
  */
 export function smoothOutlineAnchor(d: string, anchorId: number): string | null {
-  const nodes = outlineNodes(d);
-  const anchor = nodes.find((n) => n.id === anchorId);
-  const incoming = nodes.find((n) => n.id === anchorId - 1);
-  const outgoing = nodes.find((n) => n.id === anchorId + 1);
-  if (!anchor || anchor.role !== "anchor" || incoming?.role !== "control" ||
-      outgoing?.role !== "control") return null;
-  const dx = anchor.x - incoming.x;
-  const dy = anchor.y - incoming.y;
-  const incomingLength = Math.hypot(dx, dy);
-  const outgoingLength = Math.hypot(outgoing.x - anchor.x, outgoing.y - anchor.y);
-  if (incomingLength < 0.0001 || outgoingLength < 0.0001) return null;
-  return editOutlineNode(d, anchorId + 1,
-    anchor.x + dx / incomingLength * outgoingLength,
-    anchor.y + dy / incomingLength * outgoingLength);
+  const segments = parseOutline(d);
+  if (!segments) return null;
+  const location = nodeLocation(segments, anchorId);
+  if (!location) return null;
+  const { index, pair } = location;
+  const segment = segments[index]!;
+  const isAnchor = segment.cmd === "M" || segment.cmd === "L" ||
+    segment.cmd === "C" && pair === 2 || segment.cmd === "Q" && pair === 1;
+  if (!isAnchor) return null;
+
+  const anchor = { x: segment.values[pair * 2]!, y: segment.values[pair * 2 + 1]! };
+  let incoming: (typeof segments)[number] = segment;
+  let next = segments[index + 1];
+  const contour = closedContour(segments, index);
+  if (segment.cmd === "M") {
+    if (!contour?.coincident || index !== contour.start) return null;
+    incoming = segments[contour.lastIndex]!;
+    next = segments[index + 1];
+  } else if (contour?.coincident && index === contour.lastIndex) {
+    // The final explicit curve endpoint is the same anchor as M.
+    next = segments[contour.start + 1];
+  }
+  if (incoming.cmd !== "C" && incoming.cmd !== "Q") return null;
+  if (next?.cmd !== "C" && next?.cmd !== "Q") return null;
+  const handleIndex = incoming.cmd === "C" ? 2 : 0;
+  const ix = incoming.values[handleIndex]!, iy = incoming.values[handleIndex + 1]!;
+  const ox = next.values[0]!, oy = next.values[1]!;
+  const inLen = Math.hypot(anchor.x - ix, anchor.y - iy);
+  const outLen = Math.hypot(ox - anchor.x, oy - anchor.y);
+  if (inLen < 0.0001 || outLen < 0.0001) return null;
+  next.values[0] = anchor.x + (anchor.x - ix) / inLen * outLen;
+  next.values[1] = anchor.y + (anchor.y - iy) / inLen * outLen;
+  return serializeOutline(segments);
 }
