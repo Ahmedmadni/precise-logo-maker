@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
-import { editOutlineNode, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
+import { moveOutlineNodeWithHandles, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
@@ -35,6 +35,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setEditNodes = useStudio((s) => s.setEditGlyphNodes);
   const selectedNode = useStudio((s) => s.selectedGlyphNodeId);
   const showAllNodes = useStudio((s) => s.showAllGlyphNodes);
+  const moveNodeHandles = useStudio((s) => s.moveGlyphNodeHandles);
+  const setMoveNodeHandles = useStudio((s) => s.setMoveGlyphNodeHandles);
   const setShowAllNodes = useStudio((s) => s.setShowAllGlyphNodes);
   const setSelectedNode = useStudio((s) => s.setSelectedGlyphNodeId);
   const moveScope = useStudio((s) => s.letteringMoveScope);
@@ -94,9 +96,9 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setNodeCoordinate = (axis: "x" | "y", val: number) => {
     if (!node || !isOutline || !Number.isFinite(val)) return;
     commitPreview();
-    const next = editOutlineNode(selected.pathData!, node.id,
+    const next = moveOutlineNodeWithHandles(selected.pathData!, node.id,
       axis === "x" ? val : node.x,
-      axis === "y" ? val : node.y);
+      axis === "y" ? val : node.y, moveNodeHandles);
     if (next) update(selected.id, { pathData: next });
   };
   return (
@@ -280,6 +282,16 @@ export function GlyphTransformPanel({ selected, siblings }: {
                   <input type="checkbox" checked={showAllNodes} onChange={(e) => setShowAllNodes(e.target.checked)}
                     className="h-5 w-5 accent-[var(--color-primary)]" />
                 </label>
+                <label className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-border px-2 text-xs">
+                  الحفاظ على مقابض المنحنى عند تحريك نقطة التثبيت
+                  <input type="checkbox" checked={moveNodeHandles}
+                    onChange={(e) => setMoveNodeHandles(e.target.checked)}
+                    className="h-5 w-5 accent-[var(--color-primary)]" />
+                </label>
+                <p className="text-[11px] leading-5 text-muted-foreground">
+                  عند التفعيل تتحرك المقابض المتصلة مع نقطة التثبيت، دون تغيير بقية الحروف.
+                  ألغِ التفعيل لتعديل زاوية الضربة بحرية. يمكن تحريك كل مقبض بشكل مستقل في الحالتين.
+                </p>
                 <select className={input} value={node?.id ?? ""}
                   onChange={(e) => setSelectedNode(e.target.value ? Number(e.target.value) : null)}>
                   <option value="">اختر نقطة المسار</option>

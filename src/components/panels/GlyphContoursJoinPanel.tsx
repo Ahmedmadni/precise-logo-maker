@@ -95,6 +95,13 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
     update(selected.id, point);
     setNotice("تمت المحاذاة مع الإزاحة المحددة. افحص شكل الضربات بصريا؛ لم يتم توليد وصلة تلقائية.");
   };
+  const resetAnchor = (side: JoinSide) => {
+    if (!selected.joinAnchors?.[side]) return;
+    const anchors = { ...selected.joinAnchors };
+    delete anchors[side];
+    update(selected.id, { joinAnchors: anchors });
+    setNotice("تمت استعادة نقطة الاتصال الهندسية الافتراضية؛ يمكن سحبها لتحديد موضعها بدقة.");
+  };
   const setAnchorNumber = (side: JoinSide, axis: "x" | "y", number: number) => {
     if (!Number.isFinite(number) || Math.abs(number) > 100000) return;
     const current = getJoinAnchor(selected, side);
@@ -170,7 +177,8 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
         <div className="mt-3 space-y-3">
           <p className="text-xs leading-5 text-muted-foreground">
             حدد نقطتي دخول وخروج الحرف بدقة، ثم قرّب الحروف من بعضها بالمحاذاة الهندسية.
-            الربط هنا لا يرسم وصلة بخطاط تلقائي ولا يغير تشكيل OpenType.
+            نقاط الدخول والخروج الافتراضية تقديرات هندسية وليست مواضع اتصال خطاطية معتمدة.
+            اسحبها يدويًا لتحديد نقاط الاتصال الصحيحة. الربط لا يغير تشكيل OpenType.
           </p>
           <button type="button" className={btn + (editJoin ? " w-full border-primary bg-primary/15" : " w-full")}
             aria-pressed={editJoin} onClick={() => setEditJoin(!editJoin)}>
@@ -180,7 +188,14 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
           {(["entry", "exit"] as const).map((side) => {
             const anchor = getJoinAnchor(selected, side);
             return <div key={side} className="space-y-2 rounded-lg border border-border p-2">
-              <p className="text-xs font-semibold">{side === "entry" ? "نقطة دخول الحرف" : "نقطة خروجه"}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold">{side === "entry" ? "نقطة دخول الحرف" : "نقطة خروجه"}</p>
+                <button type="button" className={btn + " px-2"} disabled={!selected.joinAnchors?.[side]}
+                  onClick={() => resetAnchor(side)}
+                  aria-label={side === "entry" ? "إعادة ضبط نقطة الدخول" : "إعادة ضبط نقطة الخروج"}>
+                  إعادة الضبط
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {(["x", "y"] as const).map((axis) => (
                   <label key={axis} className="space-y-1 text-[11px]">
