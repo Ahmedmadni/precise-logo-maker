@@ -164,6 +164,9 @@ export interface StudioState {
   setEditGlyphNodes: (editing: boolean) => void;
   showAllGlyphNodes: boolean;
   setShowAllGlyphNodes: (show: boolean) => void;
+  /** Move connected Bézier handles with an anchor to preserve local tangents. */
+  moveGlyphNodeHandles: boolean;
+  setMoveGlyphNodeHandles: (preserve: boolean) => void;
   editGlyphContours: boolean;
   setEditGlyphContours: (editing: boolean) => void;
   selectedContourIndex: number | null;
@@ -377,6 +380,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     editGlyphNodes: false,
     showAllGlyphNodes: false,
     setShowAllGlyphNodes: (showAllGlyphNodes) => set({ showAllGlyphNodes }),
+    moveGlyphNodeHandles: true,
+    setMoveGlyphNodeHandles: (moveGlyphNodeHandles) => set({ moveGlyphNodeHandles }),
     setEditGlyphNodes: (editGlyphNodes) => set({
       editGlyphNodes, editGlyphContours: false, editJoinAnchors: false, selectedContourIndex: null, tool: "select",
     }),

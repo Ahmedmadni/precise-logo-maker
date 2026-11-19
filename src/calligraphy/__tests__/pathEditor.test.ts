@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editOutlineNode, glyphPointToWorld, outlineNodes, parseOutline, smoothOutlineAnchor, worldToGlyphPoint } from "../pathEditor";
+import { editOutlineNode, moveOutlineNodeWithHandles, glyphPointToWorld, outlineNodes, parseOutline, smoothOutlineAnchor, worldToGlyphPoint } from "../pathEditor";
 import { letteringSvg, createLettering, createOrnament } from "../model";
 
 describe("outline node editor", () => {
@@ -51,6 +51,52 @@ describe("outline node editor", () => {
     const inverse = worldToGlyphPoint(glyph, point.x, point.y)!;
     expect(inverse.x).toBeCloseTo(350, 5);
     expect(inverse.y).toBeCloseTo(-90, 5);
+  });
+  it("moves an anchor and its adjacent cubic handles without bending neighboring curves", () => {
+    const source = "M0 0 C2 10 8 10 10 0 C14 -3 18 -10 20 0";
+    const result = moveOutlineNodeWithHandles(source, 3, 15, 5)!;
+    const before = outlineNodes(source), after = outlineNodes(result);
+    expect(after[3]).toMatchObject({ x: 15, y: 5 });
+    expect(after[2]).toMatchObject({ x: before[2]!.x + 5, y: before[2]!.y + 5 });
+    expect(after[4]).toMatchObject({ x: before[4]!.x + 5, y: before[4]!.y + 5 });
+    expect(after[1]).toEqual(before[1]);
+    expect(after[5]).toEqual(before[5]);
+    expect(after).toHaveLength(before.length);
+    const free = outlineNodes(moveOutlineNodeWithHandles(source, 3, 15, 5, false)!);
+    expect(free[2]).toEqual(before[2]);
+    expect(free[4]).toEqual(before[4]);
+  });
+
+  it("preserves Q tangents and allows editing individual handles without dragging anchors", () => {
+    const source = "M0 0 Q5 6 10 0 Q14 2 20 0";
+    const result = outlineNodes(moveOutlineNodeWithHandles(source, 2, 15, 2)!);
+    expect(result[1]).toMatchObject({ x: 10, y: 8 });
+    expect(result[2]).toMatchObject({ x: 15, y: 2 });
+    expect(result[3]).toMatchObject({ x: 19, y: 4 });
+    const handle = outlineNodes(moveOutlineNodeWithHandles(source, 1, 7, 8)!);
+    expect(handle[0]).toMatchObject({ x: 0, y: 0 });
+    expect(handle[1]).toMatchObject({ x: 7, y: 8 });
+    expect(handle[2]).toMatchObject({ x: 10, y: 0 });
+  });
+
+  it("never moves control handles across a disconnected glyph contour", () => {
+    const source = "M0 0 C2 5 8 5 10 0 Z M20 0 C25 5 30 5 35 0";
+    const before = outlineNodes(source);
+    const result = outlineNodes(moveOutlineNodeWithHandles(source, 3, 12, 3)!);
+    expect(result[2]).toMatchObject({ x: 10, y: 8 });
+    expect(result[3]).toMatchObject({ x: 12, y: 3 });
+    expect(result.slice(4)).toEqual(before.slice(4));
+    expect(moveOutlineNodeWithHandles(source, 200, 1, 2)).toBeNull();
+    expect(moveOutlineNodeWithHandles(source, 3, Infinity, 2)).toBeNull();
+  });
+
+  it("can move a contour start and its outgoing Bézier handle without shifting other contours", () => {
+    const source = "M0 0 C5 6 10 6 15 0 Z M40 40 L50 50";
+    const result = outlineNodes(moveOutlineNodeWithHandles(source, 0, 3, 4)!);
+    expect(result[0]).toMatchObject({ x: 3, y: 4 });
+    expect(result[1]).toMatchObject({ x: 8, y: 10 });
+    expect(result[2]).toMatchObject({ x: 10, y: 6 });
+    expect(result.slice(4)).toEqual(outlineNodes(source).slice(4));
   });
   it("exports ornaments as SVG paths without HTML text", () => {
     const ornament = createOrnament("star8", 100, 100);

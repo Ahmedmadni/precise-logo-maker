@@ -27,7 +27,7 @@ import { cleanStroke } from "../../core/tracing/simplify";
 import { brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering } from "../../calligraphy/model";
-import { editOutlineNode, glyphPointToWorld, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
+import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
@@ -101,6 +101,7 @@ export function StudioCanvas() {
   const moveLettering = useStudio((s) => s.moveLettering);
   const updateLettering = useStudio((s) => s.updateLettering);
   const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
+  const moveGlyphNodeHandles = useStudio((s) => s.moveGlyphNodeHandles);
   const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
   const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
   const selectedGlyphNodeId = useStudio((s) => s.selectedGlyphNodeId);
@@ -702,7 +703,7 @@ export function StudioCanvas() {
       if (item) {
         const point = worldToGlyphPoint(item, world.x, world.y);
         if (point) {
-          const path = editOutlineNode(nodeDragRef.current.startPath, nodeDragRef.current.nodeId, point.x, point.y);
+          const path = moveOutlineNodeWithHandles(nodeDragRef.current.startPath, nodeDragRef.current.nodeId, point.x, point.y, moveGlyphNodeHandles);
           if (path) setNodePreview({ id: item.id, path });
         }
       }

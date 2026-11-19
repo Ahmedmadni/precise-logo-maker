@@ -159,6 +159,66 @@ export function worldToGlyphPoint(item: LetteringItem, wx: number, wy: number): 
   return { x: originalX / sx, y: -originalY / sy };
 }
 
+
+/**
+ * Move one outline node without arbitrarily destroying the curve tangents.
+ *
+ * When a true anchor is moved, shift its incoming and outgoing Bézier control
+ * points by the same delta. Preserve the entire remaining glyph, including
+ * disconnected contours/dots and the opposite handles on adjacent curves.
+ * Control handles themselves always remain directly editable on their own.
+ *
+ * The option is deliberately reversible via the existing document Undo.
+ */
+export function moveOutlineNodeWithHandles(
+  d: string, nodeId: number, x: number, y: number, preserveHandles = true,
+): string | null {
+  if (!Number.isInteger(nodeId) || nodeId < 0 || !Number.isFinite(x) || !Number.isFinite(y) ||
+      Math.abs(x) > 100_000 || Math.abs(y) > 100_000) return null;
+  if (!preserveHandles) return editOutlineNode(d, nodeId, x, y);
+  const segments = parseOutline(d);
+  if (!segments) return null;
+
+  let startId = 0;
+  let segmentIndex = -1;
+  let localPair = -1;
+  for (let i = 0; i < segments.length; i++) {
+    const pairs = segments[i]!.values.length / 2;
+    if (nodeId >= startId && nodeId < startId + pairs) {
+      segmentIndex = i;
+      localPair = nodeId - startId;
+      break;
+    }
+    startId += pairs;
+  }
+  if (segmentIndex < 0) return null;
+  const segment = segments[segmentIndex]!;
+  const offset = localPair * 2;
+  const isControl = segment.cmd === "C" && localPair < 2 ||
+    segment.cmd === "Q" && localPair === 0;
+  if (isControl) return editOutlineNode(d, nodeId, x, y);
+
+  const dx = x - segment.values[offset]!;
+  const dy = y - segment.values[offset + 1]!;
+  const shiftControl = (values: number[], index: number) => {
+    values[index] = values[index]! + dx;
+    values[index + 1] = values[index + 1]! + dy;
+  };
+  segment.values[offset] = x;
+  segment.values[offset + 1] = y;
+
+  // Incoming handle belongs to the curve whose endpoint is this anchor.
+  if (segment.cmd === "C") shiftControl(segment.values, 2);
+  if (segment.cmd === "Q") shiftControl(segment.values, 0);
+
+  // Outgoing handle belongs to the next segment, but *never* a new subpath.
+  const next = segments[segmentIndex + 1];
+  if (next?.cmd === "C" || next?.cmd === "Q") shiftControl(next.values, 0);
+
+  const result = segments.map((s) => s.cmd + (s.values.length ? s.values.map(f).join(" ") : "")).join(" ");
+  return result.length <= 500_000 ? result : null;
+}
+
 /**
  * Align the outgoing Bézier handle with the incoming handle at an anchor.
  * This adjusts the actual SVG control point; it is not a visual filter.

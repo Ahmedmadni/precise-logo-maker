@@ -53,6 +53,14 @@ describe("contextual joining guides", () => {
     expect(start.x).toBeGreaterThan(end.x);
     const manual = { ...example, joinAnchors: { entry: { x: 15, y: 24 } } };
     expect(getJoinAnchor(manual, "entry")).toEqual({ x: 15, y: 24 });
+    // Removing only the manual entry override restores the geometric fallback
+    // without mutating the manually configured exit anchor.
+    const customized = { ...example, joinAnchors: {
+      entry: { x: 15, y: 24 }, exit: { x: 0, y: 10 },
+    } };
+    const { entry: _removed, ...remaining } = customized.joinAnchors;
+    expect(getJoinAnchor({ ...customized, joinAnchors: remaining }, "entry")).toEqual(start);
+    expect(getJoinAnchor({ ...customized, joinAnchors: remaining }, "exit")).toEqual({ x: 0, y: 10 });
   });
 
   it("aligns a movable entry with a fixed exit without damaging Bézier outlines", () => {
