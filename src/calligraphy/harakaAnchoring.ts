@@ -9,7 +9,7 @@ import { createHaraka } from "./model";
 import { glyphPointToWorld, outlineNodes } from "./pathEditor";
 
 export type MarkPlacement = "above" | "below";
-const BELOW = new Set<HarakaId>(["kasra", "tanween-kasr"]);
+const BELOW = new Set<HarakaId>(["kasra", "tanween-kasr", "hamza-below", "subscript-alif", "small-yeh"]);
 const STACK_SHADDA = new Set<HarakaId>(["fatha", "tanween-fath"]);
 export const isBelowMark = (mark: HarakaId): boolean => BELOW.has(mark);
 

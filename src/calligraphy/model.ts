@@ -7,7 +7,7 @@ import { buildRibbonPath } from "./ribbonJoin";
  * Each shaped run keeps a groupId so ligatures can be shaped together and
  * individual glyphs then moved, resized or recolored without breaking joining.
  */
-export type HarakaId = "fatha" | "damma" | "kasra" | "shadda" | "sukun" | "tanween-fath" | "tanween-kasr" | "tanween-damm";
+export type HarakaId = "fatha" | "damma" | "kasra" | "shadda" | "sukun" | "tanween-fath" | "tanween-kasr" | "tanween-damm" | "dagger-alif" | "maddah" | "hamza-above" | "hamza-below" | "subscript-alif" | "inverted-damma" | "small-waw" | "small-yeh" | "small-high-seen" | "small-high-meem";
 export type OrnamentId = "leaf" | "star8" | "rosette" | "teardrop" | "diamond" | "kashida";
 export type FontPreset = "Amiri" | "Aref Ruqaa" | "Scheherazade New" | "Gulzar" | "Noto Naskh Arabic" | "serif" | "Custom Thuluth";
 
@@ -85,6 +85,16 @@ export const HARAKAT: { id: HarakaId; glyph: string; label: string; path: string
   { id: "tanween-fath", glyph: "ً", label: "تنوين فتح", path: "M 8 27 L 91 9 L 91 20 L 8 39 Z M 8 50 L 91 32 L 91 43 L 8 62 Z" },
   { id: "tanween-kasr", glyph: "ٍ", label: "تنوين كسر", path: "M 8 48 L 91 30 L 91 41 L 8 60 Z M 8 69 L 91 51 L 91 62 L 8 81 Z" },
   { id: "tanween-damm", glyph: "ٌ", label: "تنوين ضم", path: "M 10 29 C 2 10 32 3 41 21 C 51 41 24 48 14 36 Q 19 53 48 49 L 48 58 Q 10 65 10 29 Z M 52 29 C 43 10 76 3 84 21 C 94 41 67 48 56 36 Q 61 53 94 49 L 94 58 Q 52 65 52 29 Z" },
+  { id: "dagger-alif", glyph: "ٰ", label: "ألف خنجرية", path: "M45 12 L57 8 L53 82 L42 88 Z" },
+  { id: "maddah", glyph: "ٓ", label: "مدّة", path: "M8 50 Q25 18 49 39 Q69 57 92 24 L92 40 Q70 74 46 53 Q25 33 8 66 Z" },
+  { id: "hamza-above", glyph: "ٔ", label: "همزة فوق", path: "M72 20 Q40 8 30 34 Q25 48 52 52 L18 66 L22 78 L85 51 L80 41 Q45 51 43 35 Q44 22 69 32 Z" },
+  { id: "hamza-below", glyph: "ٕ", label: "همزة تحت", path: "M72 20 Q40 8 30 34 Q25 48 52 52 L18 66 L22 78 L85 51 L80 41 Q45 51 43 35 Q44 22 69 32 Z" },
+  { id: "subscript-alif", glyph: "ٖ", label: "ألف صغيرة تحت", path: "M45 12 L57 8 L53 82 L42 88 Z" },
+  { id: "inverted-damma", glyph: "ٗ", label: "ضمة مقلوبة", path: "M80 36 C98 8 54 0 43 21 C32 44 62 56 77 43 Q72 69 20 67 L4 59 C18 86 74 85 84 57 Q88 47 80 36 Z" },
+  { id: "small-waw", glyph: "ۥ", label: "واو صغيرة", path: "M18 36 C0 8 44 0 55 21 C66 44 36 56 21 43 Q28 72 80 69 L94 59 Q76 94 37 85 Q8 73 18 36 Z" },
+  { id: "small-yeh", glyph: "ۦ", label: "ياء صغيرة", path: "M70 18 Q90 28 80 45 L54 58 Q26 76 12 48 L5 55 Q17 94 60 74 L89 56 Q104 32 78 9 Z M35 87 L43 81 L52 89 L44 96 Z M58 87 L66 81 L75 89 L67 96 Z" },
+  { id: "small-high-seen", glyph: "ۜ", label: "سين صغيرة فوق", path: "M12 25 L23 25 L25 48 Q35 60 43 46 L44 27 L55 27 L55 48 Q64 58 74 45 L78 20 L89 20 L86 52 Q73 73 51 60 Q32 77 15 58 Z" },
+  { id: "small-high-meem", glyph: "ۢ", label: "ميم صغيرة فوق", path: "M48 15 Q77 9 82 38 Q80 65 51 58 L29 49 L18 88 L7 83 L23 36 Q31 17 48 15 Z M47 29 Q35 35 43 44 Q62 55 68 41 Q68 26 47 29 Z" },
 ];
 
 /** Original SVG paths, deliberately simple and editable: not third-party assets. */

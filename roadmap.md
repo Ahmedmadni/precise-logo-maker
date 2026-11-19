@@ -1,4 +1,5 @@
 # Next improvements
+- [x] Expand Arabic writing with caret-based tashkeel controls and 10 additional editable marks; 97 calligraphy tests pass and browser writing/insertion/undo verified.
 - [x] Preview AI construction before insertion; allow regeneration.
 - [x] Improve editable logo path controls.
 - [x] Prepare Android configuration and packaging instructions; verify available tooling.

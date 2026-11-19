@@ -16,7 +16,7 @@ describe("Arabic lettering and safe SVG export", () => {
     expect(output).toContain("مدني");
   });
   it("builds every diacritic as a separate vector path", () => {
-    expect(HARAKAT).toHaveLength(8);
+    expect(HARAKAT).toHaveLength(18);
     for (const mark of HARAKAT) {
       expect(isHaraka(mark.id)).toBe(true);
       const output = letteringSvg(createHaraka(mark.id, 25, 70));

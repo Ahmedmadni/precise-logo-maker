@@ -12,6 +12,8 @@ import { LetteringGlyph } from "../canvas/LetteringGlyph";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { useStudio } from "../../store/studioStore";
 import { placeAttachedHaraka } from "../../calligraphy/harakaAnchoring";
+import { insertAtSelection, removeArabicMarks } from "../../calligraphy/textEditing";
+import { Button } from "../ui/button";
 /* Letter controls are deliberately located in the separate Edit workspace. */
 
 const field = "w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -55,6 +57,19 @@ export function LetteringPanel({ section, onCreated }: {
   const [error, setError] = useState("");
   const [editRun, setEditRun] = useState<string | null>(null);
   const fontInput = useRef<HTMLInputElement>(null);
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const caret = useRef({ start: 0, end: 0 });
+  const [markSearch, setMarkSearch] = useState("");
+  const writeSymbol = (symbol: string) => {
+    const result = insertAtSelection(phrase, caret.current.start, caret.current.end, symbol);
+    if (result.text.length > 120) return;
+    setPhrase(result.text);
+    caret.current = { start: result.caret, end: result.caret };
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(result.caret, result.caret);
+    });
+  };
 
   const previewBounds = useMemo(() => letteringGroupBounds(previewGlyphs), [previewGlyphs]);
   useEffect(() => {
@@ -202,9 +217,29 @@ export function LetteringPanel({ section, onCreated }: {
         <section className="space-y-3">
           <label className="block space-y-1">
             <span className="text-xs font-semibold">النص المراد تشكيله</span>
-            <textarea dir="rtl" className={field + " min-h-24 resize-y"} maxLength={120} value={phrase}
+            <textarea ref={textInput} dir="rtl" className={field + " min-h-24 resize-y"} maxLength={120} value={phrase}
+              onSelect={(e) => { caret.current = { start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd }; }}
               onChange={(e) => setPhrase(e.target.value)} placeholder="اكتب الكلمة أو العبارة العربية هنا" />
           </label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold">تشكيل النص</span>
+              <span className="text-xs text-muted-foreground">{phrase.length}/120</span>
+            </div>
+            <div className="grid grid-cols-6 gap-1">
+              {HARAKAT.map((mark) => <Button key={mark.id} variant="outline" size="icon" className="h-11 w-full"
+                title={mark.label} aria-label={`كتابة ${mark.label}`} onMouseDown={(e) => e.preventDefault()}
+                onClick={() => writeSymbol(mark.glyph)}>
+                <svg viewBox="0 0 100 100" className="size-6" aria-hidden="true"><path d={mark.path} fill="currentColor" fillRule="evenodd" /></svg>
+              </Button>)}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <Button variant="outline" size="sm" aria-label="كتابة تطويل" title="تطويل" onMouseDown={(e) => e.preventDefault()} onClick={() => writeSymbol("ـ")}><span className="text-lg">ـ</span></Button>
+              <Button variant="outline" size="sm" onClick={() => setPhrase(removeArabicMarks(phrase))}>إزالة تشكيل النص</Button>
+              {selected?.kind === "outline" && selected.groupId && <Button variant="outline" size="sm"
+                onClick={() => setEditRun(selected.groupId ?? null)}>تحرير الكلمة المحددة</Button>}
+            </div>
+          </div>
           <label className="block space-y-1">
             <span className="text-xs font-semibold">الخط المستخدم في تكوين الحروف</span>
             <select className={field} value={font} onChange={(e) => setFont(e.target.value as FontPreset)}>
@@ -287,6 +322,7 @@ export function LetteringPanel({ section, onCreated }: {
           </nav>
           {markCategory === "harakat" && <div>
             <h3 className="mb-2 font-semibold">اختر حركة لإضافتها</h3>
+            <input className={field + " mb-3"} type="search" aria-label="البحث في التشكيل" placeholder="ابحث عن حركة أو علامة" value={markSearch} onChange={(e) => setMarkSearch(e.target.value)} />
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={markSource === "typeface"}
                 onClick={() => setMarkSource("typeface")}
@@ -310,15 +346,16 @@ export function LetteringPanel({ section, onCreated }: {
               حدد حرفا أولا لربط الحركة به تلقائيا. ويمكن تغيير موضعها أو فك الارتباط من «تعديل».
             </p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {HARAKAT.map((mark) => (
-                <button key={mark.id} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
+              {HARAKAT.filter((mark) => mark.label.includes(markSearch.trim())).map((mark) => (
+                <Button variant="outline" key={mark.id} className="h-auto min-h-20 min-w-0 flex-col gap-1 whitespace-normal px-1"
                   type="button" disabled={markLoading} title={mark.label} onClick={() => void createMark(mark)}>
                   <svg viewBox="0 0 100 100" className="h-8 w-10" aria-hidden="true">
                     <path d={mark.path} fill="currentColor" fillRule="evenodd" />
                   </svg><span className="text-xs font-medium">{mark.label}</span>
-                </button>
+                </Button>
               ))}
             </div>
+            {!HARAKAT.some((mark) => mark.label.includes(markSearch.trim())) && <p className="text-xs text-muted-foreground">لا توجد نتائج.</p>}
           </div>}
           {markCategory === "decorations" && <div>
             <h3 className="mb-2 font-semibold">الزخارف والامتدادات</h3>
