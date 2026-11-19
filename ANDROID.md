@@ -79,3 +79,9 @@
 - تجربة التحديد بالسحب، والتكبير بإصبعين، وتمديد الحروف دون انقلاب الوصلات على هواتف صغيرة.
 - المقارنة بين المعاينة وتصدير SVG/PNG بعد تعديل نقاط الحرف وتغييرات السُمك.
 - التحقق من تنزيل الملفات على هاتف Android؛ حزمة CI تؤكد نجاح البناء فقط، وليست اختبارا تلقائيا للتفاعل الحقيقي.
+
+## Android native file open/save (SAF)
+
+Run `node scripts/install-native-documents.mjs` after `bunx cap add android` and before `bunx cap sync android`. GitHub CI now does this automatically. The bundled first-party Android `NativeDocuments` plugin uses Storage Access Framework `ACTION_CREATE_DOCUMENT` and `ACTION_OPEN_DOCUMENT` to save `.logo`, SVG and PNG directly to a user-chosen location (without broad storage permissions). Cancelled pickers preserve the current design. The web editor retains its existing browser download implementation.
+
+Exports larger than 32 MiB and imported projects larger than 24 MiB are rejected. The `.logo` parser validates the selected file. Other picker/export operations elsewhere in panels still require native-device verification; this change does not prove end-to-end phone behavior. Test in airplane mode on an Android device: reopen `.logo`, view exported SVG/PNG in other apps, cancel dialogs, repeat saves, switch background/foreground, and check small displays. No physical-device QA has yet been performed.

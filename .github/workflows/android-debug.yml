@@ -56,6 +56,12 @@ jobs:
           "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
       - name: Generate Android Studio project
         run: bunx cap add android
+      - name: Register native Android file picker
+        run: node scripts/install-native-documents.mjs
+      - name: Validate native Android plugin registration
+        run: |
+          grep -q "registerPlugin(NativeDocumentsPlugin.class)" android/app/src/main/java/app/lovable/logogridstudio/MainActivity.java
+          test -s android/app/src/main/java/app/lovable/logogridstudio/NativeDocumentsPlugin.java
       - name: Synchronize Android project
         run: bunx cap sync android
       - name: Assemble unsigned-for-distribution debug APK
