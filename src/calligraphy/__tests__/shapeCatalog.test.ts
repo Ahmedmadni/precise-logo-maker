@@ -42,6 +42,7 @@ describe("built-in Arabic calligraphy shape library", () => {
   it("inserts a real centered editable outline and survives project save/reopen and SVG export", () => {
     const selected = createCatalogShape("kashida-double", 500, 320, "#e3a25b")!;
     expect(selected.kind).toBe("outline");
+    expect(selected.catalogShapeId).toBe("kashida-double");
     expect(selected.pathData).toBeDefined();
     expect(selected.unitsPerEm).toBe(100);
     expect(selected.x + selected.size / 2).toBe(500);
@@ -52,6 +53,7 @@ describe("built-in Arabic calligraphy shape library", () => {
     };
     const restored = parseProject(serializeProject(doc))!;
     expect(restored.lettering?.[0]?.pathData).toBe(selected.pathData);
+    expect(restored.lettering?.[0]?.catalogShapeId).toBe("kashida-double");
     const svg = buildSvgDocument(restored, { background: false });
     expect(svg).toContain(selected.pathData!);
     expect(svg).toContain('fill="#e3a25b"');

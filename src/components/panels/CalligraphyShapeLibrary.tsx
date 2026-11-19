@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Grid2X2, Heart, LayoutList, LibraryBig, Plus, Search } from "lucide-react";
+import { Check, Eye, Grid2X2, Heart, LayoutList, LibraryBig, Plus, Search, X } from "lucide-react";
 import {
   CATEGORY_LABELS, CATALOG_DRAG_MIME, SHAPE_CATALOG, createCatalogShape, filterCatalog,
   type CatalogShape, type LibraryView,
 } from "../../calligraphy/shapeCatalog";
 import { useStudio } from "../../store/studioStore";
+import { outlinePreviewViewBox } from "../../calligraphy/catalogGeometry";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 
 const FAVORITES_KEY = "logo-studio:shape-catalog:favorites:v1";
@@ -18,6 +19,20 @@ function readFavorites(): string[] {
   } catch { return []; }
 }
 
+/** The preview and final item use the identical vector path and winding. */
+function ShapePreview({ shape, large = false }: { shape: CatalogShape; large?: boolean }) {
+  return (
+    <svg role="img" aria-label={"المعاينة المتجهية للشكل: " + shape.label}
+      viewBox={outlinePreviewViewBox(shape.path)}
+      preserveAspectRatio="xMidYMid meet"
+      className={(large ? "h-40 max-h-[28dvh] sm:h-52" : "h-full") + " w-full text-foreground"}>
+      <g transform="scale(1 -1)">
+        <path d={shape.path} fill="currentColor" fillRule="evenodd" />
+      </g>
+    </svg>
+  );
+}
+
 /**
  * Indexed offline calligraphic vectors. The thumbnails are the same underlying
  * paths inserted as editable outline items, never bitmap image stickers.
@@ -26,16 +41,20 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
   const [category, setCategory] = useState<LibraryView>("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [stayInLibrary, setStayInLibrary] = useState(true);
   const [favorites, setFavorites] = useState<string[]>(readFavorites);
   const [message, setMessage] = useState("");
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
   const addLettering = useStudio((s) => s.addLettering);
+  const setSection = useStudio((s) => s.setWorkspaceSection);
   const filtered = useMemo(
     () => filterCatalog(query, category, favorites),
     [query, category, favorites],
   );
   const existing = (doc.lettering ?? []).find((shape) => shape.id === selectedId);
+  const previewShape = SHAPE_CATALOG.find((shape) => shape.id === previewId) ?? null;
   const lastColor = existing?.color && /^#[0-9a-fA-F]{6}$/.test(existing.color)
     ? existing.color : "#d1a95e";
 
@@ -58,7 +77,8 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
     }
     addLettering(item);
     setMessage("أُضيف " + entry.label + " كمسار فيكتور مستقل قابل للتحرير.");
-    onCreated?.();
+    if (stayInLibrary) setSection("ornaments");
+    else onCreated?.();
   };
 
   return (
@@ -94,6 +114,39 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
         ))}
       </nav>
 
+      {category !== "mine" && (
+        <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 text-xs">
+          <span className="min-w-0 leading-5">
+            إبقاء المكتبة مفتوحة لإضافة عدة أشكال
+          </span>
+          <input type="checkbox" checked={stayInLibrary}
+            onChange={(event) => setStayInLibrary(event.target.checked)}
+            className="h-5 w-5 shrink-0 accent-[var(--color-primary)]" />
+        </label>
+      )}
+      {previewShape && category !== "mine" && (
+        <div className="space-y-2 rounded-2xl border border-primary/40 bg-card p-3"
+          aria-label={"معاينة مكبرة: " + previewShape.label}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="truncate text-xs font-bold">{previewShape.label}</h4>
+              <p className="text-[11px] text-muted-foreground">تفاصيل الشكل قبل الإدراج</p>
+            </div>
+            <button type="button" onClick={() => setPreviewId(null)}
+              aria-label="إغلاق المعاينة المكبرة"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border">
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+          <div className="flex min-h-40 items-center justify-center rounded-xl border border-border bg-background p-4">
+            <ShapePreview shape={previewShape} large />
+          </div>
+          <button type="button" onClick={() => insert(previewShape)}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-semibold text-primary-foreground">
+            <Plus className="h-4 w-4" aria-hidden /> إدراج {previewShape.label}
+          </button>
+        </div>
+      )}
       {category === "mine" ? (
         <div className="space-y-3">
           <p className="text-xs leading-5 text-muted-foreground">
@@ -133,7 +186,7 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
               return (
                 <article key={shape.id}
                   className={"group min-w-0 rounded-2xl border border-border bg-background p-2 transition-colors hover:border-primary/50 " +
-                    (view === "list" ? "flex items-center gap-3" : "space-y-1.5")}>
+                    (view === "list" ? "flex items-center gap-2" : "space-y-1.5")}>
                   <button type="button" draggable
                     title="اضغط للإضافة أو اسحب الشكل إلى لوحة الرسم على الكمبيوتر"
                     aria-label={"إضافة " + shape.label + " إلى اللوحة"}
@@ -144,27 +197,35 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
                     }}
                     className={"flex min-w-0 items-center justify-center rounded-xl bg-card focus-visible:outline-2 focus-visible:outline-primary " +
                       (view === "list" ? "h-16 w-20 shrink-0" : "h-[88px] w-full")}>
-                    <svg viewBox="-8 -8 116 116" aria-hidden="true" className="h-full w-full max-w-[130px] p-2 text-foreground">
-                      <g transform="translate(0 100) scale(1 -1)">
-                        <path d={shape.path} fill="currentColor" fillRule="evenodd" />
-                      </g>
-                    </svg>
+                    <div className="flex h-full w-full max-w-[148px] items-center justify-center px-3 py-2">
+                      <ShapePreview shape={shape} />
+                    </div>
                   </button>
                   <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
                     <div className="min-w-0">
-                      <h4 title={shape.label} className="truncate text-[11px] font-semibold">{shape.label}</h4>
+                      <h4 title={shape.label} className="line-clamp-2 text-[11px] font-semibold leading-5">{shape.label}</h4>
                       <p className="truncate text-[10px] text-muted-foreground">
                         {CATEGORY_LABELS.find((c) => c.id === shape.category)?.label} • Vector
                       </p>
                     </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button type="button" title={"معاينة " + shape.label}
+                        aria-label={"معاينة مكبرة " + shape.label}
+                        aria-pressed={previewId === shape.id}
+                        onClick={() => setPreviewId(previewId === shape.id ? null : shape.id)}
+                        className={"flex h-11 w-11 items-center justify-center rounded-xl border " +
+                          (previewId === shape.id ? "border-primary bg-primary/10 text-primary" : "border-border")}>
+                        <Eye className="h-4 w-4" aria-hidden />
+                      </button>
                     <button type="button" aria-label={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
                       aria-pressed={favored}
                       title={favored ? "إزالة من المفضلة" : "إضافة للمفضلة"}
                       onClick={() => toggleFavorite(shape.id)}
-                      className={"flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border " +
+                      className={"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border " +
                         (favored ? "text-primary" : "text-muted-foreground")}>
                       {favored ? <Heart className="h-4 w-4" fill="currentColor" /> : <Heart className="h-4 w-4" />}
                     </button>
+                    </div>
                   </div>
                   {view === "grid" && (
                     <button type="button" onClick={() => insert(shape)}
@@ -177,7 +238,7 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
             })}
           </div>
           <p className="text-[11px] leading-5 text-muted-foreground">
-            الإضافة بالنقر تعمل على الجوال والكمبيوتر. يمكن سحب البطاقة إلى موقع محدد على لوحة الكمبيوتر.
+            الإضافة بالنقر تعمل على الجوال والكمبيوتر. اضغط على أيقونة العين لمعاينة الشكل مكبرًا، أو اسحب البطاقة إلى لوحة الكمبيوتر.
             العناصر الجديدة مسارات SVG قابلة لتحرير النقاط، ولا تُربط بحرف تلقائيًا.
           </p>
         </>

@@ -1931,7 +1931,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
     draw: "أدوات الرسم", advanced: "الإعدادات المتقدمة",
   };
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[23rem] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[clamp(23rem,29vw,29rem)] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3">
         <div>
           <h2 className="text-sm font-bold">{title[section]}</h2>

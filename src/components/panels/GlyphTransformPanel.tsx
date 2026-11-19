@@ -49,12 +49,15 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
   const isOutline = selected.kind === "outline" && !!selected.pathData;
+  const isCatalogSymbol = isOutline && !!selected.catalogShapeId;
   const tabs = [
     { id: "basic" as const, label: "أساسي", icon: Move, detail: "التحريك والحجم واللون" },
     ...(isOutline ? [
       { id: "paths" as const, label: "المسارات", icon: PencilRuler, detail: "المد والنقاط والأجزاء" },
-      { id: "joins" as const, label: "الوصلات", icon: Waypoints, detail: "الدخول والخروج" },
-      { id: "alternates" as const, label: "البدائل", icon: Shapes, detail: "أشكال الخط المتاحة" },
+      ...(!isCatalogSymbol ? [
+        { id: "joins" as const, label: "الوصلات", icon: Waypoints, detail: "الدخول والخروج" },
+        { id: "alternates" as const, label: "البدائل", icon: Shapes, detail: "أشكال الخط المتاحة" },
+      ] : []),
     ] : []),
   ];
   const changeTab = (next: InspectorTab) => {
@@ -104,13 +107,14 @@ export function GlyphTransformPanel({ selected, siblings }: {
   return (
     <section className="space-y-4 rounded-xl border border-primary/40 bg-background p-3 text-sm" dir="rtl">
       <header className="space-y-1">
-        <h3 className="font-semibold">{selected.kind === "outline" ? "تحرير الحرف المحدد" : selected.kind === "haraka" ? "تحرير حركة التشكيل" : selected.kind === "ornament" ? "تحرير الزخرفة" : "تحرير النص"}</h3>
+        <h3 className="font-semibold">{isCatalogSymbol ? "تحرير شكل خطاطي مستقل" : selected.kind === "outline" ? "تحرير الحرف المحدد" : selected.kind === "haraka" ? "تحرير حركة التشكيل" : selected.kind === "ornament" ? "تحرير الزخرفة" : "تحرير النص"}</h3>
         <p className="text-[11px] leading-5 text-muted-foreground">
-          {isOutline ? "اختر نوع التعديل من الأدوات التالية. لن تُعرض أدوات الخط الدقيقة كلها دفعة واحدة." :
+          {isCatalogSymbol ? "هذا الشكل مسار SVG مستقل: عدّل حجمه وزاويته ونقاطه واحفظه في مكتبتك. لا يعتمد على بدائل OpenType أو وصلات الحروف." :
+            isOutline ? "اختر نوع التعديل من الأدوات التالية. لن تُعرض أدوات الخط الدقيقة كلها دفعة واحدة." :
             "غيّر الموضع والحجم واللون، أو اسحب العنصر مباشرة على اللوحة."}
         </p>
       </header>
-      <nav aria-label="أدوات تحرير العنصر" className={`grid gap-1.5 ${isOutline ? "grid-cols-4" : "grid-cols-1"}`}>
+      <nav aria-label="أدوات تحرير العنصر" className={`grid gap-1.5 ${isCatalogSymbol ? "grid-cols-2" : isOutline ? "grid-cols-4" : "grid-cols-1"}`}>
         {tabs.map(({ id, label, icon: Icon, detail }) => (
           <button type="button" key={id} aria-pressed={activeTab === id} title={detail}
             onClick={() => changeTab(id)}
@@ -339,6 +343,12 @@ export function GlyphTransformPanel({ selected, siblings }: {
           <div className="mt-3"><GlyphLibraryPanel /></div>
         </details>
       </>}
+      {isCatalogSymbol && activeTab === "basic" && (
+        <details className="rounded-xl border border-primary/30 bg-card p-3">
+          <summary className="cursor-pointer text-xs font-semibold">حفظ الشكل المعدل في مكتبتي</summary>
+          <div className="mt-3"><GlyphLibraryPanel /></div>
+        </details>
+      )}
       {activeTab === "basic" && <details className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">إدارة العنصر: نسخ، ترتيب، حذف</summary>
         <div className="mt-3 grid grid-cols-3 gap-2">
