@@ -451,7 +451,7 @@ export function createCatalogShape(
 ): LetteringItem | null {
   const shape = findCatalogShape(id);
   const bounds = shape ? outlineBounds(shape.path) : null;
-  if (!bounds || !Number.isFinite(centerX) || !Number.isFinite(centerY) ||
+  if (!shape || !bounds || !Number.isFinite(centerX) || !Number.isFinite(centerY) ||
       Math.abs(centerX) > 100000 || Math.abs(centerY) > 100000 ||
       !/^#[0-9a-fA-F]{6}$/.test(color)) return null;
   if (safePath(shape.path) !== shape.path || !parseOutline(shape.path)) return null;
