@@ -10,6 +10,7 @@ import { readReferenceImage } from "../objects/reference";
 import { fitBounds } from "../core/coordinates/view";
 import { artboardWorldBounds, useStudio } from "../store/studioStore";
 import { useLangStore } from "../i18n";
+import { nativeDocumentsAvailable, saveAndroidProject, exportAndroidSvg, exportAndroidPng, openAndroidProject } from "./nativeDocuments";
 
 
 type Menu = "file" | "view" | "export" | null;
@@ -40,6 +41,7 @@ export function StudioHeaderOffline() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const projectFile = useRef<HTMLInputElement>(null);
+  const nativeFiles = nativeDocumentsAvailable();
   const referenceFile = useRef<HTMLInputElement>(null);
   const count = doc.objects.length + (doc.lettering?.length ?? 0);
   const tr = (ar: string, en: string) => lang === "ar" ? ar : en;
@@ -74,16 +76,49 @@ export function StudioHeaderOffline() {
   const exportImage = async () => {
     setBusy(true); setError("");
     try {
-      await downloadPng(doc, pngSize, transparent ? `logo-${pngSize}-transparent.png` : `logo-${pngSize}.png`, { background: !transparent });
-      close();
-    } catch { setError(tr("فشل تصدير PNG. جرّب تصدير SVG.", "PNG export failed. Try SVG.")); }
+      const filename = transparent ? "logo-" + pngSize + "-transparent.png" : "logo-" + pngSize + ".png";
+      if (nativeFiles) {
+        if (await exportAndroidPng(doc, pngSize, filename, { background: !transparent })) close();
+      } else {
+        await downloadPng(doc, pngSize, filename, { background: !transparent });
+        close();
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : tr("تعذر تصدير PNG", "PNG export failed")); }
     finally { setBusy(false); }
   };
-  const exportVector = () => {
+  const exportVector = async () => {
+    setBusy(true); setError("");
     try {
-      downloadSvg(doc, transparent ? "logo-transparent.svg" : "logo.svg", { background: !transparent });
-      close();
-    } catch { setError(tr("تعذر تصدير SVG.", "SVG export failed.")); }
+      const filename = transparent ? "logo-transparent.svg" : "logo.svg";
+      if (nativeFiles) {
+        if (await exportAndroidSvg(doc, filename, { background: !transparent })) close();
+      } else {
+        downloadSvg(doc, filename, { background: !transparent });
+        close();
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : tr("تعذر تصدير SVG", "SVG export failed")); }
+    finally { setBusy(false); }
+  };
+  const saveBackup = async () => {
+    setBusy(true); setError("");
+    try {
+      if (nativeFiles) {
+        if (await saveAndroidProject(doc)) close();
+      } else {
+        downloadProject(doc);
+        close();
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : tr("تعذر حفظ المشروع", "Project save failed")); }
+    finally { setBusy(false); }
+  };
+  const openProject = async () => {
+    if (!nativeFiles) { projectFile.current?.click(); return; }
+    setBusy(true); setError("");
+    try {
+      const parsed = await openAndroidProject();
+      if (parsed) { loadDocument(parsed, "Open Android .logo"); close(); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : tr("تعذر فتح المشروع", "Project open failed")); }
+    finally { setBusy(false); }
   };
   return (
     <header className="relative z-30 flex min-h-14 shrink-0 items-center gap-1.5 border-b border-border bg-card px-2 text-foreground sm:px-4" dir="rtl">
@@ -144,12 +179,12 @@ export function StudioHeaderOffline() {
             <button type="button" className={action} onClick={newFile}><FilePlus2 className="h-5 w-5 text-primary" />{tr("تصميم جديد", "New design")}</button>
             <button type="button" className={action} disabled={!canRedo} onClick={() => { redo(); close(); }}><Redo2 className="h-5 w-5 text-primary" />{tr("إعادة آخر تعديل", "Redo last edit")}</button>
             <button type="button" className={action} onClick={() => setMenu("view")}><Settings2 className="h-5 w-5 text-primary" />{tr("خيارات العرض والشبكات", "View & grid options")}</button>
-            <button type="button" className={action} onClick={() => projectFile.current?.click()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
-            <button type="button" className={action} onClick={() => { downloadProject(doc); close(); }}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
+            <button type="button" className={action} disabled={busy} onClick={() => void openProject()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
+            <button type="button" className={action} disabled={busy} onClick={() => void saveBackup()}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
             <button type="button" className={action} onClick={() => referenceFile.current?.click()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
             <button type="button" className={action} onClick={() => { setLang(lang === "ar" ? "en" : "ar"); close(); }}>
               <Languages className="h-5 w-5 text-primary" />{tr("اللغة: العربية", "Language: English")}</button>
-            <p className="p-2 text-[11px] leading-5 text-muted-foreground">{tr("يُحفظ عملك تلقائيا على هذا الجهاز. احتفظ بملف .logo للاستخدام على جهاز آخر.", "Your work is autosaved locally. Export a .logo file as backup.")}</p>
+            <p className="p-2 text-[11px] leading-5 text-muted-foreground">{nativeFiles ? tr("اختر مكان الحفظ من ملفات أندرويد؛ إلغاء الاختيار لا يحذف مشروعك.", "Choose a destination in Android Files; cancelling keeps your work.") : tr("يُحفظ عملك تلقائيا على هذا الجهاز. احتفظ بملف .logo للاستخدام على جهاز آخر.", "Your work is autosaved locally. Export a .logo file as backup.")}</p>
           </div>}
           {menu === "view" && <div className="space-y-1">
             <button type="button" className={action} onClick={() => { fit(); close(); }}><Maximize2 className="h-5 w-5 text-primary" />{tr("إظهار مساحة التصميم كاملة", "Fit artboard")}</button>
@@ -175,7 +210,7 @@ export function StudioHeaderOffline() {
                 className="h-4 w-4 accent-[var(--color-primary)]" />
               {tr("خلفية شفافة", "Transparent background")}
             </label>
-            <button type="button" disabled={count === 0} onClick={exportVector}
+            <button type="button" disabled={count === 0 || busy} onClick={() => void exportVector()}
               className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-semibold disabled:opacity-40">
               <span>SVG <span className="block text-[11px] font-normal text-muted-foreground">{tr("فيكتور قابل للتكبير دون فقد دقة", "Scalable vector artwork")}</span></span>
               <Download className="h-5 w-5 text-primary" />
