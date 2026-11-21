@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Move, Spline, X } from "lucide-react";
-import { moveOutlineNodeWithHandles, outlineNodes, smoothOutlineAnchor } from "../calligraphy/pathEditor";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Move } from "lucide-react";
+import { moveOutlineNodeWithHandles, outlineNodes } from "../calligraphy/pathEditor";
+import { GlyphNodeTopologyActions } from "../components/panels/GlyphNodeTopologyActions";
 import { useStudio } from "../store/studioStore";
 
 /**
@@ -36,16 +37,6 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
       setNotice("");
     }
   };
-  const smooth = () => {
-    if (!node || !item.pathData) return;
-    const changed = smoothOutlineAnchor(item.pathData, node.id);
-    if (changed && changed !== item.pathData) {
-      update(item.id, { pathData: changed });
-      setNotice("تمت محاذاة المماسات عند نقطة التثبيت");
-    } else {
-      setNotice("هذه النقطة ليست بين منحنيين متصلين قابلين للتنعيم");
-    }
-  };
   return (
     <aside dir="rtl" aria-label="تحكم دقيق بنقاط Bézier"
       className="absolute inset-x-2 bottom-2 z-20 space-y-2 rounded-2xl border border-primary/40 bg-card/95 p-2 text-foreground shadow-xl backdrop-blur-lg sm:hidden">
@@ -55,13 +46,6 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
           {node ? "نقطة " + (node.id + 1) + " · " + (node.role === "anchor" ? "تثبيت" : "مقبض منحنى")
             : "اختر نقطة من الرسم"}
         </span>
-        {node?.role === "anchor" && (
-          <button type="button" onClick={smooth} title="تنعيم اتصال المنحنيين"
-            aria-label="تنعيم مماسات النقطة المحددة"
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-border">
-            <Spline className="h-5 w-5" aria-hidden />
-          </button>
-        )}
         <button type="button" title="إنهاء تحرير النقاط" aria-label="إنهاء تحرير نقاط Bézier"
           onClick={() => setEditNodes(false)}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-primary/40 bg-primary/10 text-primary">
@@ -93,12 +77,20 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
             </label>
           </div>
           {node.role === "anchor" && (
-            <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-3 text-[11px]">
-              <span className="min-w-0 leading-5">تحريك المقابض مع نقطة التثبيت</span>
-              <input type="checkbox" checked={moveHandles}
-                onChange={(event) => setMoveHandles(event.target.checked)}
-                className="h-5 w-5 shrink-0 accent-[var(--color-primary)]" />
-            </label>
+            <>
+              <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-3 text-[11px]">
+                <span className="min-w-0 leading-5">تحريك المقابض مع نقطة التثبيت</span>
+                <input type="checkbox" checked={moveHandles}
+                  onChange={(event) => setMoveHandles(event.target.checked)}
+                  className="h-5 w-5 shrink-0 accent-[var(--color-primary)]" />
+              </label>
+              <details className="rounded-xl border border-border bg-background p-2">
+                <summary className="min-h-11 cursor-pointer px-2 py-2 text-[11px] font-semibold">
+                  إضافة وحذف العقد وتعديل الزوايا
+                </summary>
+                <GlyphNodeTopologyActions item={item} nodeId={node.id} compact />
+              </details>
+            </>
           )}
         </>
       )}

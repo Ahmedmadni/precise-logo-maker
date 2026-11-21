@@ -2,12 +2,13 @@ import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
-import { moveOutlineNodeWithHandles, outlineNodes, smoothOutlineAnchor } from "../../calligraphy/pathEditor";
+import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
 import { useStudio } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
 import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
+import { GlyphNodeTopologyActions } from "./GlyphNodeTopologyActions";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
@@ -317,11 +318,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
                       ))}
                     </div>
                     {node.role === "anchor" && (
-                      <button type="button" className={button + " w-full"}
-                        onClick={() => {
-                          const path = smoothOutlineAnchor(selected.pathData!, node.id);
-                          if (path) update(selected.id, { pathData: path });
-                        }}>تنعيم اتصال المقبضين عند نقطة التثبيت</button>
+                      <GlyphNodeTopologyActions item={selected} nodeId={node.id} />
                     )}
                   </>
                 )}
