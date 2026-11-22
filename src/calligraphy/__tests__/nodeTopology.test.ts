@@ -118,7 +118,7 @@ describe("Arabic outline node topology edits", () => {
   });
 
   it("recovers inserted quadratic nodes and keeps separated dots untouched", () => {
-    const d="M10 20 Q40 90 100 20 Z M150 150 Q160 170 170 150 Z";
+    const d="M10 20 Q40 90 100 20 L100 -20 L10 -20 Z M150 150 Q160 170 170 150 Z";
     const inserted=insertOutlineAnchor(d,2)!;
     const removed=removeOutlineAnchor(inserted.path,inserted.selectedNodeId,0.1)!;
     expect(removed.maxDeviation!).toBeLessThan(0.1);
@@ -126,6 +126,8 @@ describe("Arabic outline node topology edits", () => {
       .toEqual(parseOutline(d)!.map(s=>s.cmd));
     expect(parseOutline(removed.path)!.slice(-3)).toEqual(parseOutline(d)!.slice(-3));
     expect(removed.selectedNodeId).toBe(2);
+    const tiny=insertOutlineAnchor("M10 20 Q40 90 100 20 Z",2)!;
+    expect(removeOutlineAnchor(tiny.path,tiny.selectedNodeId,1)).toBeNull();
     expect(outlineNodeActions(inserted.path,inserted.selectedNodeId).removeDeviation).not.toBeNull();
   });
 
