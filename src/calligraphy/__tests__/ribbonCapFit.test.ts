@@ -50,7 +50,10 @@ describe("opt-in Arabic kashida endpoint fit",()=>{
     const bridge=createRibbonLink(corner,b,"exit","entry")!;
     const fit=suggestRibbonCapFit(bridge,[corner,b]);
     expect(fit?.start).toBeNull();
-    expect(fit?.end?.width).toBeCloseTo(40,1);
+    // The terminal is 40 units tall, but this chord slopes 20/50:
+    // the section perpendicular to the chord is longer by sec(theta).
+    const expected = 40 * Math.hypot(50, 20) / 50;
+    expect(fit?.end?.width).toBeCloseTo(expected, 2);
   });
 
   it("refuses off-contour and invalid geometry rather than guessing",()=>{
