@@ -54,8 +54,17 @@ jobs:
         run: |
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
-      - name: Generate Android Studio project
-        run: bunx cap add android
+      - name: Prepare existing or first-time Android Studio project
+        run: |
+          if [ -f android/app/build.gradle ] && [ -f android/gradlew ]; then
+            echo "Using tracked Android Studio project; preserving its native customizations"
+          elif [ ! -e android ]; then
+            echo "First-time Android setup"
+            bunx cap add android
+          else
+            echo "Incomplete Android directory: refusing to overwrite native files"
+            exit 1
+          fi
       - name: Register native Android file picker
         run: node scripts/install-native-documents.mjs
       - name: Validate native Android plugin registration
