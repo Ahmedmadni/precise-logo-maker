@@ -576,7 +576,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           ...(doc.lettering ?? []).map((item) => {
             if (result.sourceIds.includes(item.id)) return { ...item, hidden: true };
             if (item.kind === "haraka" && item.attachedToGlyphId &&
-              result.sourceIds.slice(0, 2).includes(item.attachedToGlyphId)) {
+              result.sourceIds.includes(item.attachedToGlyphId)) {
               return {
                 ...item, attachedToGlyphId: result.outline.id, anchorMode: "manual" as const,
                 bakedOriginalAttachment: {

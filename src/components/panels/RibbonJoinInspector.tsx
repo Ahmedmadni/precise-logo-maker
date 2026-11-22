@@ -6,6 +6,7 @@ import { isRibbonWidthRisk, ribbonHandleGeometry } from "../../calligraphy/ribbo
 import { analyzeRibbonSafety, suggestRibbonSafetyAdjustment } from "../../calligraphy/ribbonSafety";
 import { suggestRibbonCapFit } from "../../calligraphy/ribbonCapFit";
 import { useStudio } from "../../store/studioStore";
+import { inspectRibbonChain } from "../../calligraphy/bakeUnion";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
 const fields = [
@@ -38,6 +39,7 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const handleGeometry = ribbonHandleGeometry(shown, doc.lettering ?? []);
   const widthRisk = !!handleGeometry && isRibbonWidthRisk(ribbon, handleGeometry);
   const geometrySafety = analyzeRibbonSafety(shown, doc.lettering ?? []);
+  const chain = inspectRibbonChain(doc.lettering ?? [], item.id);
   const capFit = suggestRibbonCapFit(shown, doc.lettering ?? []);
   // Preview live while dragging, then keep exactly one Undo entry per gesture.
   const change = (key: keyof RibbonLink, value: number) => {
@@ -297,15 +299,25 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
       <details className="rounded-xl border border-border p-3">
         <summary className="cursor-pointer text-xs font-semibold">إنشاء شكل فيكتور موحد (متقدم)</summary>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          يجمع الوصلة والحرفين بعملية Boolean Union فعلية في شكل واحد. تحتفظ
-          النسخة الجديدة بالفراغات الداخلية، ويمكنك العودة للأحرف الأصلية.
+          يجمع سلسلة الحروف والوصلات المتصلة بعملية Boolean Union فعلية في شكل واحد.
+          يحتفظ بالفراغات الداخلية ويمكن العودة إلى جميع الحروف والوصلات الأصلية.
           تُقرّب المنحنيات إلى مضلعات دقيقة، لذلك احتفظ بالأصول عند الحاجة لتحرير Bézier.
         </p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          يجب توحيد ألوان العناصر الثلاثة، وإزالة السُمك الإضافي من الحروف،
-          والتأكد أن الوصلة تتداخل فعلًا مع طرفي الحرفين.
+          يجب توحيد ألوان جميع الحروف والوصلات، وإزالة السُمك الإضافي، والتأكد أن كل وصلة
+          تتداخل فعلًا مع طرفي حرفيها. لا يدمج المسارات المتفرعة أو الدائرية.
         </p>
-        <button type="button" disabled={!path} onClick={() => {
+        {chain.ok ? (
+          <p className="mt-2 rounded-lg border border-border p-2 text-[11px]">
+            سلسلة قابلة للفحص: {chain.glyphCount} حروف و{chain.ribbonCount} وصلات.
+            ستحتفظ النسخة الجديدة بجميع العناصر الأصلية للتراجع والتحرير.
+          </p>
+        ) : (
+          <p role="status" className="mt-2 rounded-lg border border-amber-500/40 p-2 text-[11px] leading-5">
+            {chain.reason}
+          </p>
+        )}
+        <button type="button" disabled={!path || !chain.ok} onClick={() => {
           finish();
           const result = bake(item.id);
           setBakeError(result.ok ? "" : (result.reason ?? "تعذر دمج المسارات"));
