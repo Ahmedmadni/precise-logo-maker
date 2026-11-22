@@ -101,6 +101,56 @@ describe("Arabic outline node topology edits", () => {
     expect(changeOutlineAnchor("M0 0 C10 0 20 0 30 0 Z", 0, "corner")).toBeNull();
   });
 
+
+  it("removes an inserted cubic node by constrained inverse subdivision", () => {
+    const d="M0 0 C25 80 70 -50 100 20 L130 20 Z M200 200 L210 205 Z";
+    const inserted=insertOutlineAnchor(d,3)!;
+    expect(inserted).not.toBeNull();
+    const removed=removeOutlineAnchor(inserted.path,inserted.selectedNodeId,0.1)!;
+    expect(removed).not.toBeNull();
+    expect(removed.maxDeviation!).toBeLessThan(0.1);
+    expect(parseOutline(removed.path)!.map(s=>s.cmd))
+      .toEqual(parseOutline(d)!.map(s=>s.cmd));
+    expect(parseOutline(removed.path)!.slice(-3)).toEqual(parseOutline(d)!.slice(-3));
+    const o=parseOutline(d)![1]!.values, v=parseOutline(removed.path)![1]!.values;
+    for(let i=0;i<o.length;i++) expect(v[i]).toBeCloseTo(o[i]!,1);
+    expect(outlineNodeActions(inserted.path, inserted.selectedNodeId,0.1).remove).toBe(true);
+  });
+
+  it("recovers inserted quadratic nodes and keeps separated dots untouched", () => {
+    const d="M10 20 Q40 90 100 20 Z M150 150 Q160 170 170 150 Z";
+    const inserted=insertOutlineAnchor(d,2)!;
+    const removed=removeOutlineAnchor(inserted.path,inserted.selectedNodeId,0.1)!;
+    expect(removed.maxDeviation!).toBeLessThan(0.1);
+    expect(parseOutline(removed.path)!.map(s=>s.cmd))
+      .toEqual(parseOutline(d)!.map(s=>s.cmd));
+    expect(parseOutline(removed.path)!.slice(-3)).toEqual(parseOutline(d)!.slice(-3));
+    expect(removed.selectedNodeId).toBe(2);
+    expect(outlineNodeActions(inserted.path,inserted.selectedNodeId).removeDeviation).not.toBeNull();
+  });
+
+  it("preserves near-equivalent smooth curves only within a measured tolerance", () => {
+    const d="M0 0 C25 65 75 65 100 0 L100 -30 L0 -30 Z";
+    const added=insertOutlineAnchor(d,3)!;
+    const segments=parseOutline(added.path)!;
+    segments[2]!.values[0]! += 0.3;
+    const changed=segments.map(s=>s.cmd+(s.values.length?s.values.join(" "):"")).join(" ");
+    expect(removeOutlineAnchor(changed,added.selectedNodeId,0.01)).toBeNull();
+    const merged=removeOutlineAnchor(changed,added.selectedNodeId,0.5)!;
+    expect(merged.maxDeviation!).toBeLessThanOrEqual(0.5);
+    expect(merged.maxDeviation!).toBeGreaterThan(0.01);
+  });
+
+  it("does not silently flatten corners, cusps, mixed curves or non-collinear lines", () => {
+    const curvedCorner="M0 0 C0 50 20 50 50 50 C30 50 20 0 10 0 L10 -20 L0 -20 Z";
+    expect(removeOutlineAnchor(curvedCorner,3,5)).toBeNull();
+    expect(removeOutlineAnchor("M0 0 Q20 60 40 0 C50 0 60 0 80 0 Z",2)).toBeNull();
+    expect(removeOutlineAnchor("M0 0 L20 20 L40 0 L40 40 L0 40 Z",1,2)).toBeNull();
+    expect(removeOutlineAnchor("M0 0 L20 0 L40 0 L40 40 L0 40 Z",1,0.1)).not.toBeNull();
+    expect(removeOutlineAnchor("M0 0 L20 0 L40 0",1,NaN)).toBeNull();
+    expect(removeOutlineAnchor("M0 0 L20 0 L40 0",1,1000)).toBeNull();
+  });
+
   it("reports context-specific actions and blocks invalid commands safely", () => {
     const d = "M0 0 C10 20 20 20 30 0 L40 0 L40 40 Z";
     expect(outlineNodeActions(d, 0).insert).toBe(false);
