@@ -6,6 +6,7 @@ import {
   type ContourRole, type JoinSide,
 } from "../../calligraphy/contourComposer";
 import { alignJoinWithClearance, analyzeJoin } from "../../calligraphy/joinAssistant";
+import { snapGlyphJoinAnchor } from "../../calligraphy/joinAnchorSnap";
 import { createRibbonLink } from "../../calligraphy/ribbonJoin";
 import { selectJoiningContour } from "../../calligraphy/joinAnchorGeometry";
 import { useStudio } from "../../store/studioStore";
@@ -95,6 +96,23 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
     }
     update(selected.id, point);
     setNotice("تمت المحاذاة مع الإزاحة المحددة. افحص شكل الضربات بصريا؛ لم يتم توليد وصلة تلقائية.");
+  };
+  const snapAnchor = (side: JoinSide) => {
+    const current = useStudio.getState().doc.lettering?.find((entry) => entry.id === selected.id);
+    if (!current || current.kind !== "outline") return;
+    const result = snapGlyphJoinAnchor(current, side);
+    if (!result) {
+      setNotice("تعذر تثبيت نقطة الاتصال على مسار هندسي صالح؛ راجع بيانات الحرف.");
+      return;
+    }
+    update(current.id, { joinAnchors: {
+      ...current.joinAnchors, [side]: result.point,
+    } });
+    setEditJoin(true);
+    setNotice((side === "entry" ? "ثُبّتت نقطة الدخول" : "ثُبّتت نقطة الخروج") +
+      " على المسار " + (result.contourIndex + 1) +
+      "، بعد إزاحة قدرها " + result.distance.toFixed(2) + " من وحدات الخط. " +
+      "افحص اتصال الكشيدة بصريًا.");
   };
   const resetAnchor = (side: JoinSide) => {
     if (!selected.joinAnchors?.[side]) return;
@@ -208,6 +226,13 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
                   {" "}يمكن اختيار جزء «وصلة» أو «رأس» أو «ذيل» من تبويب أجزاء الحرف لتحسين الترشيح.
                 </p>
               )}
+              <button type="button" className={btn + " w-full border-primary/30 bg-primary/5"}
+                disabled={!anchor || !suggested}
+                onClick={() => snapAnchor(side)}
+                title="إسقاط نقطة الاتصال الحالية على أقرب موضع حقيقي من حدود الجزء المرشح؛ لا يمس الحرف نفسه">
+                <Waypoints className="h-4 w-4" />
+                تثبيت النقطة على أقرب حد فعلي للحرف
+              </button>
               <div className="grid grid-cols-2 gap-2">
                 {(["x", "y"] as const).map((axis) => (
                   <label key={axis} className="space-y-1 text-[11px]">
