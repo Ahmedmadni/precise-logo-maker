@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendBrushSamples, brushPressure, vectorBrushOutline, DEFAULT_BRUSH } from "../vectorBrush";
+import { appendBrushSamples, brushPressure, vectorBrushOutline, thinBrushSamples, DEFAULT_BRUSH } from "../vectorBrush";
 import { geometryToPathData } from "../../../objects/render";
 
 const samples = [
@@ -125,6 +125,64 @@ describe("pressure-aware editable vector brushes", () => {
     expect(appendBrushSamples(first, [{ x: 8, y: 0, pressure: 0.6 }], 1, false, 1))
       .toEqual(first);
     expect(appendBrushSamples(first, [{ x: 8, y: 0, pressure: 0.6 }], 1, true, 1)[0]!.x).toBe(8);
+  });
+
+  it("thins full stylus trails without dropping sharp corners or pressure peaks", () => {
+    const dense = Array.from({ length: 901 }, (_, i) => ({
+      x: i,
+      y: i === 300 ? 45 : 0,
+      pressure: i === 650 ? 1 : 0.35,
+    }));
+    const reduced = thinBrushSamples(dense, 160, 1);
+    expect(reduced.length).toBe(160);
+    expect(reduced[0]).toEqual(dense[0]);
+    expect(reduced.at(-1)).toEqual(dense.at(-1));
+    expect(reduced.some(s => s.x === 300 && s.y === 45)).toBe(true);
+    expect(reduced.some(s => s.x === 650 && s.pressure === 1)).toBe(true);
+    expect(reduced.every(s => Number.isFinite(s.x) && Number.isFinite(s.pressure))).toBe(true);
+    // The reducer is deterministic, independent of external UI state.
+    expect(thinBrushSamples(dense, 160, 1)).toEqual(reduced);
+  });
+
+  it("keeps recording very long tablet strokes past the sample cap", () => {
+    const maxSamples = 96;
+    let trail: ReturnType<typeof appendBrushSamples> = [];
+    for (let offset = 0; offset < 4200; offset += 84) {
+      const incoming = Array.from({ length: 84 }, (_, index) => {
+        const x = offset + index;
+        return { x, y: x === 2100 ? 65 : Math.sin(x / 60) * 6,
+          pressure: x === 3070 ? 1 : 0.45 };
+      });
+      trail = appendBrushSamples(trail, incoming, 1, false, maxSamples);
+      expect(trail.length).toBeLessThanOrEqual(maxSamples);
+    }
+    expect(trail[0]?.x).toBe(0);
+    expect(trail.at(-1)?.x).toBe(4199);
+    expect(trail.some(s => s.x > 3500)).toBe(true);
+    expect(trail.some(s => s.x === 2100 && s.y === 65)).toBe(true);
+    const finished = appendBrushSamples(trail,
+      [{ x: 4200.06, y: Math.sin(4200.06 / 60) * 6, pressure: 0.45 }],
+      1, true, maxSamples);
+    expect(finished.at(-1)?.x).toBeCloseTo(4200.06, 5);
+    expect(finished.length).toBeLessThanOrEqual(maxSamples);
+    const shape = vectorBrushOutline(finished, {
+      ...DEFAULT_BRUSH, preset: "qalam", smoothing: 0.1,
+    })!;
+    expect(shape.closed).toBe(true);
+    expect(shape.points.length).toBeGreaterThan(40);
+    expect(geometryToPathData(shape)).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("retains legacy tiny sample caps and rejects invalid thinning", () => {
+    const first = [{ x: 0, y: 0, pressure: 0.5 }];
+    expect(appendBrushSamples(first, [{ x: 30, y: 0, pressure: 0.8 }], 1, false, 1))
+      .toEqual(first);
+    expect(appendBrushSamples(first, [{ x: 30, y: 0, pressure: 0.8 }], 1, true, 1))
+      .toEqual([{ x: 30, y: 0, pressure: 0.8 }]);
+    expect(thinBrushSamples(first, 0, 1)).toEqual(first);
+    expect(thinBrushSamples(first, 2, 0)).toEqual(first);
+    expect(thinBrushSamples([{ x: NaN, y: 0, pressure: 1 }, ...first], 2, 1))
+      .toHaveLength(2);
   });
 
   it("provides flat, soft and sharply pointed start/end profiles without changing the main body", () => {
