@@ -39,6 +39,11 @@ export const Route = createFileRoute("/")({
 
 function StudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [topPanelOpen, setTopPanelOpen] = useState(false);
+  const openProperties = () => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setTopPanelOpen(true);
+    else setPanelOpen(true);
+  };
   useEffect(() => {
     if (!panelOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
@@ -54,25 +59,27 @@ function StudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeader />
+      <div className="hidden sm:block">
+        <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
+      </div>
+      <div className="hidden lg:block">
+        <RightPanel layout="top" open={topPanelOpen} onOpenChange={setTopPanelOpen} />
+      </div>
       <div className="flex min-h-0 flex-1">
-        <div className="hidden sm:flex lg:hidden"><ToolRail onOpenLettering={() => setPanelOpen(true)} /></div>
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
           </ClientOnly>
-          <StudioEmptyGuide openPanel={() => setPanelOpen(true)} />
+          <StudioEmptyGuide openPanel={openProperties} />
           <ClientOnly fallback={null}>
-            <SelectionQuickEdit panelOpen={panelOpen} openPanel={() => setPanelOpen(true)} />
+            <SelectionQuickEdit panelOpen={panelOpen} openPanel={openProperties} />
           </ClientOnly>
           <ClientOnly fallback={null}>
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
           </ClientOnly>
         </main>
 
-        {/* Desktop: docked panel. Mobile: slide-over sheet. */}
-        <div className="hidden lg:flex">
-          <RightPanel />
-        </div>
+        {/* Small screens keep a slide-over sheet; desktop properties stay above the canvas. */}
         {panelOpen && (
           <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button

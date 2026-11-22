@@ -8,6 +8,8 @@ import {
   AlignStartVertical,
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronUp,
   Compass,
   Copy,
   Eraser,
@@ -1914,7 +1916,17 @@ const ADVANCED_LABELS: Record<Tab, string> = {
   History: "سجل التعديلات",
 };
 
-export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
+export function RightPanel({
+  onClose,
+  layout = "docked",
+  open,
+  onOpenChange,
+}: {
+  onClose?: () => void;
+  layout?: "docked" | "top";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const section = useStudio((s) => s.workspaceSection);
   const setSection = useStudio((s) => s.setWorkspaceSection);
   const doc = useStudio((s) => s.doc);
@@ -1925,17 +1937,64 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
     ? (doc.lettering ?? []).filter((item) => item.groupId === selected.groupId)
     : selected ? [selected] : [];
   const [tab, setTab] = useState<Tab>("Properties");
+  const [internalOpen, setInternalOpen] = useState(true);
+  const top = layout === "top";
+  const expanded = open ?? internalOpen;
+  const setExpanded = (next: boolean) => {
+    setInternalOpen(next);
+    onOpenChange?.(next);
+  };
+  const chooseSection = (next: typeof section) => {
+    setSection(next);
+    if (top) setExpanded(true);
+  };
   const title: Record<typeof section, string> = {
     text: "إضافة كتابة", ornaments: "مكتبة التشكيل العربي",
     edit: "تعديل العنصر", layers: "عناصر التصميم",
     draw: "أدوات الرسم", advanced: "الإعدادات المتقدمة",
   };
+  const sectionNavigation = (
+    <nav
+      aria-label="الأقسام الرئيسية"
+      className={cn(
+        top
+          ? "flex min-w-0 flex-1 items-center justify-center gap-1"
+          : "hidden shrink-0 grid-cols-5 border-b border-border p-1 sm:grid",
+      )}
+    >
+      {MAIN_SECTIONS.map(({ id, label, icon: Icon }) => (
+        <button type="button" key={id} aria-current={section === id ? "page" : undefined}
+          aria-label={label}
+          onClick={() => chooseSection(id)}
+          className={cn(
+            "flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] text-muted-foreground transition-colors",
+            top ? "min-h-12 max-w-24 flex-1" : "min-h-14",
+            section === id && "bg-primary/10 font-semibold text-primary",
+          )}>
+          <Icon className="h-5 w-5" aria-hidden />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden bg-card text-foreground lg:w-[clamp(23rem,29vw,29rem)] lg:border-s lg:border-border" dir="rtl" aria-label="لوحة أدوات التصميم">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3">
-        <div>
-          <h2 className="text-sm font-bold">{title[section]}</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+    <aside
+      className={cn(
+        "flex w-full flex-col overflow-hidden bg-card text-foreground",
+        top
+          ? "relative z-20 shrink-0 border-b border-border"
+          : "h-full lg:w-[clamp(23rem,29vw,29rem)] lg:border-s lg:border-border",
+      )}
+      dir="rtl"
+      aria-label="لوحة أدوات التصميم"
+    >
+      <header className={cn(
+        "flex shrink-0 items-center gap-3 border-border",
+        top ? "min-h-16 px-3 py-2" : "justify-between border-b px-3 py-3",
+      )}>
+        <div className={cn(top && "w-[10.5rem] shrink-0")}>
+          <h2 className={cn("font-bold", top ? "text-xs" : "text-sm")}>{title[section]}</h2>
+          <p className={cn("mt-0.5 text-[11px] text-muted-foreground", top && "hidden xl:block")}>
             {section === "edit" ? selected
               ? selected.kind === "haraka" ? "موضع الحركة وربطها بالحرف واللون والحجم" :
                 selected.kind === "ornament" ? "التحريك والتدوير وتنسيق الزخرفة" :
@@ -1950,34 +2009,43 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
              "خيارات متخصصة للرسم الهندسي"}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        {top && sectionNavigation}
+        <div className="flex shrink-0 items-center gap-1">
           <button type="button" aria-label="الإعدادات المتقدمة" title="الإعدادات المتقدمة"
-            onClick={() => setSection(section === "advanced" ? "draw" : "advanced")}
-            className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-muted-foreground",
+            onClick={() => chooseSection(section === "advanced" ? "draw" : "advanced")}
+            className={cn("flex shrink-0 items-center justify-center rounded-lg border text-muted-foreground",
+              top ? "h-10 w-10" : "h-11 w-11",
               section === "advanced" ? "border-primary bg-primary/10 text-primary" : "border-border")}>
             <Settings2 className="h-5 w-5" aria-hidden />
           </button>
+          {top && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              aria-label={expanded ? "طي الخصائص" : "إظهار الخصائص"}
+              aria-expanded={expanded}
+              aria-controls="studio-top-properties"
+              title={expanded ? "طي الخصائص" : "إظهار الخصائص"}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-foreground hover:bg-accent"
+            >
+              {expanded ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
+            </button>
+          )}
           {onClose && <button type="button" onClick={onClose} aria-label="إغلاق اللوحة"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-foreground lg:hidden">
             <X className="h-5 w-5" aria-hidden />
           </button>}
         </div>
       </header>
-      <nav aria-label="الأقسام الرئيسية" className="hidden shrink-0 grid-cols-5 border-b border-border p-1 sm:grid">
-        {MAIN_SECTIONS.map(({ id, label, icon: Icon }) => (
-          <button type="button" key={id} aria-current={section === id ? "page" : undefined}
-            aria-label={label}
-            onClick={() => setSection(id)}
-            className={cn(
-              "flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] text-muted-foreground transition-colors",
-              section === id && "bg-primary/10 font-semibold text-primary",
-            )}>
-            <Icon className="h-5 w-5" aria-hidden />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div key={section} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]">
+      {!top && sectionNavigation}
+      {(!top || expanded) && <div
+        id={top ? "studio-top-properties" : undefined}
+        key={section}
+        className={cn(
+          "min-h-0 space-y-3 overflow-y-auto overscroll-contain [scrollbar-width:thin]",
+          top ? "h-[min(34dvh,19rem)] shrink-0 border-t border-border px-4 py-3" : "flex-1 px-3 py-4",
+        )}
+      >
         {section === "text" && <LetteringPanel section="words" onCreated={onClose} />}
         {section === "ornaments" && <LetteringPanel section="marks" onCreated={onClose} />}
         {section === "layers" && <StudioLayersPanel />}
@@ -1998,7 +2066,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
                 <SlidersHorizontal className="mx-auto h-8 w-8 text-primary" />
                 <h3 className="mt-2 text-sm font-semibold">اختر حرفا أو شكلا لتعديله</h3>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">اضغط على أي عنصر في الرسم أو اختره من قائمة «العناصر».</p>
-                <button type="button" onClick={() => setSection("layers")}
+                <button type="button" onClick={() => chooseSection("layers")}
                   className="mt-4 min-h-11 rounded-lg bg-primary px-5 text-xs font-semibold text-primary-foreground">
                   فتح العناصر
                 </button>
@@ -2029,7 +2097,7 @@ export function RightPanel({ onClose }: { onClose?: () => void } = {}) {
             {tab === "History" && <HistoryTab />}
           </div>
         )}
-      </div>
+      </div>}
     </aside>
   );
 }
