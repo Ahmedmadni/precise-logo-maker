@@ -26,9 +26,106 @@ const valid = (s: BrushSample) => Number.isFinite(s.x) && Number.isFinite(s.y) &
 
 
 /**
+ * Reduce an overlong stroke without truncating later pen movement.
+ * Uses a bounded min-heap of local removal costs, including both screen-space
+ * geometry and pressure changes. Sharp corners / pressure peaks survive much
+ * longer than collinear samples. The first and last sample are never removed.
+ * Work is O(n log n) only when the sample cap is reached, not per pointer event.
+ */
+export function thinBrushSamples(
+  samples: readonly BrushSample[], targetCount: number, zoom: number,
+): BrushSample[] {
+  if (!Number.isFinite(zoom) || zoom <= 0 ||
+      !Number.isSafeInteger(targetCount) || targetCount < 2 ||
+      samples.length <= targetCount) return [...samples];
+  const length = samples.length;
+  if (samples.some((sample) => !valid(sample))) return [...samples];
+  const before = new Int32Array(length);
+  const after = new Int32Array(length);
+  const versions = new Uint32Array(length);
+  const heap: Array<{ index: number; score: number; version: number }> = [];
+  for (let i = 0; i < length; i++) {
+    before[i] = i - 1;
+    after[i] = i + 1;
+  }
+  const score = (index: number): number => {
+    const left = samples[before[index]!]!;
+    const mid = samples[index]!;
+    const right = samples[after[index]!]!;
+    const dx = right.x - left.x, dy = right.y - left.y;
+    const denom = dx * dx + dy * dy;
+    const t = denom > 1e-12 ? clamp(
+      ((mid.x - left.x) * dx + (mid.y - left.y) * dy) / denom, 0, 1,
+    ) : 0.5;
+    const spatialX = (mid.x - left.x - dx * t) * zoom;
+    const spatialY = (mid.y - left.y - dy * t) * zoom;
+    const predictedPressure = left.pressure + (right.pressure - left.pressure) * t;
+    const pressureError = (mid.pressure - predictedPressure) * 14;
+    return spatialX * spatialX + spatialY * spatialY + pressureError * pressureError;
+  };
+  const less = (a: typeof heap[number], b: typeof heap[number]) =>
+    a.score < b.score || (a.score === b.score && a.index < b.index);
+  const push = (index: number) => {
+    if (index <= 0 || index >= length - 1) return;
+    const item = { index, score: score(index), version: ++versions[index]! };
+    heap.push(item);
+    let at = heap.length - 1;
+    while (at > 0) {
+      const parent = Math.floor((at - 1) / 2);
+      if (!less(item, heap[parent]!)) break;
+      heap[at] = heap[parent]!;
+      at = parent;
+    }
+    heap[at] = item;
+  };
+  const pop = (): typeof heap[number] | undefined => {
+    if (!heap.length) return undefined;
+    const first = heap[0]!;
+    const last = heap.pop()!;
+    if (heap.length) {
+      let at = 0;
+      while (true) {
+        const left = at * 2 + 1, right = left + 1;
+        if (left >= heap.length) break;
+        const child = right < heap.length && less(heap[right]!, heap[left]!)
+          ? right : left;
+        if (!less(heap[child]!, last)) break;
+        heap[at] = heap[child]!;
+        at = child;
+      }
+      heap[at] = last;
+    }
+    return first;
+  };
+  for (let i = 1; i < length - 1; i++) push(i);
+  let count = length;
+  while (count > targetCount) {
+    const node = pop();
+    if (!node) break;
+    const { index } = node;
+    if (node.version !== versions[index]) continue;
+    const l = before[index]!, r = after[index]!;
+    after[l] = r;
+    before[r] = l;
+    versions[index]++;
+    count--;
+    if (l > 0) push(l);
+    if (r < length - 1) push(r);
+  }
+  const kept: BrushSample[] = [];
+  let cursor = 0;
+  while (cursor < length) {
+    kept.push(samples[cursor]!);
+    if (cursor === length - 1) break;
+    cursor = after[cursor]!;
+  }
+  return kept;
+}
+
+/**
  * Stroke-sampling helper used for both coalesced pointer events and the final
- * pointer-up position. The final point is preserved even if it falls within
- * the normal event throttling distance; otherwise a quick flick can end short.
+ * pointer-up position. Once full, it thins the least important existing
+ * samples instead of freezing the remainder of a long tablet stroke.
  */
 export function appendBrushSamples(
   previous: readonly BrushSample[],
@@ -49,8 +146,16 @@ export function appendBrushSamples(
       continue;
     }
     if (result.length === maxSamples) {
-      if (finish && i === incoming.length - 1) result[maxSamples - 1] = sample;
-      break;
+      // Preserve the cap's legacy one-point semantics used by tiny brushes.
+      // Ordinary strokes progressively free room while retaining key corners.
+      if (maxSamples >= 8) {
+        const keep = Math.max(2, Math.floor(maxSamples * 0.68));
+        const thinned = thinBrushSamples(result, keep, zoom);
+        result.splice(0, result.length, ...thinned);
+      } else {
+        if (finish && i === incoming.length - 1) result[maxSamples - 1] = sample;
+        break;
+      }
     }
     result.push(sample);
   }
