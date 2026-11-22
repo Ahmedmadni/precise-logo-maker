@@ -3,7 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Mov
 import type { LetteringItem } from "../../calligraphy/model";
 import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
-import { useStudio } from "../../store/studioStore";
+import { useStudio, type GlyphInspectorTab } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
@@ -14,7 +14,6 @@ const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-l
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 type SliderKey = "scaleX" | "scaleY" | "skewX" | "skewY" | "rotation" | "weight";
-type InspectorTab = "basic" | "paths" | "joins" | "alternates";
 const directions: { key: MorphDirection; label: string; icon: typeof ArrowRight }[] = [
   { key: "right", label: "مد لليمين", icon: ArrowRight },
   { key: "left", label: "مد لليسار", icon: ArrowLeft },
@@ -46,11 +45,17 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setPreview = useStudio((s) => s.setLetteringPreview);
   const commitPreview = useStudio((s) => s.commitLetteringPreview);
   const [step, setStep] = useState(5);
-  const [activeTab, setActiveTab] = useState<InspectorTab>("basic");
+  const storedTab = useStudio((s) => s.glyphInspectorTab);
+  const setInspectorTab = useStudio((s) => s.setGlyphInspectorTab);
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
   const isOutline = selected.kind === "outline" && !!selected.pathData;
   const isCatalogSymbol = isOutline && !!selected.catalogShapeId;
+  // When a movement/mark/symbol is selected, do not show inapplicable tools.
+  // Preserve the preferred workflow so the next regular glyph returns to it.
+  const activeTab: GlyphInspectorTab = !isOutline ||
+    (isCatalogSymbol && storedTab !== "basic" && storedTab !== "paths")
+    ? "basic" : storedTab;
   const tabs = [
     { id: "basic" as const, label: "أساسي", icon: Move, detail: "التحريك والحجم واللون" },
     ...(isOutline ? [
@@ -61,13 +66,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
       ] : []),
     ] : []),
   ];
-  const changeTab = (next: InspectorTab) => {
-    if (next === activeTab) return;
-    commitPreview();
-    useStudio.getState().setEditGlyphNodes(false);
-    useStudio.getState().setEditGlyphContours(false);
-    useStudio.getState().setEditJoinAnchors(next === "joins");
-    setActiveTab(next);
+  const changeTab = (next: GlyphInspectorTab) => {
+    if (next !== activeTab) setInspectorTab(next);
   };
   const pending = preview?.id === selected.id ? preview.patch : {};
   const currentPath = pending.pathData ?? selected.pathData ?? "";
