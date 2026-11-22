@@ -1,0 +1,1 @@
+var e=``+new URL(`amiri-arabic-400-normal-C_1DQziU.woff`,import.meta.url).href;export{e as default};

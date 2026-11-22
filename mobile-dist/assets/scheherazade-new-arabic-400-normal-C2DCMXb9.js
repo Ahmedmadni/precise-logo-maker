@@ -1,0 +1,1 @@
+var e=``+new URL(`scheherazade-new-arabic-400-normal-BusZfw6j.woff`,import.meta.url).href;export{e as default};

@@ -1,0 +1,1 @@
+var e=``+new URL(`aref-ruqaa-arabic-400-normal-DTcVTQXE.woff`,import.meta.url).href;export{e as default};

@@ -1,0 +1,1 @@
+var e=``+new URL(`gulzar-arabic-400-normal-DkcvARKu.woff`,import.meta.url).href;export{e as default};
