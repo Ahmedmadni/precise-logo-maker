@@ -39,7 +39,7 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
   };
   return (
     <aside dir="rtl" aria-label="تحكم دقيق بنقاط Bézier"
-      className="absolute inset-x-2 bottom-2 z-20 space-y-2 rounded-2xl border border-primary/40 bg-card/95 p-2 text-foreground shadow-xl backdrop-blur-lg sm:hidden">
+      className="absolute inset-x-2 bottom-2 z-20 max-h-[min(70dvh,32rem)] space-y-2 overflow-y-auto rounded-2xl border border-primary/40 bg-card/95 p-2 text-foreground shadow-xl backdrop-blur-lg sm:inset-x-auto sm:end-3 sm:w-[min(26rem,calc(100%-1.5rem))] lg:hidden">
       <div className="flex min-h-11 items-center gap-1.5">
         <Move className="mx-1 h-4 w-4 shrink-0 text-primary" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-xs font-semibold">

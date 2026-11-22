@@ -5,6 +5,16 @@ import type { Point } from "../../core/geometry/types";
 export const shouldIgnorePalmContact = (activePointerType: string | null, incomingType: string) =>
   activePointerType === "pen" && incomingType === "touch";
 
+/** A stylus must take precedence over touches already on the canvas.
+ * Some Android tablets report a resting palm before the pen goes down.
+ * This should cancel the incidental touch/pinch, not abort the new pen stroke. */
+export const shouldPrioritizeStylus = (
+  activePointerType: string | null, incomingType: string,
+  isPinching: boolean, pendingPointers: number,
+): boolean => incomingType === "pen" && pendingPointers > 0 &&
+  (activePointerType === "touch" || isPinching);
+
+
 export interface PinchSnapshot {
   distance: number;
   midpoint: Point;
