@@ -2,6 +2,7 @@ import polygonClipping, { type Geom } from "polygon-clipping";
 import type { LetteringItem } from "./model";
 import { parseOutline, glyphPointToWorld } from "./pathEditor";
 import { buildRibbonPath } from "./ribbonJoin";
+import { analyzeRibbonSafety } from "./ribbonSafety";
 
 type Point = { x: number; y: number };
 type Ring = { points: Point[]; area: number; bbox: [number, number, number, number]; parent: number; winding: number; depth: number };
@@ -159,6 +160,9 @@ export function bakeRibbonAsOutline(items:LetteringItem[],bridgeId:string):BakeR
   if(s.color.toLowerCase()!==t.color.toLowerCase()||
      s.color.toLowerCase()!==bridge.color.toLowerCase())
     return{ok:false,reason:"يجب توحيد لون الحرفين والوصلة قبل دمجهم في شكل واحد"};
+  const preflight=analyzeRibbonSafety(bridge,items);
+  if(preflight?.edgeCrossings && preflight.edgeCrossings > 0)
+    return {ok:false,reason:"فحص الوصلة رصد تقاطعًا في حوافها؛ اضبط سُمكها أو انحناءها أولًا، ثم حاول الدمج مجددًا"};
   if(items.some(x=>x.kind==="bridge"&&x.id!==bridge.id &&
     (x.ribbon?.sourceGlyphId===s.id||x.ribbon?.targetGlyphId===s.id||
      x.ribbon?.sourceGlyphId===t.id||x.ribbon?.targetGlyphId===t.id)))

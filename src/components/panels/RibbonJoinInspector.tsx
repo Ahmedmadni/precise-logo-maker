@@ -3,7 +3,7 @@ import { Copy, Link2, Merge, Trash2 } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { buildRibbonPath, DEFAULT_RIBBON, type RibbonLink } from "../../calligraphy/ribbonJoin";
 import { isRibbonWidthRisk, ribbonHandleGeometry } from "../../calligraphy/ribbonHandles";
-import { analyzeRibbonSafety } from "../../calligraphy/ribbonSafety";
+import { analyzeRibbonSafety, suggestRibbonSafetyAdjustment } from "../../calligraphy/ribbonSafety";
 import { useStudio } from "../../store/studioStore";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
@@ -25,6 +25,7 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const choose = useStudio((s) => s.selectLettering);
   const bake = useStudio((s) => s.bakeLetteringJoin);
   const [bakeError, setBakeError] = useState("");
+  const [repairNotice, setRepairNotice] = useState("");
   if (!item.ribbon || item.kind !== "bridge") return null;
   const ribbon = preview?.id === item.id && preview.patch.ribbon
     ? preview.patch.ribbon : item.ribbon;
@@ -41,6 +42,20 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
     setPreview(item.id, { ribbon: { ...ribbon, [key]: value } });
   };
   const finish = () => commitPreview();
+  const repair = () => {
+    const proposed = suggestRibbonSafetyAdjustment(shown, doc.lettering ?? []);
+    if (!proposed) {
+      setRepairNotice("لم أجد تعديلًا هندسيًا آمنًا ضمن حدود الوصلة. جرّب تحريك الحرفين أو نقاط الاتصال يدويًا.");
+      return;
+    }
+    finish();
+    update(item.id, { ribbon: proposed.ribbon });
+    setRepairNotice("تعديل هندسي قابل للتراجع: " +
+      [...new Set(proposed.changes)].join("، ") + ". " +
+      (proposed.after.needsReview
+        ? "بقيت ملاحظات هندسية؛ راجع شكل الضربة عند التكبير."
+        : "لم يرصد الفحص المتقطع مشكلات في الوصلة الجديدة. راجع النتيجة بصريًا قبل الدمج."));
+  };
   const resetAngles = () => {
     finish();
     update(item.id, { ribbon: {
@@ -117,6 +132,21 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
           </p>
         </details>
       )}
+      {geometrySafety?.needsReview && (
+        <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            اقتراح تعديل الوصلة فقط: يقلل السُمك أو الانحناء أو زوايا المقابض إذا تحسنت
+            نتائج فحص الحواف. لا يعدّل الحروف الأصلية، ولا يضمن أن الوصلة خطاطية أصيلة.
+          </p>
+          <button type="button" onClick={repair}
+            className="flex min-h-11 w-full items-center justify-center rounded-xl border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary">
+            اقتراح إصلاح هندسي قابل للتراجع
+          </button>
+        </div>
+      )}
+      {repairNotice && <p role="status" className="rounded-xl border border-border p-3 text-[11px] leading-5">
+        {repairNotice}
+      </p>}
       <div className="grid grid-cols-2 gap-2">
         <button className="min-h-11 rounded-lg border border-border px-2 text-xs" type="button"
           disabled={!source} onClick={() => choose(ribbon.sourceGlyphId)}>تعديل الحرف الأول</button>
