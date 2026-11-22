@@ -3,6 +3,7 @@ import { Copy, Link2, Merge, Trash2 } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { buildRibbonPath, DEFAULT_RIBBON, type RibbonLink } from "../../calligraphy/ribbonJoin";
 import { isRibbonWidthRisk, ribbonHandleGeometry } from "../../calligraphy/ribbonHandles";
+import { analyzeRibbonSafety } from "../../calligraphy/ribbonSafety";
 import { useStudio } from "../../store/studioStore";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
@@ -33,6 +34,7 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const path = buildRibbonPath(shown, doc.lettering ?? []);
   const handleGeometry = ribbonHandleGeometry(shown, doc.lettering ?? []);
   const widthRisk = !!handleGeometry && isRibbonWidthRisk(ribbon, handleGeometry);
+  const geometrySafety = analyzeRibbonSafety(shown, doc.lettering ?? []);
   // Preview live while dragging, then keep exactly one Undo entry per gesture.
   const change = (key: keyof RibbonLink, value: number) => {
     if (!Number.isFinite(value)) return;
@@ -80,6 +82,41 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
         تنبيه هندسي: سُمك الوصلة كبير مقارنة بالمسافة بين النقطتين؛ قد تتداخل الحواف.
         قلل السُمك أو أبعد نقطتي الاتصال وراجع المعاينة قبل الدمج.
       </p>}
+      {geometrySafety && (geometrySafety.edgeCrossings > 0 || geometrySafety.sharpTurns > 0) && (
+        <p role="status" className="rounded-xl border border-amber-500/40 p-3 text-xs leading-5 text-foreground">
+          {geometrySafety.edgeCrossings > 0
+            ? "تنبيه: حواف الوصلة تتقاطع في " + geometrySafety.edgeCrossings + " موضعًا وفق الفحص المتقطع؛ قلل السُمك أو الانحناء وراجع الرسم قبل دمج الأشكال."
+            : "تنبيه: يوجد انعطاف حاد في الوصلة؛ راجع الحواف عند التكبير قبل التصدير."}
+        </p>
+      )}
+      {geometrySafety && (
+        <details className="rounded-xl border border-border px-3 py-2">
+          <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold">
+            فحص هندسي للوصلة
+          </summary>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded-lg bg-background p-2">
+              <span className="text-muted-foreground">طول الوصلة التقريبي</span>
+              <p dir="ltr" className="mt-1 font-mono">{geometrySafety.distance.toFixed(1)} px</p>
+            </div>
+            <div className="rounded-lg bg-background p-2">
+              <span className="text-muted-foreground">أكبر عرض فعلي</span>
+              <p dir="ltr" className="mt-1 font-mono">{geometrySafety.maxWidth.toFixed(1)} px</p>
+            </div>
+            <div className="rounded-lg bg-background p-2">
+              <span className="text-muted-foreground">نسبة العرض للطول</span>
+              <p dir="ltr" className="mt-1 font-mono">{geometrySafety.widthRatio.toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg bg-background p-2">
+              <span className="text-muted-foreground">تقاطعات الحواف المرصودة</span>
+              <p dir="ltr" className="mt-1 font-mono">{geometrySafety.edgeCrossings}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+            النتائج هندسية تقريبية بفحص عينات من الحواف، وليست تقييمًا آليًا لجودة الخط العربي.
+          </p>
+        </details>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <button className="min-h-11 rounded-lg border border-border px-2 text-xs" type="button"
           disabled={!source} onClick={() => choose(ribbon.sourceGlyphId)}>تعديل الحرف الأول</button>
