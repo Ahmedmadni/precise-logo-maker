@@ -260,9 +260,9 @@ export function changeOutlineAnchor(d: string, selectedNodeId: number, mode: Nod
 /** Commands availability follows topology rather than relying on numeric IDs. */
 export function outlineNodeActions(d: string, id: number, maxError = 0.5) {
   const segments = parseOutline(d);
-  if (!segments) return { insert: false, remove: false, corner: false, smooth: false, symmetric: false };
+  if (!segments) return { insert: false, remove: false, removeDeviation: null, corner: false, smooth: false, symmetric: false };
   const where = locate(segments, id);
-  if (!where) return { insert: false, remove: false, corner: false, smooth: false, symmetric: false };
+  if (!where) return { insert: false, remove: false, removeDeviation: null, corner: false, smooth: false, symmetric: false };
   const seg = segments[where.index]!;
   const anchor = isAnchor(seg.cmd, where.pair);
   const editable = anchor && !!contour(segments, where.index);
