@@ -7,6 +7,7 @@ import { analyzeRibbonSafety, suggestRibbonSafetyAdjustment } from "../../callig
 import { suggestRibbonCapFit } from "../../calligraphy/ribbonCapFit";
 import { useStudio } from "../../store/studioStore";
 import { inspectRibbonChain } from "../../calligraphy/bakeUnion";
+import { inspectRibbonChainIntersections } from "../../calligraphy/ribbonChainIntersections";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
 const fields = [
@@ -40,6 +41,9 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const widthRisk = !!handleGeometry && isRibbonWidthRisk(ribbon, handleGeometry);
   const geometrySafety = analyzeRibbonSafety(shown, doc.lettering ?? []);
   const chain = inspectRibbonChain(doc.lettering ?? [], item.id);
+  const chainCrossings = inspectRibbonChainIntersections(
+    (doc.lettering ?? []).map((part) => preview?.id === part.id
+      ? { ...part, ...preview.patch } : part), item.id);
   const capFit = suggestRibbonCapFit(shown, doc.lettering ?? []);
   // Preview live while dragging, then keep exactly one Undo entry per gesture.
   const change = (key: keyof RibbonLink, value: number) => {
@@ -119,6 +123,27 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
             ? "تنبيه: حواف الوصلة تتقاطع في " + geometrySafety.edgeCrossings + " موضعًا وفق الفحص المتقطع؛ قلل السُمك أو الانحناء وراجع الرسم قبل دمج الأشكال."
             : "تنبيه: يوجد انعطاف حاد في الوصلة؛ راجع الحواف عند التكبير قبل التصدير."}
         </p>
+      )}
+      {chain.ok && chain.ribbonCount > 1 && (
+        <div className="rounded-xl border border-border bg-background p-3 text-[11px] leading-5">
+          <p className="font-semibold">معاينة التقاطعات بين كشائد السلسلة</p>
+          {chainCrossings.length > 0 ? (
+            <p className="mt-1 text-amber-600 dark:text-amber-400" role="status">
+              رُصدت {chainCrossings.length} نقطة محتملة لتقاطع المسارات المركزية
+              لكشائد غير متجاورة. تظهر كعلامات صفراء على اللوحة عند تحديد الوصلة؛
+              راجع الشكل بصريًا عند التكبير قبل إنشاء نسخة موحدة.
+            </p>
+          ) : (
+            <p className="mt-1 text-muted-foreground">
+              لم تُرصد تقاطعات بين المسارات المركزية للكشائد غير المتجاورة
+              ضمن عينات الفحص الحالية.
+            </p>
+          )}
+          <p className="mt-1 text-muted-foreground">
+            لا يفحص هذا التنبيه تداخل الكشائد المتجاورة داخل الحرف المشترك،
+            ولا يقرر ما إذا كان التقاطع مقصودًا فنيًا؛ لن يمنع الدمج وحده.
+          </p>
+        </div>
       )}
       {geometrySafety && (
         <details className="rounded-xl border border-border px-3 py-2">

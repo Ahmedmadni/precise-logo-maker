@@ -34,6 +34,7 @@ import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
 import { GlyphJoinDistanceGuide } from "./GlyphJoinDistanceGuide";
 import { RibbonEditHandles } from "./RibbonEditHandles";
+import { RibbonChainCrossingOverlay } from "./RibbonChainCrossingOverlay";
 import { ribbonHandleDragPatch, ribbonHandleGeometry, type RibbonHandleId } from "../../calligraphy/ribbonHandles";
 import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../calligraphy/contourComposer";
 import { CalligraphyGuides } from "./CalligraphyGuides";
@@ -1207,9 +1208,13 @@ export function StudioCanvas() {
           {/* Live ribbon controls: direct touch editing only while selected. Not exported. */}
           {tool === "select" && (doc.lettering ?? [])
             .filter((item) => item.id === selectedLetteringId && item.kind === "bridge" && !item.hidden)
-            .map((item) => <RibbonEditHandles key={item.id}
-              item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
-              glyphs={renderedLettering} zoom={view.zoom} />)}
+            .map((item) => <g key={item.id}>
+              <RibbonEditHandles
+                item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
+                glyphs={renderedLettering} zoom={view.zoom} />
+              <RibbonChainCrossingOverlay ribbonId={item.id}
+                items={renderedLettering} zoom={view.zoom} />
+            </g>)}
           {/* Live join measurement and target anchors are editor-only overlays. */}
           {editJoinAnchors && joinGuide && selectedLetteringId === joinGuide.sourceId && (() => {
             const items = doc.lettering ?? [];
