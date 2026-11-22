@@ -121,7 +121,7 @@ function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; open
   const buttonStyle = "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 text-[11px] font-semibold text-foreground active:bg-primary/15";
   return (
     <div dir="rtl" role="group" aria-label="أدوات سريعة للعنصر المحدد"
-      className="absolute bottom-3 end-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-2xl border border-primary/40 bg-card/95 p-1.5 shadow-xl backdrop-blur-lg sm:hidden">
+      className="absolute bottom-3 end-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-2xl border border-primary/40 bg-card/95 p-1.5 shadow-xl backdrop-blur-lg lg:hidden">
       {editJoins && canJoin ? (
         <>
           <span className="max-w-24 truncate px-1 text-[11px] font-semibold text-primary">

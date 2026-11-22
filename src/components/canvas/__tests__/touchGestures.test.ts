@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { screenToWorld, worldToScreen, type ViewTransform } from "../../../core/coordinates/view";
-import { pinchView, shouldIgnorePalmContact, touchPair } from "../touchGestures";
+import { pinchView, shouldIgnorePalmContact, shouldPrioritizeStylus, touchPair } from "../touchGestures";
 
 describe("tablet pen and two-finger pinch geometry", () => {
   it("does not let palm contact cancel an active stylus stroke", () => {
@@ -9,6 +9,17 @@ describe("tablet pen and two-finger pinch geometry", () => {
     expect(shouldIgnorePalmContact(null, "touch")).toBe(false);
     expect(shouldIgnorePalmContact("pen", "pen")).toBe(false);
   });
+  it("prioritizes the stylus when a palm touches first or a pinch is in progress", () => {
+    expect(shouldPrioritizeStylus("touch", "pen", false, 1)).toBe(true);
+    expect(shouldPrioritizeStylus(null, "pen", true, 2)).toBe(true);
+    expect(shouldPrioritizeStylus("pen", "touch", false, 1)).toBe(false);
+    expect(shouldPrioritizeStylus("touch", "touch", true, 2)).toBe(false);
+    expect(shouldPrioritizeStylus(null, "pen", false, 0)).toBe(false);
+    expect(shouldPrioritizeStylus("mouse", "pen", false, 1)).toBe(false);
+    // Once the pen wins, incidental palm contact must not enter the touch map.
+    expect(shouldIgnorePalmContact("pen", "touch")).toBe(true);
+  });
+
   it("computes midpoint in canvas pixels, not page pixels", () => {
     const fingers = new Map([[1, { x: 190, y: 320 }], [2, { x: 290, y: 400 }]]);
     const pair = touchPair(fingers, { x: 100, y: 200 })!;

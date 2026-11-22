@@ -40,7 +40,7 @@ import { moveOutlineContour, positionJoinAnchor, type JoinSide } from "../../cal
 import { CalligraphyGuides } from "./CalligraphyGuides";
 import { defaultCalligraphyGuides } from "../../calligraphy/harakaAnchoring";
 import { GlyphTransformHandles, glyphTransformHandles } from "./GlyphTransformHandles";
-import { touchPair, pinchView, shouldIgnorePalmContact, type PinchSnapshot } from "./touchGestures";
+import { touchPair, pinchView, shouldIgnorePalmContact, shouldPrioritizeStylus, type PinchSnapshot } from "./touchGestures";
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { GlyphOverlapPicker } from "./GlyphOverlapPicker";
 import { chooseOverlappingGlyph, uniqueGlyphStack, visibleBezierNodes, type OverlapTap } from "./glyphSelection";
@@ -438,6 +438,19 @@ export function StudioCanvas() {
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Palm touches may arrive *before* the pen on Android tablets.
+    // Preserve stylus priority, cancelling an unfinished touch gesture only.
+    if (shouldPrioritizeStylus(
+      activePointerTypeRef.current, e.pointerType,
+      pinchRef.current !== null, pointersRef.current.size,
+    )) {
+      cancelActiveInteraction();
+      pointersRef.current.clear();
+      pinchRef.current = null;
+      suppressSinglePointerRef.current = false;
+      activePointerRef.current = null;
+      activePointerTypeRef.current = null;
+    }
     // Reject incidental palm contact while the stylus is down.
     // A genuine two-finger touch gesture still works without an active pen.
     if (shouldIgnorePalmContact(activePointerTypeRef.current, e.pointerType)) return;
