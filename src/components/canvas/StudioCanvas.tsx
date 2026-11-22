@@ -25,6 +25,7 @@ import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../gri
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { appendBrushSamples, brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
+import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
@@ -124,6 +125,17 @@ export function StudioCanvas() {
   const penActiveRef = useRef(false);
   const [brushTrail, setBrushTrail] = useState<BrushSample[]>([]);
   const brushTrailRef = useRef<BrushSample[] | null>(null);
+  // The full-resolution trace remains in brushTrailRef; only the SVG preview
+  // state publishes once per display frame, even on 120/240 Hz pens.
+  const brushPreviewSchedulerRef = useRef<BrushPreviewScheduler | null>(null);
+  useEffect(() => {
+    const scheduler = createBrushPreviewScheduler((samples) => setBrushTrail(samples));
+    brushPreviewSchedulerRef.current = scheduler;
+    return () => {
+      scheduler.dispose();
+      brushPreviewSchedulerRef.current = null;
+    };
+  }, []);
   const [cellChain, setCellChain] = useState<Point[]>([]);
   const [hoverCell, setHoverCell] = useState<GridCell | null>(null);
   const [paintPreview, setPaintPreview] = useState<GridCell[]>([]);
@@ -405,6 +417,7 @@ export function StudioCanvas() {
     penActiveRef.current = false;
     setPen(null);
     brushTrailRef.current = null;
+    brushPreviewSchedulerRef.current?.clear();
     setBrushTrail([]);
     paintStrokeRef.current = null;
     setPaintPreview([]);
@@ -476,6 +489,7 @@ export function StudioCanvas() {
     // A real pressure-sensitive, closed SVG brush stroke (not the grid-cell brush).
     if (tool === "brush") {
       const first: BrushSample = { ...world, pressure: brushPressure(e.pressure, e.pointerType) };
+      brushPreviewSchedulerRef.current?.clear();
       brushTrailRef.current = [first];
       setBrushTrail([first]);
       return;
@@ -767,7 +781,7 @@ export function StudioCanvas() {
       }));
       const trail = appendBrushSamples(brushTrailRef.current, incoming, view.zoom);
       brushTrailRef.current = trail;
-      setBrushTrail(trail);
+      brushPreviewSchedulerRef.current?.enqueue(trail);
       return;
     }
 
@@ -915,7 +929,10 @@ export function StudioCanvas() {
         ? appendBrushSamples(recorded, [finalSample], view.zoom, true)
         : recorded;
       brushTrailRef.current = null;
+      // A queued preview must never paint over the finished saved vector.
+      brushPreviewSchedulerRef.current?.clear();
       setBrushTrail([]);
+      // Geometry uses the full final trace, not the last preview frame.
       const shape = vectorBrushOutline(points, brush);
       if (shape) {
         const id = addObject(shape, "Calligraphy brush stroke",
