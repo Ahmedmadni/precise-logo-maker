@@ -7,6 +7,7 @@ import {
 } from "../../calligraphy/contourComposer";
 import { alignJoinWithClearance, analyzeJoin } from "../../calligraphy/joinAssistant";
 import { createRibbonLink } from "../../calligraphy/ribbonJoin";
+import { selectJoiningContour } from "../../calligraphy/joinAnchorGeometry";
 import { useStudio } from "../../store/studioStore";
 
 const field = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground";
@@ -187,6 +188,7 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
           </button>
           {(["entry", "exit"] as const).map((side) => {
             const anchor = getJoinAnchor(selected, side);
+            const suggested = selectJoiningContour(contours, selected.contourRoles, side);
             return <div key={side} className="space-y-2 rounded-lg border border-border p-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold">{side === "entry" ? "نقطة دخول الحرف" : "نقطة خروجه"}</p>
@@ -196,6 +198,16 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
                   إعادة الضبط
                 </button>
               </div>
+              {suggested && (
+                <p className="text-[11px] leading-5 text-muted-foreground">
+                  {selected.joinAnchors?.[side]
+                    ? "الموضع مضبوط يدويًا."
+                    : "اقتراح من المسار " + (suggested.contourIndex + 1) + " (" +
+                      (suggested.role === "unassigned" ? "المسار الرئيسي هندسيًا" :
+                        roles.find((r) => r.value === suggested.role)?.label ?? "غير مصنف") + ")."}
+                  {" "}يمكن اختيار جزء «وصلة» أو «رأس» أو «ذيل» من تبويب أجزاء الحرف لتحسين الترشيح.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 {(["x", "y"] as const).map((axis) => (
                   <label key={axis} className="space-y-1 text-[11px]">

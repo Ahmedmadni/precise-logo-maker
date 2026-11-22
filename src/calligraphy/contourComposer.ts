@@ -1,5 +1,6 @@
 import type { LetteringItem } from "./model";
 import { parseOutline, glyphPointToWorld, worldToGlyphPoint } from "./pathEditor";
+import { selectJoiningContour } from "./joinAnchorGeometry";
 
 export type ContourRole = "unassigned" | "head" | "body" | "tail" | "join" | "dot" | "counter";
 export type JoinSide = "entry" | "exit";
@@ -73,18 +74,16 @@ export function moveOutlineContour(path: string, index: number, dx: number, dy: 
   return d.length <= 500_000 ? d : null;
 }
 
+/** A geometric fallback, never a font-authored joining point.
+ * Prefer user-labeled joining contours or the visually dominant body, and
+ * place the marker on a sampled SVG boundary (not an empty bounding-box
+ * midpoint or detached Arabic dot). Explicit manual anchors always win.
+ */
 export function suggestJoinAnchor(glyph: LetteringItem, side: JoinSide): GlyphAnchor | null {
   if (glyph.kind !== "outline" || !glyph.pathData) return null;
-  const contours = outlineContours(glyph.pathData);
-  if (!contours.length) return null;
-  const b = {
-    minX: Math.min(...contours.map((c) => c.bounds.minX)),
-    minY: Math.min(...contours.map((c) => c.bounds.minY)),
-    maxX: Math.max(...contours.map((c) => c.bounds.maxX)),
-    maxY: Math.max(...contours.map((c) => c.bounds.maxY)),
-  };
-  // A geometric starting point only — not font-provided Arabic joining metadata.
-  return { x: side === "entry" ? b.maxX : b.minX, y: (b.minY + b.maxY) / 2 };
+  const contours=outlineContours(glyph.pathData);
+  const candidate=selectJoiningContour(contours,glyph.contourRoles,side);
+  return candidate?.local ?? null;
 }
 
 export const getJoinAnchor = (glyph: LetteringItem, side: JoinSide) =>
