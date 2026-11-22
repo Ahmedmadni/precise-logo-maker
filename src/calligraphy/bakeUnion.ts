@@ -264,7 +264,10 @@ export function bakeRibbonAsOutline(items:LetteringItem[],bridgeId:string):BakeR
     linkGeometry.push(geo);
   }
   try{
-    const merged=union(...glyphs.map(g=>glyphGeometry.get(g.id)!),...linkGeometry) as number[][][][];
+    const shapes=[...glyphs.map(g=>glyphGeometry.get(g.id)!),...linkGeometry];
+    const first=shapes[0],second=shapes[1];
+    if(!first||!second)return {ok:false,reason:"لا توجد أشكال كافية للدمج"};
+    const merged=union(first,second,...shapes.slice(2)) as number[][][][];
     const path=merged.flatMap(poly=>poly.map(ring=>{
       const vertices=ring.slice(0,-1);
       if(vertices.length<3)return"";
