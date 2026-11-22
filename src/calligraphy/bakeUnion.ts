@@ -144,45 +144,144 @@ function polygonArea(geom:Geom):number{
 export type BakeResult = { ok:true; outline:LetteringItem; sourceIds:string[] } |
   {ok:false; reason:string};
 
-/**
- * Boolean-unite two glyphs with their selected curved ribbon.
- * Never modify source paths. The original triple is hidden by the store in
- * ONE undoable transaction. The new outline is flat world geometry.
+type ChainResult = {ok:true; glyphs:LetteringItem[]; ribbons:LetteringItem[]} |
+  {ok:false; reason:string};
+const chainError=(reason:string):ChainResult=>({ok:false,reason});
+
+/** The connected component around the chosen bridge must be a simple path,
+ * never a cycle, parallel duplicate or junction. Source outlines are untouched.
  */
-export function bakeRibbonAsOutline(items:LetteringItem[],bridgeId:string):BakeResult {
-  const bridge=items.find(x=>x.id===bridgeId);
-  if(bridge?.kind!=="bridge"||!bridge.ribbon)return{ok:false,reason:"حدد وصلة منحنية صحيحة أولاً"};
-  const s=items.find(x=>x.id===bridge.ribbon!.sourceGlyphId);
-  const t=items.find(x=>x.id===bridge.ribbon!.targetGlyphId);
-  if(!s||!t||s.kind!=="outline"||t.kind!=="outline")return{ok:false,reason:"أحد الحرفين الأصليين غير موجود"};
-  if(s.hidden||t.hidden||bridge.hidden)return{ok:false,reason:"أظهر الحرفين والوصلة أولاً"};
-  if([s,t].some(g=>(g.weight??0)>0))return{ok:false,reason:"أزل السُمك الإضافي Stroke من الحروف قبل الدمج"};
-  if(s.color.toLowerCase()!==t.color.toLowerCase()||
-     s.color.toLowerCase()!==bridge.color.toLowerCase())
-    return{ok:false,reason:"يجب توحيد لون الحرفين والوصلة قبل دمجهم في شكل واحد"};
-  const preflight=analyzeRibbonSafety(bridge,items);
-  if(preflight?.edgeCrossings && preflight.edgeCrossings > 0)
-    return {ok:false,reason:"فحص الوصلة رصد تقاطعًا في حوافها؛ اضبط سُمكها أو انحناءها أولًا، ثم حاول الدمج مجددًا"};
-  if(items.some(x=>x.kind==="bridge"&&x.id!==bridge.id &&
-    (x.ribbon?.sourceGlyphId===s.id||x.ribbon?.targetGlyphId===s.id||
-     x.ribbon?.sourceGlyphId===t.id||x.ribbon?.targetGlyphId===t.id)))
-    return{ok:false,reason:"هذان الحرفان مرتبطان بوصلات أخرى؛ ادمج كل مجموعة في مرحلة مستقلة"};
-  const a=filledGlyph(s),b=filledGlyph(t),join=filledRibbon(bridge,items);
-  if(!a||!b||!join)return{ok:false,reason:"تعذر تحويل المسارات إلى مضلعات سليمة. راجع الحروف ونقاط الوصلة"};
+function resolveRibbonChain(items:LetteringItem[],bridgeId:string):ChainResult{
+  const selected=items.find(x=>x.id===bridgeId);
+  if(selected?.kind!=="bridge"||!selected.ribbon)
+    return chainError("حدد وصلة منحنية صحيحة أولاً");
+  const links=items.filter(x=>x.kind==="bridge"&&x.ribbon);
+  const byGlyph=new Map<string,LetteringItem[]>();
+  for(const link of links){
+    const spec=link.ribbon!;
+    for(const id of [spec.sourceGlyphId,spec.targetGlyphId]){
+      const connections=byGlyph.get(id)??[];
+      connections.push(link);byGlyph.set(id,connections);
+    }
+  }
+  const ribbonIds=new Set<string>(),glyphIds=new Set<string>();
+  const pending=[selected];
+  while(pending.length){
+    const next=pending.pop()!;
+    if(ribbonIds.has(next.id))continue;
+    ribbonIds.add(next.id);
+    if(ribbonIds.size>24)return chainError("السلسلة كبيرة جدًا؛ قسّمها إلى مجموعات أصغر");
+    const spec=next.ribbon!;
+    if(!spec.sourceGlyphId||!spec.targetGlyphId||
+       spec.sourceGlyphId===spec.targetGlyphId)
+      return chainError("إحدى الوصلات غير صالحة أو تربط الحرف بنفسه");
+    for(const id of [spec.sourceGlyphId,spec.targetGlyphId]){
+      glyphIds.add(id);
+      if(glyphIds.size>25)return chainError("عدد الحروف أكبر من الحد الآمن");
+      for(const adjacent of byGlyph.get(id)??[])
+        if(!ribbonIds.has(adjacent.id))pending.push(adjacent);
+    }
+  }
+  const ribbons=links.filter(x=>ribbonIds.has(x.id));
+  const glyphMap=new Map<string,LetteringItem>();
+  for(const id of glyphIds){
+    const glyph=items.find(x=>x.id===id&&x.kind==="outline");
+    if(!glyph)return chainError("أحد الحروف الأصلية غير موجود");
+    glyphMap.set(id,glyph);
+  }
+  if(ribbons.length!==glyphMap.size-1)
+    return chainError("لا يمكن دمج دائرة أو وصلات متكررة؛ يلزم مسار حروف متسلسل");
+  const endpoints=Array.from(glyphMap.values()).filter(g=>(byGlyph.get(g.id)?.length??0)===1);
+  if(endpoints.length!==2||
+     Array.from(glyphMap.values()).some(g=>(byGlyph.get(g.id)?.length??0)>2))
+    return chainError("توجد وصلة متفرعة أو متكررة؛ يلزم سلسلة دون تفرعات");
+  const start=endpoints.find(g=>!ribbons.some(r=>r.ribbon!.targetGlyphId===g.id))??endpoints[0]!;
+  const orderedGlyphs:LetteringItem[]=[start];
+  const orderedLinks:LetteringItem[]=[];
+  const seen=new Set([start.id]);
+  let cursor=start.id,previous="";
+  while(true){
+    const options=(byGlyph.get(cursor)??[]).filter(r=>r.id!==previous);
+    if(!options.length)break;
+    if(options.length!==1)return chainError("توجد وصلة متفرعة عند الحرف المحدد");
+    const ribbon=options[0]!,spec=ribbon.ribbon!;
+    const id=spec.sourceGlyphId===cursor?spec.targetGlyphId:spec.sourceGlyphId;
+    if(seen.has(id))return chainError("لا يمكن دمج وصلات دائرية");
+    const glyph=glyphMap.get(id);
+    if(!glyph)return chainError("تعذر العثور على الحرف التالي");
+    orderedLinks.push(ribbon);orderedGlyphs.push(glyph);
+    seen.add(id);previous=ribbon.id;cursor=id;
+  }
+  if(orderedGlyphs.length!==glyphMap.size||orderedLinks.length!==ribbons.length)
+    return chainError("السلسلة ليست مسارًا متصلًا صالحًا");
+  return {ok:true,glyphs:orderedGlyphs,ribbons:orderedLinks};
+}
+export function inspectRibbonChain(items:LetteringItem[],bridgeId:string):
+  {ok:true;glyphCount:number;ribbonCount:number}|{ok:false;reason:string}{
+  const result=resolveRibbonChain(items,bridgeId);
+  if(!result.ok)return result;
+  return {ok:true,glyphCount:result.glyphs.length,ribbonCount:result.ribbons.length};
+}
+
+/** Boolean-unite all glyphs and ribbons in one safe nonbranching component.
+ * Original layers, Bézier controls, marks and their anchors survive in .logo.
+ */
+export function bakeRibbonAsOutline(items:LetteringItem[],bridgeId:string):BakeResult{
+  const chain=resolveRibbonChain(items,bridgeId);
+  if(!chain.ok)return chain;
+  const {glyphs,ribbons}=chain;
+  const sources=[...glyphs,...ribbons];
+  if(sources.some(item=>item.hidden))
+    return {ok:false,reason:"أظهر جميع الحروف والوصلات في السلسلة أولاً"};
+  if(glyphs.some(g=>(g.weight??0)!==0))
+    return {ok:false,reason:"أزل السُمك الإضافي Stroke من جميع الحروف قبل الدمج"};
+  if(sources.some(item=>item.color.toLowerCase()!==glyphs[0]!.color.toLowerCase()))
+    return {ok:false,reason:"يجب توحيد لون جميع الحروف والوصلات في السلسلة"};
+  const glyphGeometry=new Map<string,Geom>();
+  for(const glyph of glyphs){
+    const geo=filledGlyph(glyph);
+    if(!geo)return {ok:false,reason:"تعذر تحويل أحد الحروف إلى حدود متجهة سليمة"};
+    glyphGeometry.set(glyph.id,geo);
+  }
+  const linkGeometry:Geom[]=[];
+  for(const link of ribbons){
+    const spec=link.ribbon!;
+    const safety=analyzeRibbonSafety(link,items);
+    if(!safety)return {ok:false,reason:"تعذر فحص هندسة إحدى الوصلات"};
+    if(safety.edgeCrossings>0)
+      return {ok:false,reason:"فحص الوصلة رصد تقاطعًا في حوافها؛ اضبط سُمكها أو انحناءها أولًا، ثم حاول الدمج مجددًا"};
+    const geo=filledRibbon(link,items);
+    if(!geo)return {ok:false,reason:"تعذر تحويل إحدى الوصلات إلى مضلع سليم"};
+    try{
+      const a=glyphGeometry.get(spec.sourceGlyphId)!;
+      const b=glyphGeometry.get(spec.targetGlyphId)!;
+      if(polygonArea(intersection(a,geo))<0.05 ||
+         polygonArea(intersection(b,geo))<0.05)
+        return {ok:false,reason:"إحدى الوصلات لا تتداخل فعليًا مع طرفي حرفيها؛ زِد التداخل أولاً"};
+    }catch{
+      return {ok:false,reason:"تعذر فحص تداخل الوصلة مع الحروف؛ لم يتغير المشروع"};
+    }
+    linkGeometry.push(geo);
+  }
   try{
-    if(polygonArea(intersection(a,join))<0.05||polygonArea(intersection(b,join))<0.05)
-      return{ok:false,reason:"الوصلة لا تتقاطع فعليًا مع الحرفين؛ زِد التداخل عند طرفيها أولاً"};
-    const merged=union(a,b,join) as number[][][][];
+    const shapes=[...glyphs.map(g=>glyphGeometry.get(g.id)!),...linkGeometry];
+    const first=shapes[0],second=shapes[1];
+    if(!first||!second)return {ok:false,reason:"لا توجد أشكال كافية للدمج"};
+    const merged=union(first,second,...shapes.slice(2)) as number[][][][];
     const path=merged.flatMap(poly=>poly.map(ring=>{
       const vertices=ring.slice(0,-1);
       if(vertices.length<3)return"";
-      return "M "+vertices.map(([x,y],i)=>`${i?"L ":""}${format(x!)} ${format(-y!)}`).join(" ")+" Z";
+      return "M "+vertices.map(([x,y],i)=>
+        (i?"L ":"")+format(x!)+" "+format(-y!)).join(" ")+" Z";
     })).filter(Boolean).join(" ");
-    if(!path || path.length>500000)return{ok:false,reason:"الشكل الناتج كبير جدًا؛ قلل تعقيد الحروف قبل الدمج"};
-    return{ok:true,sourceIds:[s.id,t.id,bridge.id],
-      outline:{id:`weld-${crypto.randomUUID()}`,kind:"outline",x:0,y:0,
-        size:1000,unitsPerEm:1000,rotation:0,color:s.color,fillRule:"evenodd",
-        pathData:path,sourceText:"شكل موحد - "+(s.sourceText??"خط عربي"),
-        bakedSourceIds:[s.id,t.id,bridge.id]}};
-  }catch{return{ok:false,reason:"تعذرت العملية الهندسية لهذه المسارات؛ لم يتم تغيير المشروع"};}
+    if(!path||path.length>500000)
+      return {ok:false,reason:"المسار الناتج كبير جدًا؛ قسّم الحروف إلى مجموعات أصغر"};
+    const sourceIds=sources.map(x=>x.id);
+    return {ok:true,sourceIds,
+      outline:{id:"weld-"+crypto.randomUUID(),kind:"outline",x:0,y:0,
+        size:1000,unitsPerEm:1000,rotation:0,color:glyphs[0]!.color,
+        fillRule:"evenodd",pathData:path,
+        sourceText:"شكل موحد - "+(glyphs[0]!.sourceText??"خط عربي"),
+        bakedSourceIds:sourceIds}};
+  }catch{return {ok:false,reason:"فشل دمج هذه السلسلة هندسيًا؛ لم يتغير المشروع"};}
 }
