@@ -4,6 +4,7 @@ import type { LetteringItem } from "../../calligraphy/model";
 import { buildRibbonPath, DEFAULT_RIBBON, type RibbonLink } from "../../calligraphy/ribbonJoin";
 import { isRibbonWidthRisk, ribbonHandleGeometry } from "../../calligraphy/ribbonHandles";
 import { analyzeRibbonSafety, suggestRibbonSafetyAdjustment } from "../../calligraphy/ribbonSafety";
+import { suggestRibbonCapFit } from "../../calligraphy/ribbonCapFit";
 import { useStudio } from "../../store/studioStore";
 
 const line = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground";
@@ -26,6 +27,7 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const bake = useStudio((s) => s.bakeLetteringJoin);
   const [bakeError, setBakeError] = useState("");
   const [repairNotice, setRepairNotice] = useState("");
+  const [capNotice, setCapNotice] = useState("");
   if (!item.ribbon || item.kind !== "bridge") return null;
   const ribbon = preview?.id === item.id && preview.patch.ribbon
     ? preview.patch.ribbon : item.ribbon;
@@ -36,6 +38,7 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
   const handleGeometry = ribbonHandleGeometry(shown, doc.lettering ?? []);
   const widthRisk = !!handleGeometry && isRibbonWidthRisk(ribbon, handleGeometry);
   const geometrySafety = analyzeRibbonSafety(shown, doc.lettering ?? []);
+  const capFit = suggestRibbonCapFit(shown, doc.lettering ?? []);
   // Preview live while dragging, then keep exactly one Undo entry per gesture.
   const change = (key: keyof RibbonLink, value: number) => {
     if (!Number.isFinite(value)) return;
@@ -55,6 +58,17 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
       (proposed.after.needsReview
         ? "بقيت ملاحظات هندسية؛ راجع شكل الضربة عند التكبير."
         : "لم يرصد الفحص المتقطع مشكلات في الوصلة الجديدة. راجع النتيجة بصريًا قبل الدمج."));
+  };
+  const applyCapFit = () => {
+    const proposed = suggestRibbonCapFit(shown, doc.lettering ?? []);
+    if (!proposed) {
+      setCapNotice("تعذر إيجاد ضبط موثوق لطرفَي الوصلة؛ ثبّت نقاط الاتصال على حدود الحروف أو حررها يدويًا.");
+      return;
+    }
+    finish();
+    update(item.id, { ribbon: proposed.ribbon });
+    setCapNotice("تم ضبط " + proposed.changes.join(" و") +
+      " باستخدام مقطع الحرف المقاس. يمكنك التراجع عن التعديل. راجع الخط عند التكبير.");
   };
   const resetAngles = () => {
     finish();
@@ -132,6 +146,37 @@ export function RibbonJoinInspector({ item }: { item: LetteringItem }) {
           </p>
         </details>
       )}
+      <details className="rounded-xl border border-border px-3 py-2">
+        <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold">
+          مطابقة طرفَي الكشيدة مع سُمك الحروف
+        </summary>
+        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+          يقيس المقطع الداخلي للحرف بالقرب من نقطة الوصل، ويقترح سُمك الطرف واتجاهه.
+          يشترط أن تقع النقطة على حد واضح لا زاوية غامضة، وأن لا يزيد التعديل تقاطع حواف الوصلة.
+          لا يغيّر مسارات الحروف أو مواضع الحركات.
+        </p>
+        {capFit && <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+          {([
+            ["البداية", capFit.start], ["النهاية", capFit.end],
+          ] as const).map(([label, measurement]) => (
+            <div key={label} className="rounded-lg bg-background p-2">
+              <span className="font-semibold">{label}</span>
+              <p className="mt-1 text-muted-foreground" dir="auto">
+                {measurement ? measurement.width.toFixed(1) + " px — " +
+                  measurement.angle.toFixed(1) + "°" : "لا يوجد تقدير موثوق"}
+              </p>
+            </div>
+          ))}
+        </div>}
+        <button type="button" disabled={!capFit} onClick={applyCapFit}
+          className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary disabled:opacity-40">
+          تطبيق مطابقة أطراف الكشيدة (قابل للتراجع)
+        </button>
+        {!capFit && <p className="mt-2 text-[11px] text-muted-foreground">
+          لا يتوفر اقتراح آمن حاليًا. استخدم تثبيت النقاط على حواف الحروف أو اضبط السُمك والزاوية يدويًا.
+        </p>}
+        {capNotice && <p role="status" className="mt-2 text-[11px] leading-5">{capNotice}</p>}
+      </details>
       {geometrySafety?.needsReview && (
         <div className="space-y-2 rounded-xl border border-border bg-background p-3">
           <p className="text-[11px] leading-5 text-muted-foreground">
