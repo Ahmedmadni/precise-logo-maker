@@ -144,6 +144,9 @@ export interface HistoryEntry {
   state: DocumentState;
 }
 
+/** Ephemeral editor workspace; deliberately excluded from .logo serialization. */
+export type GlyphInspectorTab = "basic" | "paths" | "joins" | "alternates";
+
 export interface StudioState {
   doc: DocumentState;
   past: HistoryEntry[];
@@ -154,6 +157,9 @@ export interface StudioState {
   selection: string[];
   selectedLetteringId: string | null;
   letteringMoveScope: "glyph" | "word";
+  /** Keep the editor's current workflow when another glyph is selected. */
+  glyphInspectorTab: GlyphInspectorTab;
+  setGlyphInspectorTab: (tab: GlyphInspectorTab) => void;
   setLetteringMoveScope: (scope: "glyph" | "word") => void;
   selectedGlyphNodeId: number | null;
   setSelectedGlyphNodeId: (id: number | null) => void;
@@ -359,6 +365,21 @@ export const useStudio = create<StudioState>()((set, get) => {
     selection: [],
     selectedLetteringId: null,
     letteringMoveScope: "glyph",
+    glyphInspectorTab: "basic",
+    setGlyphInspectorTab: (glyphInspectorTab) => {
+      if (get().glyphInspectorTab === glyphInspectorTab) return;
+      get().commitLetteringPreview();
+      set({
+        glyphInspectorTab,
+        editGlyphNodes: false,
+        editGlyphContours: false,
+        editJoinAnchors: glyphInspectorTab === "joins",
+        selectedGlyphNodeId: null,
+        selectedContourIndex: null,
+        joinGuide: null,
+        tool: "select",
+      });
+    },
     setLetteringMoveScope: (letteringMoveScope) => set({ letteringMoveScope }),
     selectedGlyphNodeId: null,
     setSelectedGlyphNodeId: (selectedGlyphNodeId) => set({ selectedGlyphNodeId }),
@@ -1173,8 +1194,11 @@ export const useStudio = create<StudioState>()((set, get) => {
         selectedLetteringId: null,
         selectedGlyphNodeId: null,
         selectedContourIndex: null,
+        glyphInspectorTab: "basic",
+        editGlyphNodes: false,
         editGlyphContours: false,
         editJoinAnchors: false,
+        joinGuide: null,
         letteringPreview: null,
         measurement: null,
       });

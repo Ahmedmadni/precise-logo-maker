@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { PanelRightOpen, SlidersHorizontal, X } from "lucide-react";
+import { Check, PanelRightOpen, PencilRuler, SlidersHorizontal, Waypoints, X } from "lucide-react";
 import { StudioCanvas } from "../components/canvas/StudioCanvas";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
@@ -22,6 +22,11 @@ function ClientOnly({ children }: { children: ReactNode; fallback?: ReactNode })
 
 export function OfflineStudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [topPanelOpen, setTopPanelOpen] = useState(false);
+  const openProperties = () => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setTopPanelOpen(true);
+    else setPanelOpen(true);
+  };
   useEffect(() => {
     if (!panelOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
@@ -37,27 +42,29 @@ export function OfflineStudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeaderOffline />
+      <div className="hidden sm:block">
+        <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
+      </div>
+      <div className="hidden lg:block">
+        <RightPanel layout="top" open={topPanelOpen} onOpenChange={setTopPanelOpen} />
+      </div>
       <div className="flex min-h-0 flex-1">
-        <div className="hidden sm:flex lg:hidden"><ToolRail onOpenLettering={() => setPanelOpen(true)} /></div>
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
           </ClientOnly>
-          <StudioEmptyGuide openPanel={() => setPanelOpen(true)} />
+          <StudioEmptyGuide openPanel={openProperties} />
           <MobileBrushControls panelOpen={panelOpen} />
           <MobileNodeControls panelOpen={panelOpen} />
           <ClientOnly fallback={null}>
-            <SelectionQuickEdit panelOpen={panelOpen} openPanel={() => setPanelOpen(true)} />
+            <SelectionQuickEdit panelOpen={panelOpen} openPanel={openProperties} />
           </ClientOnly>
           <ClientOnly fallback={null}>
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
           </ClientOnly>
         </main>
 
-        {/* Desktop: docked panel. Mobile: slide-over sheet. */}
-        <div className="hidden lg:flex">
-          <RightPanel />
-        </div>
+        {/* Small screens keep a slide-over sheet; desktop properties stay above the canvas. */}
         {panelOpen && (
           <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button
@@ -78,20 +85,82 @@ export function OfflineStudioPage() {
   );
 }
 
+/**
+ * Canvas-first workflow shortcuts on narrow screens. The existing Android
+ * properties sheet stays optional; node/anchor drag can start immediately.
+ * All navigation state is ephemeral and does not alter .logo contents.
+ */
 function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; openPanel: () => void }) {
-  const glyph = useStudio((s) => s.selectedLetteringId);
+  const selectedId = useStudio((s) => s.selectedLetteringId);
+  const doc = useStudio((s) => s.doc);
   const geometryCount = useStudio((s) => s.selection.length);
   const editNodes = useStudio((s) => s.editGlyphNodes);
+  const editJoins = useStudio((s) => s.editJoinAnchors);
   const tool = useStudio((s) => s.tool);
   const setSection = useStudio((s) => s.setWorkspaceSection);
-  if (panelOpen || editNodes || tool !== "select" || (!glyph && geometryCount === 0)) return null;
+  const setInspectorTab = useStudio((s) => s.setGlyphInspectorTab);
+  const setEditNodes = useStudio((s) => s.setEditGlyphNodes);
+  const setEditJoins = useStudio((s) => s.setEditJoinAnchors);
+  const item = (doc.lettering ?? []).find((glyph) => glyph.id === selectedId);
+  if (panelOpen || editNodes || tool !== "select" || (!item && geometryCount === 0)) return null;
+
+  const isOutline = item?.kind === "outline" && !!item.pathData;
+  const canJoin = isOutline && !item.catalogShapeId;
+  const detailed = () => { setSection("edit"); openPanel(); };
+  const openNodes = () => {
+    setSection("edit");
+    setInspectorTab("paths");
+    setEditNodes(true);
+  };
+  const openJoins = () => {
+    if (!canJoin) return;
+    setSection("edit");
+    setInspectorTab("joins");
+    setEditJoins(true);
+  };
+  const buttonStyle = "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 text-[11px] font-semibold text-foreground active:bg-primary/15";
   return (
-    <button type="button" onClick={() => { setSection("edit"); openPanel(); }}
-      aria-label="تحرير العنصر المحدد"
-      className="absolute bottom-4 end-3 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-primary/60 bg-card/95 px-4 text-xs font-semibold text-primary shadow-xl backdrop-blur-sm sm:hidden">
-      <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-      {glyph ? "تعديل الحرف المحدد" : "تعديل الشكل المحدد"}
-    </button>
+    <div dir="rtl" role="group" aria-label="أدوات سريعة للعنصر المحدد"
+      className="absolute bottom-3 end-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-2xl border border-primary/40 bg-card/95 p-1.5 shadow-xl backdrop-blur-lg sm:hidden">
+      {editJoins && canJoin ? (
+        <>
+          <span className="max-w-24 truncate px-1 text-[11px] font-semibold text-primary">
+            نقاط الوصل
+          </span>
+          <button type="button" onClick={() => setEditJoins(false)}
+            aria-label="إنهاء تحرير نقاط الوصل" className={buttonStyle}>
+            <Check className="h-4 w-4" aria-hidden /> إنهاء
+          </button>
+          <button type="button" onClick={detailed}
+            aria-label="فتح تفاصيل نقاط الوصل" className={buttonStyle}>
+            <SlidersHorizontal className="h-4 w-4" aria-hidden /> تفاصيل
+          </button>
+        </>
+      ) : (
+        <>
+          {isOutline && (
+            <button type="button" onClick={openNodes}
+              aria-label="فتح تحرير نقاط Bézier مباشرة على الرسم" className={buttonStyle}>
+              <PencilRuler className="h-4 w-4" aria-hidden /> العقد
+            </button>
+          )}
+          {canJoin && (
+            <button type="button" onClick={openJoins}
+              aria-label="فتح تحرير نقاط وصل الحروف على الرسم" className={buttonStyle}>
+              <Waypoints className="h-4 w-4" aria-hidden /> الوصلات
+            </button>
+          )}
+          <button type="button" onClick={detailed}
+            aria-label={item?.kind === "bridge" ? "تحرير إعدادات الكشيدة" :
+              item?.kind === "haraka" ? "تحرير حركة التشكيل" : "فتح أدوات تعديل العنصر"}
+            className={buttonStyle+" border-primary/50 text-primary"}>
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            {item?.kind === "bridge" ? "الكشيدة" :
+              item?.kind === "haraka" ? "الحركة" : "تفاصيل"}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
