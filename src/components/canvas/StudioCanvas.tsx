@@ -25,6 +25,7 @@ import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../gri
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
 import { appendBrushSamples, brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
+import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import { geometryToPathData } from "../../objects/render";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
@@ -1018,8 +1019,12 @@ export function StudioCanvas() {
 
   // What the freehand stroke will become once released.
   const brushPreview = useMemo(
-    () => vectorBrushOutline(brushTrail, brush),
-    [brushTrail, brush],
+    () => vectorBrushPreviewOutline(brushTrail, brush, view.zoom),
+    [brushTrail, brush, view.zoom],
+  );
+  const brushPreviewPath = useMemo(
+    () => brushPreview ? geometryToPathData(brushPreview) : null,
+    [brushPreview],
   );
   const penPreview = useMemo(
     () =>
@@ -1329,9 +1334,9 @@ export function StudioCanvas() {
             />
           )}
           {/* The live stroke uses the exact vector outline committed on release. */}
-          {brushPreview && (
+          {brushPreviewPath && (
             <path
-              d={geometryToPathData(brushPreview)}
+              d={brushPreviewPath}
               fill={brush.color}
               opacity={0.85}
               stroke="none"
