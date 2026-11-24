@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
-import { morphGlyphPixels, type MorphDirection, type MorphProfile } from "../../calligraphy/morph";
+import { morphGlyphPixels, type MorphDirection, type MorphProfile, type MorphRegion } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
 import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
 import { CubicHandleLinkControls } from "./CubicHandleLinkControls";
@@ -54,6 +54,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
   const [morphProfile, setMorphProfile] = useState<MorphProfile>("gradual");
+  const [morphRegion, setMorphRegion] = useState<MorphRegion>("whole");
   const isOutline = selected.kind === "outline" && !!selected.pathData;
   const isCatalogSymbol = isOutline && !!selected.catalogShapeId;
   // When a movement/mark/symbol is selected, do not show inapplicable tools.
@@ -95,7 +96,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const previewStretch = (value: number, chosenDirection = direction) => {
     if (!isOutline) return;
     setExtension(value);
-    const path = morphGlyphPixels(selected, chosenDirection, value, morphProfile);
+    const path = morphGlyphPixels(selected, chosenDirection, value, morphProfile, morphRegion);
     if (path) setPreview(selected.id, { ...pending, pathData: path });
   };
   const finishStretch = () => {
@@ -263,6 +264,13 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 </button>
               ))}
             </div>
+            <label className="block space-y-1 text-xs">نطاق التعديل من الطرف المختار
+              <select className={input} value={morphRegion} onChange={(e) => { if (extension) finishStretch(); setMorphRegion(e.target.value as MorphRegion); }}>
+                <option value="whole">كامل المسار</option>
+                <option value="outer-half">النصف الخارجي</option>
+                <option value="outer-third">الثلث الخارجي</option>
+              </select>
+            </label>
             <label className="block space-y-1 text-xs">توزيع المد على المسار
               <select className={input} value={morphProfile} onChange={(e) => { if (extension) finishStretch(); setMorphProfile(e.target.value as MorphProfile); }}>
                 <option value="gradual">تدريجي — الحفاظ على منطقة الاتصال</option>
