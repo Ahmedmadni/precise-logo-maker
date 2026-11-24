@@ -14,19 +14,20 @@ const swatch: BrushSample[] = [
   { x: 91, y: 27, pressure: 0.45 },
 ];
 
-export function BrushPresetPreview({ preset, settings, className = "" }: {
+export function BrushPresetPreview({ preset, settings, className = "", live = false }: {
   preset: BrushPreset;
   settings?: BrushSettings | undefined;
   className?: string | undefined;
+  live?: boolean;
 }) {
   const shape = vectorBrushOutline(swatch, {
     ...(settings ?? DEFAULT_BRUSH),
-    preset, size: 13, pressure: false, smoothing: 0.18,
+    preset, ...(live ? { size: Math.min(100, (settings ?? DEFAULT_BRUSH).size) } : { size: 13, pressure: false, smoothing: 0.18 }),
   });
   return (
-    <svg viewBox="0 0 102 54" aria-hidden="true" preserveAspectRatio="xMidYMid meet"
-      className={"block h-10 w-full max-w-28 text-current " + className}>
-      {shape && <path d={geometryToPathData(shape)} fill="currentColor" stroke="none" />}
+    <svg viewBox={live ? "-50 -50 202 154" : "0 0 102 54"} aria-hidden="true" preserveAspectRatio="xMidYMid meet"
+      className={(live ? "block h-32 w-full" : "block h-10 w-full max-w-28 text-current") + " " + className}>
+      {shape && <path d={geometryToPathData(shape)} fill={live ? (settings ?? DEFAULT_BRUSH).color : "currentColor"} stroke="none" />}
     </svg>
   );
 }
