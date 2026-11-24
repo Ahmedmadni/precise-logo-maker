@@ -5,7 +5,7 @@
  * their relative displacement when their owning glyph is translated.
  */
 import type { HarakaId, LetteringItem } from "./model";
-import { createHaraka } from "./model";
+import { createHaraka, HARAKAT } from "./model";
 import { glyphPointToWorld, outlineNodes } from "./pathEditor";
 
 export type MarkPlacement = "above" | "below";
@@ -41,6 +41,18 @@ export function glyphWorldBounds(glyph: LetteringItem):
   };
 }
 const realSize = (item: LetteringItem) => Math.max(1, Math.min(250, item.size));
+// SVG mark paths use a 100-unit square, centered at the item origin.
+// Control-point bounds are conservative; rotated marks use a radial envelope.
+function markVerticalExtent(item: LetteringItem): number {
+  const path = item.markPathData || HARAKAT.find((mark) => mark.id === item.mark)?.path;
+  const nodes = path ? outlineNodes(path) : [];
+  const size = Math.max(1, Math.min(1000, item.size));
+  if (!nodes.length) return size / 2;
+  const sx = Math.abs(item.scaleX ?? 1), sy = Math.abs(item.scaleY ?? 1);
+  const transformed = !!(item.rotation || item.skewX || item.skewY);
+  if (transformed) return Math.max(...nodes.map((p) => Math.hypot((p.x - 50) * sx, (p.y - 50) * sy))) * size / 100;
+  return Math.max(...nodes.map((p) => Math.abs(p.y - 50))) * sy * size / 100;
+}
 function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: number, stackDistance?: number) {
   const bounds = glyphWorldBounds(glyph);
   if (!bounds) {
@@ -51,9 +63,10 @@ function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: numb
   const size = realSize(mark);
   const margin = Math.max(9, Math.min(30, glyph.size * 0.12));
   const gap = stackDistance ?? tier * size * 0.67;
+  const clearance = markVerticalExtent(mark);
   return {
     x: (bounds.minX + bounds.maxX) / 2,
-    y: below ? bounds.maxY + margin + gap : bounds.minY - margin - gap,
+    y: below ? bounds.maxY + margin + clearance + gap : bounds.minY - margin - clearance - gap,
   };
 }
 
@@ -89,7 +102,7 @@ export function relayoutHarakat(previous: LetteringItem[], current: LetteringIte
       (originalOrder.get(a.id) ?? 0) - (originalOrder.get(b.id) ?? 0));
     let distance = 0;
     stack.forEach((mark, tier) => {
-      if (tier > 0) distance += (realSize(stack[tier - 1]!) + realSize(mark)) * 0.335;
+      if (tier > 0) distance += 2 * markVerticalExtent(stack[tier - 1]!) + 4;
       tiers.set(mark.id, tier);
       distances.set(mark.id, distance);
     });
