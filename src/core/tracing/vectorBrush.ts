@@ -371,3 +371,28 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     return null;
   return { kind: "path", points: outline, closed: true };
 }
+
+/** Opt-in cubic fitting for consumers that preserve cubic geometry through edits.
+ * Caps and sharp corners remain linear. Controls stay near the sampled edge.
+ */
+export function fitBrushCubics(path: PathGeometry): PathGeometry {
+  const points = path.points;
+  if (!path.closed || points.length < 6) return path;
+  const n = points.length;
+  const tangent = (i: number): Point | null => {
+    const a = points[(i + n - 1) % n]!, b = points[i]!, c = points[(i + 1) % n]!;
+    const u = { x: b.x - a.x, y: b.y - a.y }, v = { x: c.x - b.x, y: c.y - b.y };
+    const ul = Math.hypot(u.x, u.y), vl = Math.hypot(v.x, v.y);
+    if (ul < 1e-6 || vl < 1e-6 || (u.x*v.x + u.y*v.y)/(ul*vl) < 0.94) return null;
+    const x = u.x/ul + v.x/vl, y = u.y/ul + v.y/vl, len = Math.hypot(x,y);
+    return { x: x/len, y: y/len };
+  };
+  const cubicSegments = points.map((a,i) => {
+    const j = (i+1)%n, b = points[j]!, t = tangent(i), u = tangent(j);
+    const length = distance(a,b);
+    if (!t || !u || length < 0.15) return null;
+    const k = Math.min(length/3, distance(a,points[(i+n-1)%n]!)/2, distance(b,points[(j+1)%n]!)/2);
+    return { control1: {x:a.x+t.x*k,y:a.y+t.y*k}, control2:{x:b.x-u.x*k,y:b.y-u.y*k} };
+  });
+  return { ...path, cubicSegments };
+}
