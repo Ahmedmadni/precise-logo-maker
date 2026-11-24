@@ -88,6 +88,11 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           <p className="text-xs leading-5 text-muted-foreground">
             ارسم بالإصبع أو القلم. يتم حفظ كل ضربة كشكل فيكتور مغلق يمكن تغيير حجمه ولونه وتصديره.
           </p>
+          <div className="rounded-xl border border-border bg-background p-2">
+            <p className="text-xs font-semibold">معاينة القلم الحالي</p>
+            <BrushPresetPreview preset={brush.preset} settings={brush} live />
+            <p className="text-[11px] text-muted-foreground">عينة متجهية بضغط متدرج، تتحدث مع إعدادات القلم.</p>
+          </div>
           <div className="space-y-2">
             <p className="text-xs font-semibold">إعدادات قلم سريعة</p>
             <div className="grid grid-cols-2 gap-2">
