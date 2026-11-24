@@ -347,7 +347,26 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     right.push({ x: sample.x - normal.x * halfWidth, y: sample.y - normal.y * halfWidth });
   });
 
-  const outline = [...left, ...right.reverse()];
+  // Remove nearly collinear edge samples without rounding intentional corners.
+  // Preserve each edge's endpoints so the cap geometry remains unchanged.
+  const simplifyEdge = (edge: Point[]): Point[] => {
+    if (edge.length < 3) return edge;
+    const tolerance = Math.min(0.25, settings.size * 0.015);
+    const kept: Point[] = [edge[0]!];
+    for (let i = 1; i < edge.length - 1; i++) {
+      const a = kept[kept.length - 1]!, b = edge[i]!, c = edge[i + 1]!;
+      const dx = c.x - a.x, dy = c.y - a.y;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < 1e-12) { kept.push(b); continue; }
+      const t = ((b.x - a.x) * dx + (b.y - a.y) * dy) / len2;
+      const error = Math.hypot(b.x - a.x - t * dx, b.y - a.y - t * dy);
+      // Limit the span to prevent cumulative drift over long curves.
+      if (t <= 0 || t >= 1 || error > tolerance || Math.sqrt(len2) > settings.size * 2) kept.push(b);
+    }
+    kept.push(edge[edge.length - 1]!);
+    return kept;
+  };
+  const outline = [...simplifyEdge(left), ...simplifyEdge(right).reverse()];
   if (outline.length < 4 || outline.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y)))
     return null;
   return { kind: "path", points: outline, closed: true };
