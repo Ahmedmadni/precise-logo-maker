@@ -43,6 +43,7 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
   const [view, setView] = useState<"grid" | "list">("grid");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [stayInLibrary, setStayInLibrary] = useState(true);
+  const [insertSize, setInsertSize] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<string[]>(readFavorites);
   const [message, setMessage] = useState("");
   const doc = useStudio((s) => s.doc);
@@ -75,10 +76,10 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
       setMessage("تعذرت إضافة الشكل؛ المسار غير صالح.");
       return;
     }
-    addLettering(item);
+    addLettering(insertSize === null ? item : { ...item, size: insertSize });
     setMessage("أُضيف " + entry.label + " كمسار فيكتور مستقل قابل للتحرير.");
     if (stayInLibrary) setSection("ornaments");
-    else onCreated?.();
+    else { setSection("edit"); onCreated?.(); }
   };
 
   return (
@@ -124,6 +125,13 @@ export function CalligraphyShapeLibrary({ onCreated }: { onCreated?: (() => void
             className="h-5 w-5 shrink-0 accent-[var(--color-primary)]" />
         </label>
       )}
+      {category !== "mine" && <label className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border px-3 text-xs">
+        حجم الشكل عند الإدراج
+        <select className="min-h-10 rounded-lg border border-border bg-background px-2" value={insertSize ?? ""} onChange={(e) => setInsertSize(e.target.value === "" ? null : Number(e.target.value))}>
+          <option value="">الحجم الأصلي</option>
+          {[25, 50, 75, 100, 150, 200, 300].map((size) => <option key={size} value={size}>{size} px</option>)}
+        </select>
+      </label>}
       {previewShape && category !== "mine" && (
         <div className="space-y-2 rounded-2xl border border-primary/40 bg-card p-3"
           aria-label={"معاينة مكبرة: " + previewShape.label}>
