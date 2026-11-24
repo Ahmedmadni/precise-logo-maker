@@ -85,3 +85,33 @@ export function centerLetteringAt(items: LetteringItem[], target: CoordinatePair
   const dy = target.y - (bounds.y + bounds.height / 2);
   return items.map((item) => ({ ...item, x: item.x + dx, y: item.y + dy }));
 }
+
+/** Local transverse expansion around the outline's geometric centerline.
+ * This is a geometric width adjustment, not a typographic stroke offset.
+ */
+export function adjustOutlineRegionWidth(d: string, direction: MorphDirection, factor: number, region: MorphRegion = "outer-third"): string | null {
+  if (!Number.isFinite(factor) || factor < 0.5 || factor > 1.5) return null;
+  const segments = parseOutline(d), nodes = outlineNodes(d);
+  if (!segments || !nodes.length) return null;
+  if (factor === 1) return d;
+  const horizontal = direction === "left" || direction === "right";
+  const axis = horizontal ? "x" : "y", transverse = horizontal ? "y" : "x";
+  const along = nodes.map(n => n[axis]), across = nodes.map(n => n[transverse]);
+  const min = Math.min(...along), span = Math.max(...along) - min;
+  const center = (Math.min(...across) + Math.max(...across)) / 2;
+  if (span < 0.01) return null;
+  const positive = direction === "right" || direction === "up";
+  const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
+  return segments.map(segment => {
+    if (segment.cmd === "Z") return "Z";
+    const v = [...segment.values];
+    for (let i = 0; i < v.length; i += 2) {
+      const a = i + (horizontal ? 0 : 1), b = i + (horizontal ? 1 : 0);
+      const t = (v[a]! - min) / span;
+      const u = Math.max(0, Math.min(1, ((positive ? t : 1 - t) - cutoff) / (1 - cutoff)));
+      const weight = u * u * (3 - 2 * u);
+      v[b] = center + (v[b]! - center) * (1 + (factor - 1) * weight);
+    }
+    return segment.cmd + v.map(round).join(" ");
+  }).join(" ");
+}
