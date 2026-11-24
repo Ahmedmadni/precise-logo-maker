@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
-import { morphGlyphPixels, type MorphDirection, type MorphProfile, type MorphRegion } from "../../calligraphy/morph";
+import { adjustOutlineRegionWidth, morphGlyphPixels, type MorphDirection, type MorphProfile, type MorphRegion } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
 import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
 import { CubicHandleLinkControls } from "./CubicHandleLinkControls";
@@ -53,6 +53,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setInspectorTab = useStudio((s) => s.setGlyphInspectorTab);
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
+  const [regionWidth, setRegionWidth] = useState(100);
   const [morphProfile, setMorphProfile] = useState<MorphProfile>("gradual");
   const [morphRegion, setMorphRegion] = useState<MorphRegion>("whole");
   const isOutline = selected.kind === "outline" && !!selected.pathData;
@@ -103,6 +104,12 @@ export function GlyphTransformPanel({ selected, siblings }: {
     commitPreview();
     setExtension(0);
   };
+  const previewRegionWidth = (value: number) => {
+    if (!isOutline || !selected.pathData) return;
+    const path = adjustOutlineRegionWidth(selected.pathData, direction, value / 100, morphRegion);
+    if (path) { setRegionWidth(value); setPreview(selected.id, { ...pending, pathData: path }); }
+  };
+  const finishRegionWidth = () => { commitPreview(); setRegionWidth(100); };
   const setNodeCoordinate = (axis: "x" | "y", val: number) => {
     if (!node || !isOutline || !Number.isFinite(val)) return;
     commitPreview();
@@ -289,6 +296,14 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 onPointerUp={finishStretch} onPointerCancel={finishStretch}
                 onKeyUp={finishStretch} onBlur={finishStretch} />
             </label>
+            <label className="block space-y-1 text-xs">
+              <span className="flex justify-between">العرض الموضعي للمقطع <span dir="ltr">{regionWidth}%</span></span>
+              <input type="range" min="50" max="150" step="5" value={regionWidth}
+                className="min-h-10 w-full accent-[var(--color-primary)]"
+                onChange={(e) => previewRegionWidth(Number(e.target.value))}
+                onPointerUp={finishRegionWidth} onPointerCancel={finishRegionWidth} onKeyUp={finishRegionWidth} onBlur={finishRegionWidth} />
+            </label>
+            <p className="text-[11px] text-muted-foreground">يستخدم العرض الموضعي الاتجاه والنطاق المحددين أعلاه، ولا يمثل سماكة قلم حقيقية.</p>
             <p className="text-[11px] text-muted-foreground">يمكنك تطبيق المد أكثر من مرة، والتراجع عن كل عملية بشكل مستقل.</p>
             </div>
           </details>
