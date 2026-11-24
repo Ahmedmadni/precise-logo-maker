@@ -48,6 +48,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setPreview = useStudio((s) => s.setLetteringPreview);
   const commitPreview = useStudio((s) => s.commitLetteringPreview);
   const [step, setStep] = useState(5);
+  const [showAdvancedCoordinates, setShowAdvancedCoordinates] = useState(false);
   const storedTab = useStudio((s) => s.glyphInspectorTab);
   const setInspectorTab = useStudio((s) => s.setGlyphInspectorTab);
   const [direction, setDirection] = useState<MorphDirection>("right");
@@ -189,7 +190,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
         <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
           value={selected.color} onChange={(e) => update(selected.id, { color: e.target.value })} />
       </label>
-      <details className="rounded-lg border border-border p-3">
+      <details open={showAdvancedCoordinates} onToggle={(event) => setShowAdvancedCoordinates(event.currentTarget.open)} className="rounded-lg border border-border p-3">
         <summary className="cursor-pointer text-xs font-bold">الإحداثيات الدقيقة (X / Y / الحجم)</summary>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {([
@@ -209,8 +210,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
         </div>
       </details>
 
-      <details open className="rounded-lg border border-border p-3">
-        <summary className="cursor-pointer text-xs font-bold">الحجم والدوران والسُمك</summary>
+      <details className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-xs font-bold">التحويلات المتقدمة: الحجم والدوران والسُمك والميل</summary>
         <div className="mt-3 space-y-3">
         {([
           ["scaleX", "إطالة الحرف أفقيًا", 0.35, 4, 0.05],
