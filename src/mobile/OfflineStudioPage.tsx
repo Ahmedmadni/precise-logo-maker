@@ -13,6 +13,7 @@ import { useAutosave } from "../hooks/useAutosave";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 import { useLanguageBootstrap, useT } from "../i18n";
 import { useStudio } from "../store/studioStore";
+import { readStudioAppearance, saveStudioAppearance, type StudioAppearance } from "./studioAppearance";
 
 // An Android WebView already starts entirely on the client; there is no SSR
 // hydration, TanStack router, Cloudflare backend, or PWA service worker here.
@@ -22,9 +23,11 @@ function ClientOnly({ children }: { children: ReactNode; fallback?: ReactNode })
 
 export function OfflineStudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [topPanelOpen, setTopPanelOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [appearance, setAppearance] = useState<StudioAppearance>(readStudioAppearance);
+  useEffect(() => saveStudioAppearance(appearance), [appearance]);
   const openProperties = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) setTopPanelOpen(true);
+    if (window.matchMedia("(min-width: 1024px)").matches) setInspectorOpen(true);
     else setPanelOpen(true);
   };
   useEffect(() => {
@@ -37,19 +40,24 @@ export function OfflineStudioPage() {
   }, [panelOpen]);
 
   return (
-    <div className="dark flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className={"studio-workspace flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground " +
+      (appearance === "dark" ? "dark" : "")}>
       <ClientOnly fallback={null}>
         <LanguageSync />
       </ClientOnly>
-      <StudioHeaderOffline />
+      <StudioHeaderOffline appearance={appearance} onAppearanceChange={setAppearance} />
       <div className="hidden sm:block">
         <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
       </div>
-      <div className="hidden lg:block">
-        <RightPanel layout="top" open={topPanelOpen} onOpenChange={setTopPanelOpen} />
-      </div>
+      {/* At desktop sizes the inspector docks beside—not above—the canvas. */}
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">
+          <button type="button" onClick={() => setInspectorOpen((shown) => !shown)}
+            aria-label={inspectorOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}
+            aria-pressed={inspectorOpen} title="إظهار أو إخفاء خصائص التصميم"
+            className="absolute end-3 top-3 z-30 hidden h-11 w-11 items-center justify-center rounded-xl border border-border bg-card/95 text-foreground shadow-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary lg:inline-flex">
+            {inspectorOpen ? <X className="h-5 w-5" aria-hidden /> : <PanelRightOpen className="h-5 w-5" aria-hidden />}
+          </button>
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
           </ClientOnly>
@@ -64,7 +72,7 @@ export function OfflineStudioPage() {
           </ClientOnly>
         </main>
 
-        {/* Small screens keep a slide-over sheet; desktop properties stay above the canvas. */}
+        {/* Mobile and tablet use a modal sheet; desktop uses a docked inspector. */}
         {panelOpen && (
           <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button
@@ -76,6 +84,11 @@ export function OfflineStudioPage() {
             <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
+          </div>
+        )}
+        {inspectorOpen && (
+          <div className="hidden h-full w-[clamp(17rem,24vw,22rem)] shrink-0 lg:block">
+            <RightPanel />
           </div>
         )}
       </div>

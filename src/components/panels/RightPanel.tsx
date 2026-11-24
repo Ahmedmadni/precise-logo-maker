@@ -1968,8 +1968,8 @@ export function RightPanel({
           onClick={() => chooseSection(id)}
           className={cn(
             "flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] text-muted-foreground transition-colors",
-            top ? "min-h-12 max-w-24 flex-1" : "min-h-14",
-            section === id && "bg-primary/10 font-semibold text-primary",
+            top ? "min-h-12 max-w-24 flex-1" : "min-h-[3.5rem]",
+            section === id && "bg-primary/10 font-semibold text-primary ring-1 ring-inset ring-primary/20",
           )}>
           <Icon className="h-5 w-5" aria-hidden />
           <span>{label}</span>
@@ -1983,14 +1983,14 @@ export function RightPanel({
         "flex w-full flex-col overflow-hidden bg-card text-foreground",
         top
           ? "relative z-20 shrink-0 border-b border-border"
-          : "h-full lg:w-[clamp(23rem,29vw,29rem)] lg:border-s lg:border-border",
+          : "h-full min-w-0 lg:w-full lg:border-s lg:border-border",
       )}
       dir="rtl"
       aria-label="لوحة أدوات التصميم"
     >
       <header className={cn(
         "flex shrink-0 items-center gap-3 border-border",
-        top ? "min-h-16 px-3 py-2" : "justify-between border-b px-3 py-3",
+        top ? "min-h-16 px-3 py-2" : "min-h-[4.5rem] justify-between border-b px-3 py-3",
       )}>
         <div className={cn(top && "w-[10.5rem] shrink-0")}>
           <h2 className={cn("font-bold", top ? "text-xs" : "text-sm")}>{title[section]}</h2>
