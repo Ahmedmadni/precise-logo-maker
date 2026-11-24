@@ -11,6 +11,8 @@ export interface BrushSettings {
   smoothing: number;
   /** Optional to preserve compatibility with older brush presets. */
   endStyle?: BrushEndStyle;
+  pressureCurve?: "soft" | "linear" | "firm";
+  nibRatio?: number;
 }
 export interface BrushSample extends Point { pressure: number }
 
@@ -174,6 +176,8 @@ export function brushIsValid(config: BrushSettings): boolean {
     Number.isFinite(config.angle) && Math.abs(config.angle) <= 180 &&
     Number.isFinite(config.smoothing) && config.smoothing >= 0 && config.smoothing <= 0.9 &&
     (config.endStyle === undefined || ["flat", "soft", "sharp"].includes(config.endStyle)) &&
+    (config.pressureCurve === undefined || ["soft", "linear", "firm"].includes(config.pressureCurve)) &&
+    (config.nibRatio === undefined || (Number.isFinite(config.nibRatio) && config.nibRatio >= 0.05 && config.nibRatio <= 0.8)) &&
     /^#[0-9a-fA-F]{6}$/.test(config.color);
 }
 
@@ -232,7 +236,7 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
   if (!clean.length) return null;
 
   const pressed = (sample: BrushSample) => settings.pressure
-    ? (0.3 + 0.7 * clamp(sample.pressure, 0.08, 1)) : 1;
+    ? (0.3 + 0.7 * Math.pow(clamp(sample.pressure, 0.08, 1), settings.pressureCurve === "soft" ? 0.5 : settings.pressureCurve === "firm" ? 2 : 1)) : 1;
   const point = clean[0]!;
   if (clean.length === 1) {
     const radius = settings.size * pressed(point) / 2;
@@ -256,7 +260,7 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
       ] };
     }
     // A chisel makes a short angled nib imprint rather than a round dot.
-    const thin = Math.max(0.2, radius * 0.22);
+    const thin = Math.max(0.2, radius * (settings.nibRatio ?? 0.22));
     const points = [
       [radius, thin * 0.55], [radius * 0.82, thin], [-radius * 0.82, thin], [-radius, thin * 0.55],
       [-radius, -thin * 0.55], [-radius * 0.82, -thin], [radius * 0.82, -thin], [radius, -thin * 0.55],
@@ -319,7 +323,8 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
       // moving perpendicular to the edge creates a thick stroke; moving
       // parallel creates a hairline. Previously the directions were reversed.
       const mag = Math.hypot(normal.x, normal.y) || 1;
-      halfWidth *= 0.18 + 0.82 * Math.abs((normal.x * nibEdge.x + normal.y * nibEdge.y) / mag);
+      const ratio = settings.nibRatio ?? 0.18;
+      halfWidth *= ratio + (1 - ratio) * Math.abs((normal.x * nibEdge.x + normal.y * nibEdge.y) / mag);
     } else if (settings.preset === "taper") {
       const t = cumulative[i]! / strokeLength;
       halfWidth *= 0.16 + 0.84 * Math.pow(Math.sin(Math.PI * t), 0.5);
