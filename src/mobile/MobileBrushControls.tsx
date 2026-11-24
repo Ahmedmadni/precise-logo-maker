@@ -76,6 +76,20 @@ export function MobileBrushControls({ panelOpen }: { panelOpen: boolean }) {
               className="min-w-0 flex-1 accent-[var(--color-primary)]" />
             <output className="w-10 text-left tabular-nums" dir="ltr">{brush.angle}°</output>
           </label>}
+          <label className="flex items-center gap-2 text-xs">
+            <span className="w-20 shrink-0">تنعيم الضربة</span>
+            <input type="range" min={0} max={80} step={1}
+              aria-label="مقدار تنعيم الفرشاة مع الحفاظ على الزوايا"
+              value={Math.round(brush.smoothing * 100)}
+              onChange={(event) => setBrush({ smoothing: Number(event.target.value) / 100 })}
+              className="min-w-0 flex-1 accent-[var(--color-primary)]" />
+            <output className="w-12 text-left tabular-nums" dir="ltr">
+              {Math.round(brush.smoothing * 100)}%
+            </output>
+          </label>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            التنعيم يقلل اهتزاز اليد ويحافظ على الزوايا الحادة وتغيّرات ضغط القلم الواضحة.
+          </p>
           <label className="flex min-h-11 items-center justify-between gap-2 text-xs">
             <span>حساسية ضغط القلم</span>
             <input type="checkbox" checked={brush.pressure}
