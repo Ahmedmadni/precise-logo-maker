@@ -1,4 +1,4 @@
-import type { ArcGeometry, Bounds, Geometry, Point } from "./types";
+import type { ArcGeometry, Bounds, Geometry, PathGeometry, Point } from "./types";
 
 export const EPS = 1e-9;
 
@@ -90,6 +90,25 @@ export const pathSegments = (points: Point[], closed: boolean): [Point, Point][]
   return out;
 };
 
+/** Sample cubic edges for picking; straight legacy paths remain unchanged. */
+export function sampledPathSegments(g: PathGeometry): [Point, Point][] {
+  const edges = pathSegments(g.points, g.closed);
+  if (!g.cubicSegments) return edges;
+  return edges.flatMap(([a,b], i): [Point,Point][] => {
+    const c = g.cubicSegments?.[i];
+    if (!c) return [[a,b]];
+    const result: [Point,Point][] = [];
+    let previous = a;
+    for (let j=1;j<=24;j++) {
+      const t=j/24, u=1-t;
+      const next=pt(u*u*u*a.x+3*u*u*t*c.control1.x+3*u*t*t*c.control2.x+t*t*t*b.x,
+        u*u*u*a.y+3*u*u*t*c.control1.y+3*u*t*t*c.control2.y+t*t*t*b.y);
+      result.push([previous,next]); previous=next;
+    }
+    return result;
+  });
+}
+
 export const closestPointOnGeometry = (g: Geometry, p: Point): Point => {
   switch (g.kind) {
     case "line":
@@ -99,7 +118,7 @@ export const closestPointOnGeometry = (g: Geometry, p: Point): Point => {
     case "path": {
       let best: Point = g.points[0] ?? p;
       let bestD = Infinity;
-      for (const [a, b] of pathSegments(g.points, g.closed)) {
+      for (const [a, b] of sampledPathSegments(g)) {
         const q = closestPointOnSegment(a, b, p);
         const d = dist(q, p);
         if (d < bestD) {
@@ -140,8 +159,14 @@ export const geometryBounds = (g: Geometry): Bounds => {
   switch (g.kind) {
     case "line":
       return expandBounds(expandBounds(emptyBounds(), g.a), g.b);
-    case "path":
-      return g.points.reduce<Bounds>(expandBounds, emptyBounds());
+    case "path": {
+      // The cubic control hull conservatively encloses every curve.
+      let b = g.points.reduce<Bounds>(expandBounds, emptyBounds());
+      for (const c of g.cubicSegments ?? []) if (c) {
+        b = expandBounds(expandBounds(b, c.control1), c.control2);
+      }
+      return b;
+    }
     case "circle":
       return {
         minX: g.center.x - g.radius,
