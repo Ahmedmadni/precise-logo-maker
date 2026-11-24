@@ -41,16 +41,19 @@ export function glyphWorldBounds(glyph: LetteringItem):
   };
 }
 const realSize = (item: LetteringItem) => Math.max(1, Math.min(250, item.size));
-function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: number) {
+function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: number, stackDistance?: number) {
   const bounds = glyphWorldBounds(glyph);
-  if (!bounds) return { x: glyph.x, y: glyph.y - glyph.size * 0.8 - tier * realSize(mark) * 0.65 };
+  if (!bounds) {
+    const sign = mark.mark && isBelowMark(mark.mark) ? 1 : -1;
+    return { x: glyph.x, y: glyph.y + sign * (glyph.size * 0.8 + (stackDistance ?? tier * realSize(mark) * 0.65)) };
+  }
   const below = mark.mark && isBelowMark(mark.mark);
   const size = realSize(mark);
   const margin = Math.max(9, Math.min(30, glyph.size * 0.12));
-  const gap = size * 0.67;
+  const gap = stackDistance ?? tier * size * 0.67;
   return {
     x: (bounds.minX + bounds.maxX) / 2,
-    y: below ? bounds.maxY + margin + tier * gap : bounds.minY - margin - tier * gap,
+    y: below ? bounds.maxY + margin + gap : bounds.minY - margin - gap,
   };
 }
 
@@ -78,12 +81,18 @@ export function relayoutHarakat(previous: LetteringItem[], current: LetteringIte
     stacks.set(key, stack);
   }
   const tiers = new Map<string, number>();
+  const distances = new Map<string, number>();
   for (const stack of stacks.values()) {
     stack.sort((a, b) =>
       Number(b.mark === "shadda") - Number(a.mark === "shadda") ||
       (a.stackOrder ?? 0) - (b.stackOrder ?? 0) ||
       (originalOrder.get(a.id) ?? 0) - (originalOrder.get(b.id) ?? 0));
-    stack.forEach((mark, tier) => tiers.set(mark.id, tier));
+    let distance = 0;
+    stack.forEach((mark, tier) => {
+      if (tier > 0) distance += (realSize(stack[tier - 1]!) + realSize(mark)) * 0.335;
+      tiers.set(mark.id, tier);
+      distances.set(mark.id, distance);
+    });
   }
   const marks = [...current].map((item) => {
     if (item.kind !== "haraka" || !item.attachedToGlyphId) return item;
@@ -96,7 +105,7 @@ export function relayoutHarakat(previous: LetteringItem[], current: LetteringIte
       return dx || dy ? { ...item, x: item.x + dx, y: item.y + dy } : item;
     }
     const tier = tiers.get(item.id) ?? 0;
-    const at = smartMarkPosition(glyph, item, tier);
+    const at = smartMarkPosition(glyph, item, tier, distances.get(item.id));
     return { ...item, ...at, stackOrder: tier };
   });
   return marks;
