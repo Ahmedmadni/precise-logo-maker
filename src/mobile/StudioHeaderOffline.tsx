@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import {
   Check, ChevronDown, Download, Eye, EyeOff, FilePlus2, FolderOpen,
   ImagePlus, Languages, Maximize2, Redo2, RotateCcw, Save, Settings2,
-  Undo2, X,
+  Undo2, Moon, Sun, X,
 } from "lucide-react";
 import { downloadSvg, downloadPng } from "../objects/export";
 import { downloadProject, readProjectFile } from "../objects/project";
@@ -11,13 +11,19 @@ import { fitBounds } from "../core/coordinates/view";
 import { artboardWorldBounds, useStudio } from "../store/studioStore";
 import { useLangStore } from "../i18n";
 import { nativeDocumentsAvailable, saveAndroidProject, exportAndroidSvg, exportAndroidPng, openAndroidProject, openAndroidReferenceImage } from "./nativeDocuments";
+import type { StudioAppearance } from "./studioAppearance";
 
 
 type Menu = "file" | "view" | "export" | null;
 const action = "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm transition-colors hover:bg-accent";
 const borderButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary";
 
-export function StudioHeaderOffline() {
+export function StudioHeaderOffline({
+  appearance = "dark", onAppearanceChange,
+}: {
+  appearance?: StudioAppearance;
+  onAppearanceChange?: (value: StudioAppearance) => void;
+} = {}) {
   const doc = useStudio((s) => s.doc);
   const view = useStudio((s) => s.view);
   const setView = useStudio((s) => s.setView);
@@ -159,6 +165,12 @@ export function StudioHeaderOffline() {
         aria-label={tr("العرض", "View")} className={`${borderButton} hidden px-2.5 sm:inline-flex`}>
         <Settings2 className="h-4 w-4" /><span className="hidden sm:inline">{tr("عرض", "View")}</span>
       </button>
+      <button type="button" onClick={() => onAppearanceChange?.(appearance === "dark" ? "light" : "dark")}
+        aria-label={tr(appearance === "dark" ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن", appearance === "dark" ? "Switch to light theme" : "Switch to dark theme")}
+        title={tr("تبديل المظهر", "Switch appearance")}
+        className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-foreground hover:bg-accent sm:inline-flex">
+        {appearance === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+      </button>
       <button type="button" aria-expanded={menu === "export"} onClick={() => open("export")}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
         <Download className="h-4 w-4" /><span>{tr("تصدير", "Export")}</span><ChevronDown className="h-3.5 w-3.5" />
@@ -191,6 +203,10 @@ export function StudioHeaderOffline() {
             <button type="button" className={action} disabled={busy} onClick={() => void openProject()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
             <button type="button" className={action} disabled={busy} onClick={() => void saveBackup()}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
             <button type="button" className={action} disabled={busy} onClick={() => void openReference()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
+            <button type="button" className={action} onClick={() => onAppearanceChange?.(appearance === "dark" ? "light" : "dark")}>
+              {appearance === "dark" ? <Sun className="h-5 w-5 text-primary" /> : <Moon className="h-5 w-5 text-primary" />}
+              {appearance === "dark" ? tr("تفعيل المظهر الفاتح", "Switch to light theme") : tr("تفعيل المظهر الداكن", "Switch to dark theme")}
+            </button>
             <button type="button" className={action} onClick={() => { setLang(lang === "ar" ? "en" : "ar"); close(); }}>
               <Languages className="h-5 w-5 text-primary" />{tr("اللغة: العربية", "Language: English")}</button>
             <p className="p-2 text-[11px] leading-5 text-muted-foreground">{nativeFiles ? tr("اختر مكان الحفظ من ملفات أندرويد؛ إلغاء الاختيار لا يحذف مشروعك.", "Choose a destination in Android Files; cancelling keeps your work.") : tr("يُحفظ عملك تلقائيا على هذا الجهاز. احتفظ بملف .logo للاستخدام على جهاز آخر.", "Your work is autosaved locally. Export a .logo file as backup.")}</p>

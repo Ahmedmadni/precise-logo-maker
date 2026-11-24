@@ -57,7 +57,7 @@ export function ToolRail({
       className={cn(
         "shrink-0 border-border bg-card [scrollbar-width:thin]",
         horizontal
-          ? "flex h-[4.5rem] w-full flex-row items-stretch gap-1 overflow-x-auto overflow-y-hidden border-b px-2 py-1"
+          ? "flex h-[4.25rem] w-full flex-row items-stretch gap-1 overflow-x-auto overflow-y-hidden border-b px-2 py-1"
           : "flex h-full w-[5.25rem] flex-col gap-2 overflow-y-auto overscroll-contain border-e px-1 py-2",
       )}
     >
@@ -75,8 +75,8 @@ export function ToolRail({
           <button key={id} type="button" onClick={() => open(id)}
             title={label} aria-label={label} aria-pressed={section === id}
             className={cn("flex flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] transition-colors",
-              horizontal ? "min-h-[56px] w-[4.25rem] shrink-0" : "mx-auto min-h-[52px] w-[4.5rem]",
-              section === id ? "border-primary/30 bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent")}>
+              horizontal ? "min-h-[52px] w-[4.25rem] shrink-0" : "mx-auto min-h-[52px] w-[4.5rem]",
+              section === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent")}>
             <Icon className="h-5 w-5" aria-hidden /><span>{label}</span>
           </button>
         ))}
@@ -96,8 +96,8 @@ export function ToolRail({
             <button key={id} type="button" onClick={() => setTool(id)}
               title={label + " (" + key + ")"} aria-label={label} aria-pressed={tool === id}
               className={cn("flex flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] transition-colors",
-                horizontal ? "min-h-[56px] w-[4rem] shrink-0" : "mx-auto min-h-[52px] w-[3.8rem]",
-                tool === id ? "border-primary/30 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
+                horizontal ? "min-h-[52px] w-[4rem] shrink-0" : "mx-auto min-h-[52px] w-[3.8rem]",
+                tool === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
               <Icon className="h-5 w-5" aria-hidden/><span>{label}</span>
             </button>
           ))}
