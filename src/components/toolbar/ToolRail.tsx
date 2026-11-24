@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CircleDashed, Hand, PaintBucket, Paintbrush, PenTool, Ruler,
   Minus, MousePointer2, Spline, Waypoints, Type, Sparkles,
@@ -44,6 +45,7 @@ export function ToolRail({
   const section = useStudio((s) => s.workspaceSection);
   const setSection = useStudio((s) => s.setWorkspaceSection);
   const horizontal = orientation === "horizontal";
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("رسم");
 
   const open = (to: "text" | "ornaments") => {
     setTool("select");
@@ -81,28 +83,28 @@ export function ToolRail({
           </button>
         ))}
       </div>
-      {groups.map((group) => (
-        <div
-          className={cn(
-            "border-border/65",
-            horizontal
-              ? "flex shrink-0 items-center gap-1 border-e px-1 last:border-e-0"
-              : "space-y-1 border-b pb-2 last:border-b-0",
-          )}
-          key={group.label}
-        >
-          <p className={cn("text-[10px] font-semibold text-muted-foreground", horizontal ? "sr-only" : "text-center")}>{group.label}</p>
-          {group.tools.map(({ id, label, key, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => setTool(id)}
-              title={label + " (" + key + ")"} aria-label={label} aria-pressed={tool === id}
-              className={cn("flex flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] transition-colors",
-                horizontal ? "min-h-[52px] w-[4rem] shrink-0" : "mx-auto min-h-[52px] w-[3.8rem]",
-                tool === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
-              <Icon className="h-5 w-5" aria-hidden/><span>{label}</span>
+      {groups.map((group) => {
+        const active = group.tools.some((item) => item.id === tool);
+        const expanded = expandedGroup === group.label || active;
+        return (
+          <div key={group.label} className={cn("shrink-0 border-border/65", horizontal ? "flex items-center gap-1 border-e px-1" : "space-y-1 border-b pb-2")}>
+            <button type="button" aria-expanded={expanded} aria-label={`أدوات ${group.label}`}
+              onClick={() => setExpandedGroup(expandedGroup === group.label ? null : group.label)}
+              className={cn("rounded-lg border border-border px-2 py-2 text-xs font-semibold hover:bg-accent", horizontal ? "min-h-11" : "w-full")}>
+              {group.label} {expanded ? "−" : "+"}
             </button>
-          ))}
-        </div>
-      ))}
+            {expanded && group.tools.map(({ id, label, key, icon: Icon }) => (
+              <button key={id} type="button" onClick={() => setTool(id)}
+                title={label + " (" + key + ")"} aria-label={label} aria-pressed={tool === id}
+                className={cn("flex min-h-[48px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-transparent px-1 text-[10px] transition-colors",
+                  horizontal ? "w-[4rem]" : "mx-auto w-[3.8rem]",
+                  tool === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
+                <Icon className="h-5 w-5" aria-hidden /><span>{label}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
     </nav>
   );
 }
