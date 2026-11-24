@@ -35,10 +35,17 @@ export interface ArcGeometry {
  * Poly-path: freehand pen strokes and grid-cell chains share this shape.
  * `closed` renders a closed (fillable) outline.
  */
+export interface CubicSegment {
+  control1: Point;
+  control2: Point;
+}
+
 export interface PathGeometry {
   kind: "path";
   points: Point[];
   closed: boolean;
+  /** Optional cubic controls indexed by outgoing edge; null denotes a straight edge. */
+  cubicSegments?: (CubicSegment | null)[];
 }
 
 export type Geometry = CircleGeometry | LineGeometry | ArcGeometry | PathGeometry;
