@@ -40,6 +40,16 @@ export function GlyphAnchorInspector({ selected }: { selected: LetteringItem }) 
             <button className={`min-h-11 rounded-lg border px-2 text-xs ${selected.anchorMode === "manual" ? "border-primary bg-primary/10" : "border-border"}`}
               type="button" onClick={() => update(selected.id, { anchorMode: "manual" })}>موضع يدوي</button>
           </div>}
+          {target && <div className="space-y-2 rounded-lg border border-border bg-background p-2">
+            <p className="text-xs font-semibold">ضبط موضع الحركة بدقة</p>
+            <p className="text-[11px] text-muted-foreground">كل ضغطة تحرك العلامة بمقدار 2 بكسل وتفعّل الضبط اليدوي مع استمرار ارتباطها بالحرف.</p>
+            <div className="grid grid-cols-4 gap-2">
+              {([{ label: "يمين", dx: 2, dy: 0 }, { label: "يسار", dx: -2, dy: 0 }, { label: "أعلى", dx: 0, dy: -2 }, { label: "أسفل", dx: 0, dy: 2 }] as const).map(({ label, dx, dy }) => (
+                <button key={label} type="button" aria-label={`تحريك الحركة ${label}`} onClick={() => update(selected.id, { x: selected.x + dx, y: selected.y + dy, anchorMode: "manual" })}
+                  className="min-h-11 rounded-lg border border-border bg-secondary px-1 text-xs hover:bg-accent">{label}</button>
+              ))}
+            </div>
+          </div>}
           <p className="text-[11px] leading-5 text-muted-foreground">
             عند سحب الحركة يدويًا تتحول إلى الوضع اليدوي تلقائيًا، وتظل مرتبطة بنقل الحرف.
           </p>
