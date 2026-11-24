@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { brushIsValid, type BrushSettings } from "../../core/tracing/vectorBrush";
 import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
@@ -16,11 +18,27 @@ const tools: { id: ToolId; label: string; description: string; icon: typeof PenL
   { id: "measure", label: "قياس", description: "الأطوال والزوايا", icon: Ruler },
 ];
 
+const PEN_KEY = "logo-studio:custom-pens:v1";
+type SavedPen = { name: string; settings: BrushSettings };
+function readPens(): SavedPen[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PEN_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((p): p is SavedPen => !!p && typeof p.name === "string" && !!p.settings && brushIsValid(p.settings)).slice(0, 30) : [];
+  } catch { return []; }
+}
+
 export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | undefined }) {
   const selected = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
   const brush = useStudio((s) => s.brush);
   const setBrush = useStudio((s) => s.setBrush);
+  const [pens, setPens] = useState<SavedPen[]>(readPens);
+  const [penName, setPenName] = useState("");
+  const [penMessage, setPenMessage] = useState("");
+  const persistPens = (next: SavedPen[]) => {
+    try { localStorage.setItem(PEN_KEY, JSON.stringify(next)); setPens(next); setPenMessage("تم تحديث مكتبة الأقلام"); }
+    catch { setPenMessage("تعذر حفظ المكتبة على الجهاز"); }
+  };
   const showGrids = useStudio((s) => s.showGrids);
   const setShowGrids = useStudio((s) => s.setShowGrids);
   const guideDraw = useStudio((s) => s.guideDraw);
@@ -84,6 +102,18 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               ))}
             </div>
           </div>
+          <details className="rounded-xl border border-border bg-background p-3">
+            <summary className="cursor-pointer text-xs font-semibold">أقلامي المخصصة ({pens.length})</summary>
+            <div className="mt-3 space-y-2">
+              <input aria-label="اسم القلم" placeholder="اسم القلم الجديد" maxLength={40} value={penName} onChange={(e) => setPenName(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" />
+              <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]); setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
+              {pens.map((pen, i) => <div key={i} className="flex items-center gap-2">
+                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
+                <button type="button" aria-label={"حذف " + pen.name} className="min-h-11 rounded-lg border border-border px-2 text-xs" onClick={() => persistPens(pens.filter((_, index) => index !== i))}>حذف</button>
+              </div>)}
+              <p role="status" className="text-[11px] text-muted-foreground">{penMessage}</p>
+            </div>
+          </details>
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="شكل سن القلم">
             {([
               ["round", "دائرية"], ["qalam", "سن قصبة"], ["taper", "مدببة"],
