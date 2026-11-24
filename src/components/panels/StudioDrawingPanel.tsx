@@ -70,6 +70,20 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           <p className="text-xs leading-5 text-muted-foreground">
             ارسم بالإصبع أو القلم. يتم حفظ كل ضربة كشكل فيكتور مغلق يمكن تغيير حجمه ولونه وتصديره.
           </p>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold">إعدادات قلم سريعة</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { label: "قصبة عريضة", preset: "qalam", size: 24, angle: 45, smoothing: 0.35, endStyle: "flat" },
+                { label: "قصبة دقيقة", preset: "qalam", size: 8, angle: 35, smoothing: 0.45, endStyle: "flat" },
+                { label: "قلم مرن", preset: "taper", size: 14, angle: 0, smoothing: 0.5, endStyle: "sharp" },
+                { label: "قلم دائري", preset: "round", size: 6, angle: 0, smoothing: 0.3, endStyle: "soft" },
+              ] as const).map(({ label, ...settings }) => (
+                <button key={label} type="button" className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs hover:border-primary"
+                  onClick={() => setBrush(settings)}>{label}</button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="شكل سن القلم">
             {([
               ["round", "دائرية"], ["qalam", "سن قصبة"], ["taper", "مدببة"],
