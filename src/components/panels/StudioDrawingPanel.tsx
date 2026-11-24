@@ -128,6 +128,9 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               type="color" value={brush.color} onChange={(e) => setBrush({ color: e.target.value })} />
           </label>
           {brush.preset === "qalam" && <div className="space-y-2">
+            <label className="block space-y-1 text-xs">نسبة سماكة السن <span dir="ltr">{Math.round((brush.nibRatio ?? 0.18) * 100)}%</span>
+              <input type="range" min={5} max={80} step={1} value={Math.round((brush.nibRatio ?? 0.18) * 100)} className="w-full accent-[var(--color-primary)]" onChange={(e) => setBrush({ nibRatio: Number(e.target.value) / 100 })} />
+            </label>
             <label className="block space-y-1 text-xs">
               <span className="flex justify-between">
                 <span>زاوية حافة سن القصبة</span><span dir="ltr">{brush.angle}°</span>
@@ -160,6 +163,11 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <input type="checkbox" checked={brush.pressure}
               onChange={(e) => setBrush({ pressure: e.target.checked })} className="h-5 w-5" />
           </label>
+          {brush.pressure && <label className="block space-y-1 text-xs">استجابة الضغط
+            <select className="min-h-11 w-full rounded-lg border border-border bg-background px-2" value={brush.pressureCurve ?? "linear"} onChange={(e) => setBrush({ pressureCurve: e.target.value as "soft" | "linear" | "firm" })}>
+              <option value="soft">ناعمة</option><option value="linear">متوازنة</option><option value="firm">قوية</option>
+            </select>
+          </label>}
           <p className="text-[11px] leading-5 text-muted-foreground">
             الضغط الفعلي يحتاج قلمًا وجهازًا يدعمان Pointer Events. الرسم بالإصبع يستخدم ضغطًا افتراضيًا ثابتًا.
             نقرة القصبة المفردة تترك بصمة سن مائلة بدل دائرة. الأطراف المدببة تعتمد على المسافة لا سرعة العينات. هذه فرش فيكتور وليست ضربات ثلث أصيلة جاهزة.
