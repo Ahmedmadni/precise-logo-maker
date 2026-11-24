@@ -54,7 +54,7 @@ function StudioPage() {
   }, [panelOpen]);
 
   return (
-    <div className="dark flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
       <ClientOnly fallback={null}>
         <LanguageSync />
       </ClientOnly>
