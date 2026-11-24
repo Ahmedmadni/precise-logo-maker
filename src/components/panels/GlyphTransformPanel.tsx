@@ -3,6 +3,8 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Mov
 import type { LetteringItem } from "../../calligraphy/model";
 import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
+import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
+import { CubicHandleLinkControls } from "./CubicHandleLinkControls";
 import { useStudio, type GlyphInspectorTab } from "../../store/studioStore";
 import { AlternateBrowser } from "./AlternateBrowser";
 import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
@@ -36,6 +38,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const selectedNode = useStudio((s) => s.selectedGlyphNodeId);
   const showAllNodes = useStudio((s) => s.showAllGlyphNodes);
   const moveNodeHandles = useStudio((s) => s.moveGlyphNodeHandles);
+  const controlLinkMode = useStudio((s) => s.controlLinkMode);
   const setMoveNodeHandles = useStudio((s) => s.setMoveGlyphNodeHandles);
   const setShowAllNodes = useStudio((s) => s.setShowAllGlyphNodes);
   const setSelectedNode = useStudio((s) => s.setSelectedGlyphNodeId);
@@ -100,9 +103,12 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setNodeCoordinate = (axis: "x" | "y", val: number) => {
     if (!node || !isOutline || !Number.isFinite(val)) return;
     commitPreview();
-    const next = moveOutlineNodeWithHandles(selected.pathData!, node.id,
-      axis === "x" ? val : node.x,
-      axis === "y" ? val : node.y, moveNodeHandles);
+    const x = axis === "x" ? val : node.x;
+    const y = axis === "y" ? val : node.y;
+    const next = node.role === "control" && controlLinkMode !== "free"
+      ? moveLinkedCubicControl(selected.pathData!, node.id, x, y, controlLinkMode)
+        ?? moveOutlineNodeWithHandles(selected.pathData!, node.id, x, y, moveNodeHandles)
+      : moveOutlineNodeWithHandles(selected.pathData!, node.id, x, y, moveNodeHandles);
     if (next) update(selected.id, { pathData: next });
   };
   return (
@@ -317,6 +323,9 @@ export function GlyphTransformPanel({ selected, siblings }: {
                         </label>
                       ))}
                     </div>
+                    {node.role === "control" && (
+                      <CubicHandleLinkControls path={currentPath} nodeId={node.id} />
+                    )}
                     {node.role === "anchor" && (
                       <GlyphNodeTopologyActions item={selected} nodeId={node.id} />
                     )}

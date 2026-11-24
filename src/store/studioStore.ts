@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { ControlLinkMode } from "../calligraphy/handleCoupling";
 import type { LetteringItem } from "../calligraphy/model";
 import {
   combineGlyphLibrary, makeGlyphLibraryEntry, makeStandaloneLibraryGlyph,
@@ -173,6 +174,9 @@ export interface StudioState {
   /** Move connected Bézier handles with an anchor to preserve local tangents. */
   moveGlyphNodeHandles: boolean;
   setMoveGlyphNodeHandles: (preserve: boolean) => void;
+  /** Lock opposite cubic tangent during a handle drag (editor-only, not saved). */
+  controlLinkMode: ControlLinkMode;
+  setControlLinkMode: (mode: ControlLinkMode) => void;
   editGlyphContours: boolean;
   setEditGlyphContours: (editing: boolean) => void;
   selectedContourIndex: number | null;
@@ -403,6 +407,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     setShowAllGlyphNodes: (showAllGlyphNodes) => set({ showAllGlyphNodes }),
     moveGlyphNodeHandles: true,
     setMoveGlyphNodeHandles: (moveGlyphNodeHandles) => set({ moveGlyphNodeHandles }),
+    controlLinkMode: "free",
+    setControlLinkMode: (controlLinkMode) => set({ controlLinkMode }),
     setEditGlyphNodes: (editGlyphNodes) => set({
       editGlyphNodes, editGlyphContours: false, editJoinAnchors: false, selectedContourIndex: null, tool: "select",
     }),
@@ -1195,6 +1201,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         selectedGlyphNodeId: null,
         selectedContourIndex: null,
         glyphInspectorTab: "basic",
+        controlLinkMode: "free",
         editGlyphNodes: false,
         editGlyphContours: false,
         editJoinAnchors: false,
