@@ -45,7 +45,7 @@ export function LetteringPanel({ section, onCreated }: {
     if (section) setWorkspaceSection(next === "words" ? "text" : next === "marks" ? "ornaments" : "layers");
   };
   const [phrase, setPhrase] = useState("المدني");
-  const [markCategory, setMarkCategory] = useState<"catalog" | "harakat" | "decorations">("catalog");
+  const [markCategory, setMarkCategory] = useState<"catalog" | "harakat" | "decorations">("harakat");
   const [markSource, setMarkSource] = useState<"typeface" | "simple">("typeface");
   const [markLoading, setMarkLoading] = useState(false);
   const [font, setFont] = useState<FontPreset>("Amiri");
@@ -103,6 +103,8 @@ export function LetteringPanel({ section, onCreated }: {
 
   const items = doc.lettering ?? [];
   const selected = items.find((entry) => entry.id === selectedId);
+  const attachedTarget = selected?.kind === "outline" ? selected : selected?.kind === "haraka" && selected.attachedToGlyphId ? items.find((item) => item.id === selected.attachedToGlyphId && item.kind === "outline") : undefined;
+  const filteredHarakat = HARAKAT.filter((mark) => mark.label.includes(markSearch.trim()) || mark.glyph.includes(markSearch.trim()));
   const grouped = new Map<string, LetteringItem[]>();
   for (const item of items) if (item.groupId) {
     const existing = grouped.get(item.groupId) ?? [];
@@ -325,6 +327,9 @@ export function LetteringPanel({ section, onCreated }: {
           {markCategory === "catalog" && <CalligraphyShapeLibrary onCreated={onCreated} />}
           {markCategory === "harakat" && <div>
             <h3 className="mb-2 font-semibold">اختر حركة لإضافتها</h3>
+            <div role="status" className="mb-3 rounded-lg border border-border bg-background p-3 text-xs leading-5">
+              {attachedTarget ? "سيتم ربط الحركة بالحرف المحدد تلقائيًا، ويمكن تعديل ارتباطها لاحقًا." : "لم يتم تحديد حرف. ستُضاف الحركة مستقلة في منتصف اللوحة؛ حدد حرفًا أولًا لربطها به."}
+            </div>
             <input className={field + " mb-3"} type="search" aria-label="البحث في التشكيل" placeholder="ابحث عن حركة أو علامة" value={markSearch} onChange={(e) => setMarkSearch(e.target.value)} />
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={markSource === "typeface"}
@@ -349,7 +354,7 @@ export function LetteringPanel({ section, onCreated }: {
               حدد حرفا أولا لربط الحركة به تلقائيا. ويمكن تغيير موضعها أو فك الارتباط من «تعديل».
             </p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {HARAKAT.filter((mark) => mark.label.includes(markSearch.trim())).map((mark) => (
+              {filteredHarakat.map((mark) => (
                 <Button variant="outline" key={mark.id} className="h-auto min-h-20 min-w-0 flex-col gap-1 whitespace-normal px-1"
                   type="button" disabled={markLoading} title={mark.label} onClick={() => void createMark(mark)}>
                   <svg viewBox="0 0 100 100" className="h-8 w-10" aria-hidden="true">
@@ -358,7 +363,7 @@ export function LetteringPanel({ section, onCreated }: {
                 </Button>
               ))}
             </div>
-            {!HARAKAT.some((mark) => mark.label.includes(markSearch.trim())) && <p className="text-xs text-muted-foreground">لا توجد نتائج.</p>}
+            {filteredHarakat.length === 0 && <p className="text-xs text-muted-foreground">لا توجد نتائج.</p>}
           </div>}
           {markCategory === "decorations" && <div>
             <h3 className="mb-2 font-semibold">الزخارف والامتدادات</h3>
