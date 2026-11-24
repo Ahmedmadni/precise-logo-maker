@@ -46,11 +46,11 @@ export function OfflineStudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeaderOffline appearance={appearance} onAppearanceChange={setAppearance} />
-      <div className="hidden sm:block">
-        <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
-      </div>
       {/* At desktop sizes the inspector docks beside—not above—the canvas. */}
       <div className="flex min-h-0 flex-1">
+        <div className="hidden sm:flex">
+          <ToolRail onOpenLettering={openProperties} />
+        </div>
         <main className="relative min-w-0 flex-1">
           <button type="button" onClick={() => setInspectorOpen((shown) => !shown)}
             aria-label={inspectorOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}

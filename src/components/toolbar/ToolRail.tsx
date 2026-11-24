@@ -1,41 +1,49 @@
 import { useState } from "react";
 import {
-  CircleDashed, Hand, PaintBucket, Paintbrush, PenTool, Ruler,
+  ChevronsLeft, ChevronsRight, CircleDashed, Hand, PaintBucket, Paintbrush, PenTool, Ruler,
   Minus, MousePointer2, Spline, Waypoints, Type, Sparkles,
 } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 import { cn } from "../../lib/utils";
 
-type StudioRailTool = {
-  id: ToolId;
+type RailItem = {
+  id: ToolId | "text" | "ornaments";
   label: string;
-  key: string;
+  shortcut?: string;
   icon: typeof Hand;
+  panel?: "text" | "ornaments";
 };
-const groups: { label: string; tools: StudioRailTool[] }[] = [
-  { label: "اختيار", tools: [
-    { id: "select", label: "تحديد", key: "V", icon: MousePointer2 },
-    { id: "pan", label: "تحريك", key: "H", icon: Hand },
-  ] },
-  { label: "رسم", tools: [
-    { id: "pen", label: "قلم المسار", key: "P", icon: PenTool },
-    { id: "brush", label: "الفرشاة الخطاطية", key: "B", icon: Paintbrush },
-  ] },
-  { label: "هندسة", tools: [
-    { id: "line", label: "خط", key: "L", icon: Minus },
-    { id: "circle", label: "دائرة", key: "C", icon: CircleDashed },
-    { id: "arc", label: "قوس", key: "A", icon: Spline },
-    { id: "polygon", label: "مضلع", key: "N", icon: Waypoints },
-    { id: "cell", label: "تلوين خلايا", key: "G", icon: PaintBucket },
-    { id: "measure", label: "قياس", key: "M", icon: Ruler },
-  ] },
+
+// Photoshop-style tool grouping: Select -> Paint -> Vector & Type -> Shapes -> Navigate & Measure
+const TOOL_GROUPS: RailItem[][] = [
+  [
+    { id: "select", label: "تحديد", shortcut: "V", icon: MousePointer2 },
+  ],
+  [
+    { id: "brush", label: "الفرشاة الخطاطية", shortcut: "B", icon: Paintbrush },
+    { id: "cell", label: "تلوين خلايا", shortcut: "G", icon: PaintBucket },
+  ],
+  [
+    { id: "pen", label: "قلم المسار", shortcut: "P", icon: PenTool },
+    { id: "text", label: "كتابة", shortcut: "T", icon: Type, panel: "text" },
+    { id: "ornaments", label: "المكتبة", icon: Sparkles, panel: "ornaments" },
+  ],
+  [
+    { id: "line", label: "خط", shortcut: "L", icon: Minus },
+    { id: "circle", label: "دائرة", shortcut: "C", icon: CircleDashed },
+    { id: "arc", label: "قوس", shortcut: "A", icon: Spline },
+    { id: "polygon", label: "مضلع", shortcut: "N", icon: Waypoints },
+  ],
+  [
+    { id: "pan", label: "تحريك", shortcut: "H", icon: Hand },
+    { id: "measure", label: "قياس", shortcut: "M", icon: Ruler },
+  ],
 ];
 
-/** Drawing tools can dock vertically on tablets or horizontally above the canvas. */
+/** Compact icon-only vertical tool rail styled after Photoshop. */
 export function ToolRail({
   onOpenLettering,
-  orientation = "vertical",
 }: {
   onOpenLettering?: () => void;
   orientation?: "vertical" | "horizontal";
@@ -44,67 +52,77 @@ export function ToolRail({
   const setTool = useStudio((s) => s.setTool);
   const section = useStudio((s) => s.workspaceSection);
   const setSection = useStudio((s) => s.setWorkspaceSection);
-  const horizontal = orientation === "horizontal";
-  const [expandedGroup, setExpandedGroup] = useState<string | null>("رسم");
+  const [twoColumns, setTwoColumns] = useState(false);
 
-  const open = (to: "text" | "ornaments") => {
-    setTool("select");
-    setSection(to);
-    onOpenLettering?.();
+  const handleSelect = (item: RailItem) => {
+    if (item.panel) {
+      setTool("select");
+      setSection(item.panel);
+      onOpenLettering?.();
+      return;
+    }
+    setTool(item.id as ToolId);
   };
+
   return (
     <nav
       aria-label="أدوات الرسم والخط"
       dir="rtl"
       className={cn(
-        "shrink-0 border-border bg-card [scrollbar-width:thin]",
-        horizontal
-          ? "flex h-[4.25rem] w-full flex-row items-stretch gap-1 overflow-x-auto overflow-y-hidden border-b px-2 py-1"
-          : "flex h-full w-[5.25rem] flex-col gap-2 overflow-y-auto overscroll-contain border-e px-1 py-2",
+        "flex h-full shrink-0 flex-col items-center overflow-y-auto overscroll-contain border-s border-border bg-card py-1.5 select-none [scrollbar-width:none]",
+        twoColumns ? "w-[4.75rem] px-1.5" : "w-11 px-1",
       )}
     >
-      <div className={cn(
-        "border-border",
-        horizontal
-          ? "flex shrink-0 items-center gap-1 border-e pe-2"
-          : "space-y-1 border-b pb-2",
-      )}>
-        <p className={cn("text-[10px] font-semibold text-muted-foreground", horizontal ? "sr-only" : "text-center")}>الخط</p>
-        {([
-          { id: "text", label: "كتابة", icon: Type },
-          { id: "ornaments", label: "المكتبة", icon: Sparkles },
-        ] as const).map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" onClick={() => open(id)}
-            title={label} aria-label={label} aria-pressed={section === id}
-            className={cn("flex flex-col items-center justify-center gap-1 rounded-xl border border-transparent text-[10px] transition-colors",
-              horizontal ? "min-h-[52px] w-[4.25rem] shrink-0" : "mx-auto min-h-[52px] w-[4.5rem]",
-              section === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent")}>
-            <Icon className="h-5 w-5" aria-hidden /><span>{label}</span>
-          </button>
+      <button
+        type="button"
+        onClick={() => setTwoColumns((prev) => !prev)}
+        title={twoColumns ? "عمود واحد" : "عمودان"}
+        aria-label={twoColumns ? "تبديل إلى عمود واحد" : "تبديل إلى عمودين"}
+        aria-pressed={twoColumns}
+        className="mb-1.5 flex h-5 w-full items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {twoColumns ? (
+          <ChevronsRight className="h-3.5 w-3.5" aria-hidden />
+        ) : (
+          <ChevronsLeft className="h-3.5 w-3.5" aria-hidden />
+        )}
+      </button>
+
+      <div className={cn("w-full", twoColumns ? "space-y-1.5" : "space-y-1")}>
+        {TOOL_GROUPS.map((group, groupIndex) => (
+          <div
+            key={groupIndex}
+            className={cn(
+              groupIndex > 0 && "border-t border-border/70 pt-1.5",
+              twoColumns ? "grid grid-cols-2 gap-1" : "flex flex-col items-center gap-0.5",
+            )}
+          >
+            {group.map((item) => {
+              const Icon = item.icon;
+              const active = item.panel ? section === item.panel && tool === "select" : tool === item.id;
+              const tooltip = item.shortcut ? `${item.label} (${item.shortcut})` : item.label;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelect(item)}
+                  title={tooltip}
+                  aria-label={item.label}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                </button>
+              );
+            })}
+          </div>
         ))}
       </div>
-      {groups.map((group) => {
-        const active = group.tools.some((item) => item.id === tool);
-        const expanded = expandedGroup === group.label || active;
-        return (
-          <div key={group.label} className={cn("shrink-0 border-border/65", horizontal ? "flex items-center gap-1 border-e px-1" : "space-y-1 border-b pb-2")}>
-            <button type="button" aria-expanded={expanded} aria-label={`أدوات ${group.label}`}
-              onClick={() => setExpandedGroup(expandedGroup === group.label ? null : group.label)}
-              className={cn("rounded-lg border border-border px-2 py-2 text-xs font-semibold hover:bg-accent", horizontal ? "min-h-11" : "w-full")}>
-              {group.label} {expanded ? "−" : "+"}
-            </button>
-            {expanded && group.tools.map(({ id, label, key, icon: Icon }) => (
-              <button key={id} type="button" onClick={() => setTool(id)}
-                title={label + " (" + key + ")"} aria-label={label} aria-pressed={tool === id}
-                className={cn("flex min-h-[48px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-transparent px-1 text-[10px] transition-colors",
-                  horizontal ? "w-[4rem]" : "mx-auto w-[3.8rem]",
-                  tool === id ? "border-primary/40 bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
-                <Icon className="h-5 w-5" aria-hidden /><span>{label}</span>
-              </button>
-            ))}
-          </div>
-        );
-      })}
     </nav>
   );
 }

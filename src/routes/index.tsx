@@ -59,9 +59,6 @@ function StudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeader />
-      <div className="hidden sm:block">
-        <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
-      </div>
       <div className="flex min-h-0 flex-1">
         <div className="hidden shrink-0 lg:flex lg:flex-col lg:border-e lg:border-border">
           <button type="button" onClick={() => setDesktopPanelOpen((value) => !value)}
@@ -87,6 +84,9 @@ function StudioPage() {
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
           </ClientOnly>
         </main>
+        <div className="hidden sm:flex">
+          <ToolRail onOpenLettering={openProperties} />
+        </div>
 
         {/* Small screens keep a slide-over sheet; desktop properties stay beside the canvas. */}
         {panelOpen && (
