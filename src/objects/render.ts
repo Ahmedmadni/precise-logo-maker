@@ -11,7 +11,14 @@ export const geometryToPathData = (g: Geometry): string => {
     case "path": {
       const [first, ...rest] = g.points;
       if (!first) return "";
-      const body = rest.map((p) => `L ${f(p.x)} ${f(p.y)}`).join(" ");
+      const edge = (p: typeof first, i: number) => {
+        const c = g.cubicSegments?.[i];
+        if (!c || ![c.control1.x, c.control1.y, c.control2.x, c.control2.y].every(Number.isFinite)) return `L ${f(p.x)} ${f(p.y)}`;
+        return `C ${f(c.control1.x)} ${f(c.control1.y)} ${f(c.control2.x)} ${f(c.control2.y)} ${f(p.x)} ${f(p.y)}`;
+      };
+      const parts = rest.map(edge);
+      if (g.closed && g.cubicSegments?.[g.points.length - 1]) parts.push(edge(first, g.points.length - 1));
+      const body = parts.join(" ");
       return `M ${f(first.x)} ${f(first.y)}${body ? ` ${body}` : ""}${g.closed ? " Z" : ""}`;
     }
     case "circle": {
