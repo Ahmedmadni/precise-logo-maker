@@ -1,6 +1,6 @@
 import polygonClipping, { type Geom } from "polygon-clipping";
 const { union, difference, intersection, xor } = polygonClipping;
-import { arcSweep, pointOnCircle } from "../core/geometry/math";
+import { arcSweep, pointOnCircle, sampledPathSegments } from "../core/geometry/math";
 import type { Geometry, PathGeometry, Point } from "../core/geometry/types";
 
 /** Illustrator-style pathfinder operations. */
@@ -26,8 +26,12 @@ export const geometryToRing = (g: Geometry): Point[] => {
     }
     case "line":
       return [g.a, g.b];
-    case "path":
-      return g.points;
+    case "path": {
+      if (!g.cubicSegments?.some(Boolean)) return g.points;
+      const segments = sampledPathSegments(g);
+      if (!segments.length) return g.points;
+      return [segments[0]![0], ...segments.map(([, end]) => end)];
+    }
   }
 };
 
