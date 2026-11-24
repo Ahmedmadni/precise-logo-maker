@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Move } from "lucide-react";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../calligraphy/pathEditor";
+import { moveLinkedCubicControl } from "../calligraphy/handleCoupling";
+import { CubicHandleLinkControls } from "../components/panels/CubicHandleLinkControls";
 import { GlyphNodeTopologyActions } from "../components/panels/GlyphNodeTopologyActions";
 import { useStudio } from "../store/studioStore";
 
@@ -18,6 +20,7 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
   const editNodes = useStudio((state) => state.editGlyphNodes);
   const setEditNodes = useStudio((state) => state.setEditGlyphNodes);
   const moveHandles = useStudio((state) => state.moveGlyphNodeHandles);
+  const controlLinkMode = useStudio((state) => state.controlLinkMode);
   const setMoveHandles = useStudio((state) => state.setMoveGlyphNodeHandles);
   const tool = useStudio((state) => state.tool);
   const update = useStudio((state) => state.updateLettering);
@@ -29,9 +32,14 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
 
   const move = (dx: number, dy: number) => {
     if (!node || !item.pathData) return;
-    const changed = moveOutlineNodeWithHandles(
-      item.pathData, node.id, node.x + dx, node.y + dy, moveHandles,
-    );
+    const changed = node.role === "control" && controlLinkMode !== "free"
+      ? moveLinkedCubicControl(
+          item.pathData, node.id, node.x + dx, node.y + dy, controlLinkMode,
+        ) ?? moveOutlineNodeWithHandles(item.pathData, node.id,
+          node.x + dx, node.y + dy, moveHandles)
+      : moveOutlineNodeWithHandles(
+          item.pathData, node.id, node.x + dx, node.y + dy, moveHandles,
+        );
     if (changed && changed !== item.pathData) {
       update(item.id, { pathData: changed });
       setNotice("");
@@ -76,6 +84,9 @@ export function MobileNodeControls({ panelOpen }: { panelOpen: boolean }) {
               </select>
             </label>
           </div>
+          {node.role === "control" && (
+            <CubicHandleLinkControls path={item.pathData} nodeId={node.id} />
+          )}
           {node.role === "anchor" && (
             <>
               <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-3 text-[11px]">

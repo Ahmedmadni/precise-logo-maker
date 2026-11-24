@@ -31,6 +31,7 @@ import { geometryToPathData } from "../../objects/render";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
+import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
 import { LetteringGlyph } from "./LetteringGlyph";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
@@ -108,6 +109,7 @@ export function StudioCanvas() {
   const updateLettering = useStudio((s) => s.updateLettering);
   const editGlyphNodes = useStudio((s) => s.editGlyphNodes);
   const moveGlyphNodeHandles = useStudio((s) => s.moveGlyphNodeHandles);
+  const controlLinkMode = useStudio((s) => s.controlLinkMode);
   const letteringMoveScope = useStudio((s) => s.letteringMoveScope);
   const setSelectedGlyphNodeId = useStudio((s) => s.setSelectedGlyphNodeId);
   const selectedGlyphNodeId = useStudio((s) => s.selectedGlyphNodeId);
@@ -761,7 +763,11 @@ export function StudioCanvas() {
       if (item) {
         const point = worldToGlyphPoint(item, world.x, world.y);
         if (point) {
-          const path = moveOutlineNodeWithHandles(nodeDragRef.current.startPath, nodeDragRef.current.nodeId, point.x, point.y, moveGlyphNodeHandles);
+          const drag = nodeDragRef.current;
+          const path = controlLinkMode !== "free"
+            ? moveLinkedCubicControl(drag.startPath, drag.nodeId, point.x, point.y, controlLinkMode)
+              ?? moveOutlineNodeWithHandles(drag.startPath, drag.nodeId, point.x, point.y, moveGlyphNodeHandles)
+            : moveOutlineNodeWithHandles(drag.startPath, drag.nodeId, point.x, point.y, moveGlyphNodeHandles);
           if (path) setNodePreview({ id: item.id, path });
         }
       }
