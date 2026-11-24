@@ -39,9 +39,9 @@ export const Route = createFileRoute("/")({
 
 function StudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [topPanelOpen, setTopPanelOpen] = useState(false);
+  const [desktopPanelOpen, setDesktopPanelOpen] = useState(true);
   const openProperties = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) setTopPanelOpen(true);
+    if (window.matchMedia("(min-width: 1024px)").matches) setDesktopPanelOpen(true);
     else setPanelOpen(true);
   };
   useEffect(() => {
@@ -62,10 +62,19 @@ function StudioPage() {
       <div className="hidden sm:block">
         <ToolRail orientation="horizontal" onOpenLettering={openProperties} />
       </div>
-      <div className="hidden lg:block">
-        <RightPanel layout="top" open={topPanelOpen} onOpenChange={setTopPanelOpen} />
-      </div>
       <div className="flex min-h-0 flex-1">
+        <div className="hidden shrink-0 lg:flex lg:flex-col lg:border-e lg:border-border">
+          <button type="button" onClick={() => setDesktopPanelOpen((value) => !value)}
+            aria-label={desktopPanelOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}
+            aria-expanded={desktopPanelOpen}
+            className="m-2 flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-2 text-xs hover:bg-accent">
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {desktopPanelOpen ? "إخفاء الخصائص" : "الخصائص"}
+          </button>
+          {desktopPanelOpen && <div className="min-h-0 w-[min(23rem,30vw)] flex-1 overflow-hidden">
+            <RightPanel />
+          </div>}
+        </div>
         <main className="relative min-w-0 flex-1">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
@@ -79,7 +88,7 @@ function StudioPage() {
           </ClientOnly>
         </main>
 
-        {/* Small screens keep a slide-over sheet; desktop properties stay above the canvas. */}
+        {/* Small screens keep a slide-over sheet; desktop properties stay beside the canvas. */}
         {panelOpen && (
           <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button
