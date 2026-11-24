@@ -31,7 +31,11 @@ export function morphOutline(
   const span = max - min;
   if (span < 0.01) return null;
   const atPositiveEnd = direction === "right" || direction === "up";
-  const amount = Math.min(span * 1.5, Math.max(-span * 0.4, amountInFontUnits));
+  const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
+  const exponent = profile === "tip" ? 4 : profile === "balanced" ? 1 : 2;
+  // Bound the maximum derivative of the contraction to prevent axial foldover.
+  const maxContraction = Math.min(span * 0.4, span * (1 - cutoff) * 0.9 / exponent);
+  const amount = Math.min(span * 1.5, Math.max(-maxContraction, amountInFontUnits));
   let hasChange = false;
   const warped = segments.map((segment) => {
     if (segment.cmd === "Z") return "Z";
@@ -41,7 +45,6 @@ export function morphOutline(
       const t = (coordinate - min) / span;
       // Smooth easing keeps the joining/base region almost unchanged.
       const u = Math.max(0, Math.min(1, atPositiveEnd ? t : 1 - t));
-      const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
       const local = Math.max(0, (u - cutoff) / (1 - cutoff));
       const influence = profile === "tip" ? local ** 4 : profile === "balanced" ? local : local * local;
       const delta = influence * amount * (atPositiveEnd ? 1 : -1);
