@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
-import { morphGlyphPixels, type MorphDirection } from "../../calligraphy/morph";
+import { morphGlyphPixels, type MorphDirection, type MorphProfile } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
 import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
 import { CubicHandleLinkControls } from "./CubicHandleLinkControls";
@@ -53,6 +53,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const setInspectorTab = useStudio((s) => s.setGlyphInspectorTab);
   const [direction, setDirection] = useState<MorphDirection>("right");
   const [extension, setExtension] = useState(0);
+  const [morphProfile, setMorphProfile] = useState<MorphProfile>("gradual");
   const isOutline = selected.kind === "outline" && !!selected.pathData;
   const isCatalogSymbol = isOutline && !!selected.catalogShapeId;
   // When a movement/mark/symbol is selected, do not show inapplicable tools.
@@ -94,7 +95,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
   const previewStretch = (value: number, chosenDirection = direction) => {
     if (!isOutline) return;
     setExtension(value);
-    const path = morphGlyphPixels(selected, chosenDirection, value);
+    const path = morphGlyphPixels(selected, chosenDirection, value, morphProfile);
     if (path) setPreview(selected.id, { ...pending, pathData: path });
   };
   const finishStretch = () => {
@@ -262,6 +263,13 @@ export function GlyphTransformPanel({ selected, siblings }: {
                 </button>
               ))}
             </div>
+            <label className="block space-y-1 text-xs">توزيع المد على المسار
+              <select className={input} value={morphProfile} onChange={(e) => { if (extension) finishStretch(); setMorphProfile(e.target.value as MorphProfile); }}>
+                <option value="gradual">تدريجي — الحفاظ على منطقة الاتصال</option>
+                <option value="tip">تركيز المد على الطرف</option>
+                <option value="balanced">توزيع متوازن على كامل المسار</option>
+              </select>
+            </label>
             <label className="block space-y-1">
               <span className="flex justify-between gap-2 text-xs">
                 مقدار المد أو التقصير
