@@ -177,15 +177,44 @@ export function brushIsValid(config: BrushSettings): boolean {
     /^#[0-9a-fA-F]{6}$/.test(config.color);
 }
 
-function smooth(samples: BrushSample[], amount: number): BrushSample[] {
+/**
+ * Respect actual sample spacing, deliberate turns and pressure accents.
+ * A previous unweighted neighbor average could shift points along straight
+ * but unevenly sampled strokes, round off 90° pen corners and flatten stylus
+ * pressure peaks. This remains one linear pass, suitable for frame previews.
+ *
+ * Endpoints, hard turns (>=75°) and strong pressure extrema survive intact.
+ * Only shallow oscillations are reduced, with an independent pressure weight.
+ */
+export function smoothBrushSamples(samples: BrushSample[], amount: number): BrushSample[] {
   if (samples.length < 3 || amount === 0) return samples;
+  if (!Number.isFinite(amount) || amount < 0 || amount > 0.9) return samples;
+  const cornerCutoff = Math.cos(75 * Math.PI / 180);
+  const softTurn = Math.cos(25 * Math.PI / 180);
   return samples.map((sample, i) => {
     if (i === 0 || i === samples.length - 1) return sample;
     const left = samples[i - 1]!, right = samples[i + 1]!;
+    const ax = sample.x - left.x, ay = sample.y - left.y;
+    const bx = right.x - sample.x, by = right.y - sample.y;
+    const before = Math.hypot(ax, ay), after = Math.hypot(bx, by);
+    if (before < 1e-6 || after < 1e-6) return sample;
+    const direction = clamp((ax * bx + ay * by) / (before * after), -1, 1);
+    const turnProtection = clamp((direction - cornerCutoff) / (softTurn - cornerCutoff), 0, 1);
+    // The point's position along the neighboring segment is proportional to
+    // traveled distance, not the number/rate of device pointer events.
+    const t = before / (before + after);
+    const meanX = left.x + (right.x - left.x) * t;
+    const meanY = left.y + (right.y - left.y) * t;
+    const spatialWeight = amount * turnProtection;
+    const expectedPressure = left.pressure + (right.pressure - left.pressure) * t;
+    const pressureDeviation = Math.abs(sample.pressure - expectedPressure);
+    // Peaks exceeding 0.15 pressure units are treated as intentional accents.
+    const pressureProtection = clamp((0.15 - pressureDeviation) / 0.12, 0, 1);
+    const pressureWeight = spatialWeight * pressureProtection;
     return {
-      x: sample.x * (1 - amount) + (left.x + right.x) * amount / 2,
-      y: sample.y * (1 - amount) + (left.y + right.y) * amount / 2,
-      pressure: sample.pressure * (1 - amount) + (left.pressure + right.pressure) * amount / 2,
+      x: sample.x + (meanX - sample.x) * spatialWeight,
+      y: sample.y + (meanY - sample.y) * spatialWeight,
+      pressure: sample.pressure + (expectedPressure - sample.pressure) * pressureWeight,
     };
   });
 }
@@ -238,7 +267,7 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     return { kind: "path", points, closed: true };
   }
 
-  const samples = smooth(clean, settings.smoothing);
+  const samples = smoothBrushSamples(clean, settings.smoothing);
   const angle = settings.angle * Math.PI / 180;
   const nibEdge = { x: Math.cos(angle), y: Math.sin(angle) };
   const left: Point[] = [], right: Point[] = [];
