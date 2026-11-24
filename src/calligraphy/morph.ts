@@ -3,6 +3,7 @@ import type { LetteringItem } from "./model";
 
 export type MorphDirection = "right" | "left" | "up" | "down";
 export type MorphProfile = "gradual" | "tip" | "balanced";
+export type MorphRegion = "whole" | "outer-third" | "outer-half";
 type CoordinatePair = { x: number; y: number };
 const round = (value: number): string => Number(value.toFixed(4)).toString();
 
@@ -16,6 +17,7 @@ export function morphOutline(
   direction: MorphDirection,
   amountInFontUnits: number,
   profile: MorphProfile = "gradual",
+  region: MorphRegion = "whole",
 ): string | null {
   if (!Number.isFinite(amountInFontUnits) || Math.abs(amountInFontUnits) > 5000) return null;
   const segments = parseOutline(d);
@@ -39,7 +41,9 @@ export function morphOutline(
       const t = (coordinate - min) / span;
       // Smooth easing keeps the joining/base region almost unchanged.
       const u = Math.max(0, Math.min(1, atPositiveEnd ? t : 1 - t));
-      const influence = profile === "tip" ? u ** 4 : profile === "balanced" ? u : u * u;
+      const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
+      const local = Math.max(0, (u - cutoff) / (1 - cutoff));
+      const influence = profile === "tip" ? local ** 4 : profile === "balanced" ? local : local * local;
       const delta = influence * amount * (atPositiveEnd ? 1 : -1);
       const index = j + (axis === "x" ? 0 : 1);
       v[index] = coordinate + delta;
@@ -51,13 +55,13 @@ export function morphOutline(
 }
 
 /** Unit conversion lets the designer request an extension in canvas pixels. */
-export function morphGlyphPixels(item: LetteringItem, direction: MorphDirection, pixels: number, profile: MorphProfile = "gradual"): string | null {
+export function morphGlyphPixels(item: LetteringItem, direction: MorphDirection, pixels: number, profile: MorphProfile = "gradual", region: MorphRegion = "whole"): string | null {
   if (item.kind !== "outline" || !item.pathData || !Number.isFinite(pixels)) return null;
   const axisScale = direction === "left" || direction === "right" ? item.scaleX ?? 1 : item.scaleY ?? 1;
   const ratio = item.size / (item.unitsPerEm || 1000);
   if (!Number.isFinite(ratio) || ratio <= 0 || Math.abs(axisScale) < 0.01) return null;
   const units = Math.max(-2000, Math.min(2000, pixels / (ratio * Math.abs(axisScale))));
-  return morphOutline(item.pathData, direction, units, profile);
+  return morphOutline(item.pathData, direction, units, profile, region);
 }
 
 export function letteringGroupBounds(items: LetteringItem[]): { x: number; y: number; width: number; height: number } | null {
