@@ -25,7 +25,7 @@ import {
 } from "../core/geometry/types";
 import { DEFAULT_PRECISION, type PrecisionSettings } from "../core/precision/constraints";
 import type { Measurement } from "../core/precision/measure";
-import { mirrorGeometry, rotateGeometry, translateGeometry } from "../objects/transform";
+import { mirrorGeometry, rotateGeometry, scaleGeometry, translateGeometry } from "../objects/transform";
 import {
   alignOffsets,
   distributeOffsets,
@@ -1125,10 +1125,7 @@ export const useStudio = create<StudioState>()((set, get) => {
             const cy = c.y / n;
             return {
               ...o,
-              geometry: {
-                ...g,
-                points: g.points.map((p) => pt(cx + (p.x - cx) * factor, cy + (p.y - cy) * factor)),
-              },
+              geometry: scaleGeometry(g, factor, pt(cx, cy)),
             };
           }
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
