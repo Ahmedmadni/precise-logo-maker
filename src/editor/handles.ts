@@ -34,6 +34,7 @@ export const handlesOf = (g: Geometry, cubicEdge?: number): Handle[] => {
     ];
   }
   if (g.kind === "path") {
+    if(g.holes?.length)return [];
     const anchors:Handle[]=g.points.map((p, i) => ({
       id: `p${i}`,
       point: p,
