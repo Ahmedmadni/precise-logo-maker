@@ -227,7 +227,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </button>
           ))}
         </div>
-        {hasWordGroup && <FreePathLayoutPanel siblings={siblings}/>}
+        <FreePathLayoutPanel siblings={siblings}/>
         <div className="grid grid-cols-2 gap-1">
           <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onArrange("baseline")}>محاذاة السطر</button>
           <button type="button" className={btn} disabled={siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length < 3} onClick={() => onArrange("equal-spacing")}>توزيع المراسي</button>
