@@ -94,9 +94,13 @@ export const pathSegments = (points: Point[], closed: boolean): [Point, Point][]
 export function sampledPathSegments(g: PathGeometry): [Point, Point][] {
   const edges = pathSegments(g.points, g.closed);
   if (!g.cubicSegments) return edges;
+  // A two-anchor closed path may have a curved return edge.
+  if (g.closed && g.points.length === 2 && g.cubicSegments[1]) {
+    edges.push([g.points[1]!, g.points[0]!]);
+  }
   return edges.flatMap(([a,b], i): [Point,Point][] => {
     const c = g.cubicSegments?.[i];
-    if (!c) return [[a,b]];
+    if (!c || ![c.control1?.x, c.control1?.y, c.control2?.x, c.control2?.y].every(Number.isFinite)) return [[a,b]];
     const result: [Point,Point][] = [];
     let previous = a;
     for (let j=1;j<=24;j++) {
