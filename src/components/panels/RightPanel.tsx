@@ -54,6 +54,7 @@ import { cn } from "../../lib/utils";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { PathNodesSection } from "./PathNodesSection";
+import { CompoundRingsPanel } from "./CompoundRingsPanel";
 import { LetteringPanel } from "./LetteringPanel";
 import { GlyphTransformPanel } from "./GlyphTransformPanel";
 import { RibbonJoinInspector } from "./RibbonJoinInspector";
@@ -521,7 +522,7 @@ function ObjectSection() {
       </div>
 
       {g.kind === "path" && selection.length === 1 && (
-        g.holes?.length ? <p className="rounded-lg border border-border p-2 text-xs text-muted-foreground">مسار مركب: {g.holes.length} فراغ داخلي. يمكن تحريك الشكل وتغيير حجمه وإعادة استخدامه في Pathfinder؛ تحرير نقاط الحلقات مؤجل.</p> : <PathNodesSection key={selected.id} objectId={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
+        g.holes?.length ? <CompoundRingsPanel key={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} /> : <PathNodesSection key={selected.id} objectId={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
       )}
 
       {/* Derived dimensions — type a value to reshape the object instantly. */}
