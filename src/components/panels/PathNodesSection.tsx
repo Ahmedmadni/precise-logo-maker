@@ -1,16 +1,28 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { PathGeometry } from "../../core/geometry/types";
-import { insertPathNode, deletePathNode, movePathNode } from "../../editor/path-nodes";
+import type { PathGeometry, Point } from "../../core/geometry/types";
+import { insertPathNode, deletePathNode, movePathNode, setPathEdgeCurved, movePathControl, type PathControl, type PathControlMode } from "../../editor/path-nodes";
 import { useT } from "../../i18n";
 import { Button } from "../ui/button";
 
 export function PathNodesSection({ path, disabled, onChange }: { path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
   const t = useT();
   const [node, setNode] = useState(0);
+  const [mode,setMode]=useState<PathControlMode>("free");
+  const [preview,setPreview]=useState<{control:PathControl;point:Point}|null>(null);
+  const drag=useRef<{control:PathControl;index:number;point:Point;inverse:DOMMatrix}|null>(null);
+  const svg=useRef<SVGSVGElement|null>(null);
   const index = Math.min(node, path.points.length - 1);
   const point = path.points[index];
   if (!point) return null;
+  const end=path.points[index+1]??(path.closed?path.points[0]:undefined);
+  const curve=path.cubicSegments?.[index];
+  const edited=curve&&preview?{...curve,[preview.control]:preview.point}:curve;
+  const bounds=curve&&end?[point,end,curve.control1,curve.control2]:[];
+  const left=Math.min(...bounds.map(p=>p.x)),top=Math.min(...bounds.map(p=>p.y));
+  const right=Math.max(...bounds.map(p=>p.x)),bottom=Math.max(...bounds.map(p=>p.y));
+  const pad=Math.max(4,Math.max(right-left,bottom-top)*.2);
+  const viewBox=bounds.length?[left-pad,top-pad,right-left+pad*2,bottom-top+pad*2].join(" "):"0 0 100 100";
   const update = (axis: "x" | "y", value: string) => {
     if (!value.trim()) return;
     const number = Number(value);
@@ -21,7 +33,7 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
       <legend className="mb-2 text-xs font-semibold">{t("Path nodes")}</legend>
       <label className="flex items-center gap-2 text-xs">
         {t("Node")}
-        <select aria-label={t("Node")} className="min-w-0 flex-1 rounded-md border border-border bg-background p-1.5" value={index} onChange={(e) => setNode(Number(e.target.value))}>
+        <select aria-label={t("Node")} className="min-w-0 flex-1 rounded-md border border-border bg-background p-1.5" value={index} onChange={(e) => {setNode(Number(e.target.value));drag.current=null;setPreview(null);}}>
           {path.points.map((_, i) => <option key={i} value={i}>{i + 1}</option>)}
         </select>
       </label>
@@ -33,6 +45,39 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
         <Button variant="outline" size="icon" title={t("Delete node")} aria-label={t("Delete node")} disabled={disabled || path.points.length <= (path.closed ? 3 : 2)} onClick={() => { onChange(deletePathNode(path, index)); setNode(Math.max(0, index - 1)); }}><Trash2 /></Button>
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={path.closed} disabled={disabled || path.points.length < 3} onChange={(e) => onChange({ ...path, closed: e.target.checked })} />{t("Closed path")}</label>
       </div>
+      {end&&<details className="rounded-lg border border-border p-2">
+        <summary className="cursor-pointer py-2 text-xs font-semibold">تحرير منحنى المقطع التالي</summary>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-1">
+            <button type="button" aria-pressed={!curve} onClick={()=>onChange(setPathEdgeCurved(path,index,false))} className={`min-h-11 rounded-lg border text-xs ${!curve?"border-primary bg-primary/10":"border-border"}`}>مستقيم</button>
+            <button type="button" aria-pressed={!!curve} onClick={()=>onChange(setPathEdgeCurved(path,index,true))} className={`min-h-11 rounded-lg border text-xs ${curve?"border-primary bg-primary/10":"border-border"}`}>Bézier</button>
+          </div>
+          {edited&&<>
+            <label className="block text-xs">ربط المقابض
+              <select value={mode} onChange={e=>setMode(e.target.value as PathControlMode)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2">
+                <option value="free">حر (زاوية مستقلة)</option><option value="aligned">محاذاة (اتجاه مشترك)</option><option value="symmetric">متماثل (اتجاه وطول)</option>
+              </select>
+            </label>
+            <svg ref={svg} viewBox={viewBox} className="block h-40 w-full touch-none rounded-lg border border-border bg-background" role="img" aria-label="تحرير مقابض المقطع المحدد"
+              onPointerMove={e=>{const d=drag.current;if(!d||!svg.current)return;const p=svg.current.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(d.inverse);d.point={x:q.x,y:q.y};setPreview({control:d.control,point:d.point});}}
+              onPointerUp={()=>{const d=drag.current;drag.current=null;setPreview(null);if(d&&d.index===index&&!disabled)onChange(movePathControl(path,index,d.control,d.point,mode));}}
+              onPointerCancel={()=>{drag.current=null;setPreview(null);}}
+              onLostPointerCapture={()=>{drag.current=null;setPreview(null);}}>
+              <path d={`M ${point.x} ${point.y} L ${edited.control1.x} ${edited.control1.y} M ${end.x} ${end.y} L ${edited.control2.x} ${edited.control2.y}`} stroke="currentColor" opacity=".45" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" fill="none"/>
+              <path d={`M ${point.x} ${point.y} C ${edited.control1.x} ${edited.control1.y} ${edited.control2.x} ${edited.control2.y} ${end.x} ${end.y}`} stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" fill="none"/>
+              {([point,end] as const).map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={pad*.12} fill="currentColor"/>)}
+              {(["control1","control2"] as const).map(control=><g key={control} className="cursor-grab" onPointerDown={e=>{if(disabled||!svg.current)return;const matrix=svg.current.getScreenCTM();if(!matrix)return;e.preventDefault();drag.current={control,index,point:edited[control],inverse:matrix.inverse()};svg.current.setPointerCapture(e.pointerId);}}>
+                <circle cx={edited[control].x} cy={edited[control].y} r={pad*.4} fill="transparent"/>
+                <circle cx={edited[control].x} cy={edited[control].y} r={pad*.16} fill="var(--color-background)" stroke="currentColor" vectorEffect="non-scaling-stroke"/>
+              </g>)}
+            </svg>
+            {(["control1","control2"] as const).map((control,i)=><div key={control}><p className="text-xs">مقبض {i+1}</p><div className="grid grid-cols-2 gap-2">
+              {(["x","y"] as const).map(axis=><label key={axis} className="text-xs">{axis.toUpperCase()}<input type="number" step=".5" className="min-h-10 w-full rounded border border-border bg-background p-1" value={Number(edited[control][axis].toFixed(3))} onChange={e=>{if(e.target.value.trim()&&Number.isFinite(Number(e.target.value)))onChange(movePathControl(path,index,control,{...edited[control],[axis]:Number(e.target.value)},mode));}}/></label>)}
+            </div></div>)}
+            <p className="text-[11px] text-muted-foreground">اسحب المقابض في المعاينة أو اضبط الإحداثيات. الربط يؤثر على المقبض المقابل إن وجد في المقطع المجاور. يُعتمد السحب عند رفع القلم.</p>
+          </>}
+        </div>
+      </details>}
     </fieldset>
   );
 }
