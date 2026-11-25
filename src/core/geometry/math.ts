@@ -165,11 +165,34 @@ export const geometryBounds = (g: Geometry): Bounds => {
     case "line":
       return expandBounds(expandBounds(emptyBounds(), g.a), g.b);
     case "path": {
-      // The cubic control hull conservatively encloses every curve.
       let b = g.points.reduce<Bounds>(expandBounds, emptyBounds());
       for(const ring of g.holes??[])for(const p of ring)b=expandBounds(b,p);
-      for (const c of g.cubicSegments ?? []) if (c) {
-        b = expandBounds(expandBounds(b, c.control1), c.control2);
+      // Bound the actual curve using roots of its coordinate derivatives.
+      const edgeCount = g.closed && g.points.length > 1 ? g.points.length : Math.max(0, g.points.length - 1);
+      for (let i = 0; i < edgeCount; i++) {
+        const a = g.points[i]!, d = g.points[(i + 1) % g.points.length]!;
+        const c = g.cubicSegments?.[i];
+        if (!c || ![c.control1?.x, c.control1?.y, c.control2?.x, c.control2?.y].every(Number.isFinite)) continue;
+        const p = c.control1, q = c.control2;
+        const roots = (v0: number, v1: number, v2: number, v3: number): number[] => {
+          const A = -v0 + 3*v1 - 3*v2 + v3;
+          const B = 2*(v0 - 2*v1 + v2);
+          const C = v1 - v0;
+          const tolerance = Number.EPSILON * Math.max(Math.abs(A), Math.abs(B), Math.abs(C)) * 16;
+          if (Math.abs(A) <= tolerance) return Math.abs(B) <= tolerance ? [] : [-C/B];
+          const disc = B*B - 4*A*C;
+          if (disc < 0) return [];
+          const r = -0.5*(B + (B >= 0 ? 1 : -1)*Math.sqrt(disc));
+          return r === 0 ? [-B/(2*A)] : [r/A, C/r];
+        };
+        for (const t of [...roots(a.x,p.x,q.x,d.x), ...roots(a.y,p.y,q.y,d.y)]) {
+          if (!(t > 0 && t < 1)) continue;
+          const u = 1-t;
+          b = expandBounds(b, pt(
+            u*u*u*a.x + 3*u*u*t*p.x + 3*u*t*t*q.x + t*t*t*d.x,
+            u*u*u*a.y + 3*u*u*t*p.y + 3*u*t*t*q.y + t*t*t*d.y,
+          ));
+        }
       }
       return b;
     }
