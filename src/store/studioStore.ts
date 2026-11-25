@@ -39,7 +39,7 @@ import { cleanStroke } from "../core/tracing/simplify";
 import type { GridCell } from "../grids/cells";
 import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
-import { splitShapeAtAngle, type SplitAxis } from "../objects/splitShape";
+import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
 import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
 
@@ -295,7 +295,7 @@ export interface StudioState {
   /** Pathfinder: combine the selected shapes into one outline. */
   joinSelectedPaths:(aId:string,bId:string,aEnd:PathEnd,bEnd:PathEnd,mode:JoinMode)=>{ok:true}|{ok:false;reason:"selection"|"protected"|"invalid"};
   cutSelectedOpenPath:(edge:number,t:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"};
-  splitSelectedShape: (axis:SplitAxis|"angle",fraction:number,degrees?:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"|"empty"|"complexity"};
+  splitSelectedShape: (axis:SplitAxis|"angle"|"curve",fraction:number,degrees?:number,bend?:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"|"empty"|"complexity"};
   booleanSelection: (op: BooleanOp) => {ok:true;count:number}|{ok:false;reason:"selection"|"invalid"|"holes"|"empty"|"complexity"|"protected"};
 
   setSnapEnabled: (enabled: boolean) => void;
@@ -1191,13 +1191,13 @@ export const useStudio = create<StudioState>()((set, get) => {
       return {ok:true,count:made.length};
     },
 
-    splitSelectedShape:(axis,fraction,degrees)=>{
+    splitSelectedShape:(axis,fraction,degrees,bend)=>{
       const {selection,doc}=get();
       if(selection.length!==1)return {ok:false,reason:"selection"};
       const source=doc.objects.find(o=>o.id===selection[0]);
       if(!source)return {ok:false,reason:"selection"};
       if(source.locked||!source.visible||source.guide||source.cellKey!==undefined)return {ok:false,reason:"protected"};
-      const result=splitShapeAtAngle(source.geometry,axis==="x"?0:axis==="y"?90:degrees??NaN,fraction);
+      const result=axis==="curve"?splitShapeCurved(source.geometry,degrees??NaN,fraction,bend??NaN):splitShapeAtAngle(source.geometry,axis==="x"?0:axis==="y"?90:degrees??NaN,fraction);
       if(!result.ok)return result;
       const made=result.parts.map((geometry,i):VectorObject=>({...source,id:nextObjectId(),name:`${source.name} · ${i+1}`,type:"path",geometry,cellKey:undefined}));
       commit("Split shape",d=>({...d,objects:d.objects.flatMap(o=>o.id===source.id?made:[o])}));
