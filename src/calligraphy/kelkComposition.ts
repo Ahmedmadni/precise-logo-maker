@@ -55,7 +55,7 @@ export function composeWordLayout(
   intensity = 1,
 ): LetteringPatchEntry[] {
   const glyphs = sortRtl(items.filter((i) => i.kind === "outline" || i.kind === "text"));
-  if (glyphs.length === 0) return [];
+  if (glyphs.length === 0 || (glyphs.length < 2 && style !== "reset")) return [];
   const k = Math.max(0.25, Math.min(3, Number.isFinite(intensity) ? intensity : 1));
   const avgSize = glyphs.reduce((sum, g) => sum + g.size, 0) / glyphs.length;
   const baseY = glyphs[0]!.y;
@@ -123,9 +123,15 @@ export function adjustGroupOverlap(items: LetteringItem[], deltaPx: number): Let
   const glyphs = sortRtl(items.filter((i) => i.kind === "outline" || i.kind === "text"));
   if (glyphs.length < 2 || !Number.isFinite(deltaPx) || deltaPx === 0) return [];
   const midIdx = (glyphs.length - 1) / 2;
+  // Adjacent x-coordinate gaps change by the same step. Never reverse
+  // their current RTL order, even after repeated compression.
+  const gaps = glyphs.slice(1).map((g, i) => glyphs[i]!.x - g.x);
+  const minGap = Math.min(...gaps);
+  const step = deltaPx < 0 ? Math.max(deltaPx, -Math.max(0, minGap - 0.02)) : Math.min(1000, deltaPx);
+  if (step === 0) return [];
   return glyphs.map((g, idx) => {
     // In RTL order, idx 0 is rightmost (+x), last idx is leftmost (-x).
-    const offset = (midIdx - idx) * deltaPx;
+    const offset = (midIdx - idx) * step;
     return { id: g.id, patch: { x: round(g.x + offset) } };
   });
 }
@@ -234,4 +240,23 @@ export function createConnectedKashida(
     nibContrast: Math.max(0, Math.min(0.8, options.nibContrast ?? 0)) };
   const result = { ...item, ribbon, sourceText: "ـ" };
   return isValidRibbon(ribbon) && buildRibbonPath(result, [source,target]) ? result : null;
+}
+
+
+/** Equal anchor spacing preserves the outermost glyph positions and RTL order.
+ * Baseline alignment only changes vertical position, preserving glyph shape.
+ */
+export function arrangeWordAnchors(items: LetteringItem[], mode: "equal-spacing" | "baseline"): LetteringPatchEntry[] {
+  const glyphs = sortRtl(items.filter(g => !g.hidden && (g.kind === "outline" || g.kind === "text") && Number.isFinite(g.x) && Number.isFinite(g.y)));
+  if (glyphs.length < 2) return [];
+  if (mode === "baseline") {
+    const baseline = glyphs[0]!.y - (glyphs[0]!.baselineOffset ?? 0);
+    return glyphs.map(g => ({id:g.id,patch:{y:round(baseline + (g.baselineOffset ?? 0))}}));
+  }
+  if (glyphs.length < 3) return [];
+  const right = glyphs[0]!.x, left = glyphs[glyphs.length-1]!.x;
+  if (right <= left) return [];
+  return glyphs.slice(1,-1).map((g,i) => ({
+    id:g.id, patch:{x:round(right - (right-left)*(i+1)/(glyphs.length-1))},
+  }));
 }
