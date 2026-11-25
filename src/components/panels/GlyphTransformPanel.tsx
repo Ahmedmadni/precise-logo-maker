@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, RotateCcw, Trash2, Move, PencilRuler, Waypoints, Shapes, Sparkles } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import { adjustOutlineRegionWidth, morphGlyphPixels, type MorphDirection, type MorphProfile, type MorphRegion } from "../../calligraphy/morph";
 import { moveOutlineNodeWithHandles, outlineNodes } from "../../calligraphy/pathEditor";
@@ -69,7 +69,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
     ...(isOutline ? [
       { id: "paths" as const, label: "المسارات", icon: PencilRuler, detail: "المد والنقاط والأجزاء" },
       ...(!isCatalogSymbol ? [
-        { id: "joins" as const, label: "الوصلات", icon: Waypoints, detail: "الدخول والخروج" },
+        { id: "joins" as const, label: "الوصلات", icon: Waypoints, detail: "نقاط الاتصال والوصلات القائمة" },
+        { id: "composition" as const, label: "التكوين", icon: Sparkles, detail: "التركيب والتباعد والمسارات والكشيدة" },
         { id: "alternates" as const, label: "البدائل", icon: Shapes, detail: "أشكال الخط المتاحة" },
       ] : []),
     ] : []),
@@ -132,11 +133,11 @@ export function GlyphTransformPanel({ selected, siblings }: {
             "غيّر الموضع والحجم واللون، أو اسحب العنصر مباشرة على اللوحة."}
         </p>
       </header>
-      <nav aria-label="أدوات تحرير العنصر" className={`grid gap-1.5 ${isCatalogSymbol ? "grid-cols-2" : isOutline ? "grid-cols-4" : "grid-cols-1"}`}>
+      <nav aria-label="أدوات تحرير العنصر" className={`grid gap-1.5 ${isCatalogSymbol ? "grid-cols-2" : isOutline ? "grid-cols-3" : "grid-cols-1"}`}>
         {tabs.map(({ id, label, icon: Icon, detail }) => (
           <button type="button" key={id} aria-pressed={activeTab === id} title={detail}
             onClick={() => changeTab(id)}
-            className={`${button} flex min-h-[62px] min-w-0 flex-col gap-1 px-1 text-[11px] ${activeTab === id ? "border-primary bg-primary/15 font-semibold text-primary" : ""}`}>
+            className={`${button} flex min-h-[50px] min-w-0 flex-col gap-1 px-1 text-[11px] ${activeTab === id ? "border-primary bg-primary/15 font-semibold text-primary" : ""}`}>
             <Icon className="h-5 w-5 shrink-0" aria-hidden="true" /><span>{label}</span>
           </button>
         ))}
@@ -372,8 +373,8 @@ export function GlyphTransformPanel({ selected, siblings }: {
         </>
       )}
 
+      {isOutline && !isCatalogSymbol && activeTab === "composition" && <KelkCompositionPanel selected={selected} siblings={siblings} />}
       {isOutline && activeTab === "joins" && <>
-        {!isCatalogSymbol && <KelkCompositionPanel selected={selected} siblings={siblings} />}
         <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="joins" />
       </>}
       {isOutline && activeTab === "alternates" && <>
