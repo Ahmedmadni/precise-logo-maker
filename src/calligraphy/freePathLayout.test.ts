@@ -45,7 +45,7 @@ describe("free path guides",()=>{
 describe("intact word composition",()=>{
   it("moves each word rigidly in explicit selection order",()=>{
     const items=[{...glyph("a",100,0),groupId:"first"},{...glyph("b",130,1),groupId:"first",rotation:15},{...glyph("c",0,0),groupId:"second"}];
-    const patches=composeWordGroupsOnPath(items,["first","second"],straight,{scale:1,margin:0,reverse:false,tangent:true,upright:true});
+    const patches=composeWordGroupsOnPath(items,["first","second"],straight,{scale:1,margin:0,reverse:false,tangent:false,upright:true});
     expect(patches).toHaveLength(3);
     const a=patches.find(p=>p.id==="a")!.patch,b=patches.find(p=>p.id==="b")!.patch;
     expect(b.x!-a.x!).toBeCloseTo(30);
@@ -56,5 +56,30 @@ describe("intact word composition",()=>{
   it("requires two distinct valid groups",()=>{
     const items=[{...glyph("a",100,0),groupId:"first"}];
     expect(composeWordGroupsOnPath(items,["first","first"],straight,{scale:1,margin:0,reverse:false,tangent:false,upright:true})).toEqual([]);
+  });
+});
+
+
+describe("rigid tangent word rotation",()=>{
+  it("preserves distances and relative rotations including attached marks",()=>{
+    const items:LetteringItem[]=[
+      {...glyph("a",100,0),groupId:"first"},
+      {...glyph("b",130,1),groupId:"first",rotation:15},
+      {...glyph("c",0,0),groupId:"second"},
+      {id:"mark",kind:"haraka",x:100,y:80,size:12,rotation:0,color:"#111111",mark:"fatha",attachedToGlyphId:"a",anchorMode:"auto"},
+    ];
+    const vertical=[{x:50,y:10},{x:50,y:35},{x:50,y:65},{x:50,y:90}];
+    const opts={scale:1,margin:0,reverse:false,tangent:true,upright:true};
+    const patches=composeWordGroupsOnPath(items,["first","second"],vertical,opts);
+    const a=patches.find(p=>p.id==="a")!.patch,b=patches.find(p=>p.id==="b")!.patch,m=patches.find(p=>p.id==="mark")!.patch;
+    expect(a.rotation).toBeCloseTo(90);
+    expect(b.rotation!-a.rotation!).toBeCloseTo(15);
+    expect(Math.hypot(b.x!-a.x!,b.y!-a.y!)).toBeCloseTo(30);
+    expect(Math.hypot(m.x!-a.x!,m.y!-a.y!)).toBeCloseTo(20);
+    expect(m.anchorMode).toBe("manual");
+    const moved=items.map(g=>({...g,...patches.find(p=>p.id===g.id)?.patch}));
+    const second=composeWordGroupsOnPath(moved,["first","second"],vertical,opts);
+    expect(second.find(p=>p.id==="a")?.patch.rotation).toBeCloseTo(90);
+    expect(second.find(p=>p.id==="b")?.patch.rotation).toBeCloseTo(105);
   });
 });
