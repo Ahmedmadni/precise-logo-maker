@@ -12,6 +12,9 @@ const safePaint = (value: string): string =>
 const opacity01 = (value: number | undefined): number =>
   value === undefined || !Number.isFinite(value) ? 1 : Math.min(1, Math.max(0, value));
 
+const safeCap=(value:unknown)=>value==="butt"||value==="square"?value:"round";
+const safeJoin=(value:unknown)=>value==="miter"||value==="bevel"?value:"round";
+
 const objectToSvg = (o: VectorObject): string => {
   const s = o.style;
   const extras = [
@@ -21,7 +24,7 @@ const objectToSvg = (o: VectorObject): string => {
   ].join("");
   return `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
     o.geometry,
-  )}"${o.geometry.kind==="path"&&o.geometry.holes?.length?' fill-rule="evenodd"':""} fill="${safePaint(s.fill)}" stroke="${safePaint(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
+  )}"${o.geometry.kind==="path"&&o.geometry.holes?.length?' fill-rule="evenodd"':""} fill="${safePaint(s.fill)}" stroke="${safePaint(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${safeCap(s.cap)}" stroke-linejoin="${safeJoin(s.join)}"${extras} />`;
 };
 
 export interface ExportOptions {
@@ -29,11 +32,23 @@ export interface ExportOptions {
   background: boolean;
 }
 
+export const MAX_PNG_EDGE=4096;
+export const MAX_PNG_PIXELS=4096*4096;
+export function pngDimensions(artboard:Pick<Artboard,"width"|"height">,size:number):{width:number;height:number}|null{
+  if(![artboard.width,artboard.height,size].every(Number.isFinite)||artboard.width<=0||artboard.height<=0||size<1)return null;
+  const width=Math.round(size),height=Math.max(1,Math.round(width*artboard.height/artboard.width));
+  if(width>MAX_PNG_EDGE||height>MAX_PNG_EDGE||width*height>MAX_PNG_PIXELS)return null;
+  return {width,height};
+}
+export const hasExportLiveText=(doc:DocumentState):boolean=>(doc.lettering??[]).some(i=>!i.hidden&&i.kind==="text"&&!!i.text?.trim());
+
 export const buildSvgDocument = (
   doc: DocumentState,
   options: ExportOptions = { background: true },
+  rasterSize?:{width:number;height:number},
 ): string => {
   const a: Artboard = doc.artboard;
+  if(![a.width,a.height].every(n=>typeof n==="number"&&Number.isFinite(n)&&n>0))throw new Error("Invalid artboard dimensions");
   const body = doc.objects
     .filter((o) => o.visible && !o.guide)
     .map(objectToSvg)
@@ -46,7 +61,7 @@ export const buildSvgDocument = (
     ...letteringItems.filter((item) => item.kind !== "bridge" && !item.hidden),
   ];
   const lettering = orderedLettering.map((item) => letteringSvg(item, letteringItems)).filter(Boolean).join("\n");
-  const hasLiveCustomText = (doc.lettering ?? []).some((item) => item.kind === "text" && item.font === "Custom Thuluth");
+  const hasLiveCustomText = (doc.lettering ?? []).some((item) => !item.hidden && item.kind === "text" && item.font === "Custom Thuluth");
   const embeddedFont = hasLiveCustomText && doc.customThuluthFont && /^data:(?:font\/(?:ttf|otf|woff|woff2|sfnt)|application\/(?:octet-stream|x-font-ttf|font-woff));base64,[A-Za-z0-9+/=]+$/.test(doc.customThuluthFont)
     ? `  <defs><style>@font-face { font-family: "Custom Thuluth"; src: url("${doc.customThuluthFont}"); }</style></defs>\n`
     : "";
@@ -54,7 +69,7 @@ export const buildSvgDocument = (
     ? `  <rect width="${a.width}" height="${a.height}" fill="${safePaint(a.background)}" />\n`
     : "";
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${rasterSize?.width??a.width}" height="${rasterSize?.height??a.height}" viewBox="0 0 ${a.width} ${a.height}">`,
     embeddedFont + bg + [body, lettering].filter(Boolean).join("\n"),
     "</svg>",
     "",
@@ -68,32 +83,36 @@ export const downloadSvg = (doc: DocumentState, filename = "logo.svg", options: 
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 
 /** Rasterises the exported SVG to a PNG blob at the requested pixel width. */
 export const renderPng = async (doc: DocumentState, size: number, options: ExportOptions = { background: true }): Promise<Blob> => {
-  const svg = buildSvgDocument(doc, options);
+  const dimensions=pngDimensions(doc.artboard,size);
+  if(!dimensions)throw new Error("PNG dimensions exceed supported limits (4096 px per edge). Choose a smaller width or export SVG.");
+  const svg = buildSvgDocument(doc, options,dimensions);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  let canvas:HTMLCanvasElement|undefined;
   try {
     const image = new Image();
-    image.decoding = "sync";
+    image.decoding = "async";
     await new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
       image.onerror = () => reject(new Error("Failed to rasterise SVG"));
       image.src = url;
     });
-    const ratio = doc.artboard.height / doc.artboard.width;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(size);
-    canvas.height = Math.round(size * ratio);
+    canvas = document.createElement("canvas");
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D context unavailable");
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const raster=canvas;
     return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("PNG encoding failed"))), "image/png");
+      raster.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("PNG encoding failed"))), "image/png");
     });
   } finally {
+    if(canvas){canvas.width=0;canvas.height=0;}
     URL.revokeObjectURL(url);
   }
 };
