@@ -21,7 +21,7 @@ const objectToSvg = (o: VectorObject): string => {
   ].join("");
   return `  <path id="${escapeXml(o.id)}" data-name="${escapeXml(o.name)}" d="${geometryToPathData(
     o.geometry,
-  )}" fill="${safePaint(s.fill)}" stroke="${safePaint(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
+  )}"${o.geometry.kind==="path"&&o.geometry.holes?.length?' fill-rule="evenodd"':""} fill="${safePaint(s.fill)}" stroke="${safePaint(s.stroke)}" stroke-width="${Number.isFinite(s.strokeWidth) ? Math.max(0, s.strokeWidth) : 0}" stroke-linecap="${s.cap ?? "round"}" stroke-linejoin="${s.join ?? "round"}"${extras} />`;
 };
 
 export interface ExportOptions {
