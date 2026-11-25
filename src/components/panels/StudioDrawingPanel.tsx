@@ -100,7 +100,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
                 { label: "قلم دائري", preset: "round", size: 6, angle: 0, smoothing: 0.3, endStyle: "soft" },
               ] as const).map(({ label, ...settings }) => (
                 <button key={label} type="button" className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs hover:border-primary"
-                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", pressureFloor:.3, smoothCurves:false, nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
+                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", pressureFloor:.3, smoothCurves:false, nibRatio:.18, nibShape:"chisel", ...settings, color:brush.color })}>{label}</button>
               ))}
             </div>
           </div>
@@ -110,7 +110,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               <input aria-label="اسم القلم" placeholder="اسم القلم الجديد" maxLength={40} value={penName} onChange={(e) => setPenName(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" />
               <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { if(pens.some(p=>p.name===penName.trim())){setPenMessage("الاسم مستخدم بالفعل");return;} if(persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]))setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
               {pens.map((pen, i) => <div key={i} className="flex items-center gap-2">
-                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", pressureFloor:pen.settings.pressureFloor??.3, smoothCurves:pen.settings.smoothCurves??false, nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
+                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", pressureFloor:pen.settings.pressureFloor??.3, smoothCurves:pen.settings.smoothCurves??false, nibRatio: pen.settings.nibRatio ?? 0.18, nibShape:pen.settings.nibShape??"chisel", endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
                 <button type="button" aria-label={"حذف " + pen.name} className="min-h-11 rounded-lg border border-border px-2 text-xs" onClick={() => persistPens(pens.filter((_, index) => index !== i))}>حذف</button>
               </div>)}
               <p role="status" className="text-[11px] text-muted-foreground">{penMessage}</p>
@@ -162,6 +162,14 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               type="color" value={brush.color} onChange={(e) => setBrush({ color: e.target.value })} />
           </label>
           {brush.preset === "qalam" && <div className="space-y-2">
+            <label className="block space-y-1 text-xs">شكل سن القصبة
+              <select className="min-h-11 w-full rounded-lg border border-border bg-background px-2" value={brush.nibShape ?? "chisel"}
+                onChange={e=>setBrush({nibShape:e.target.value as "chisel"|"ellipse"|"square"})}>
+                <option value="chisel">قصبة مشطوفة</option>
+                <option value="ellipse">سن بيضاوي</option>
+                <option value="square">سن مستطيل حاد</option>
+              </select>
+            </label>
             <label className="block space-y-1 text-xs">نسبة سماكة السن <span dir="ltr">{Math.round((brush.nibRatio ?? 0.18) * 100)}%</span>
               <input type="range" min={5} max={80} step={1} value={Math.round((brush.nibRatio ?? 0.18) * 100)} className="w-full accent-[var(--color-primary)]" onChange={(e) => setBrush({ nibRatio: Number(e.target.value) / 100 })} />
             </label>
@@ -176,8 +184,10 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               <svg viewBox="0 0 70 48" className="h-12 w-20 shrink-0" role="img"
                 aria-label={"شكل حافة سن القصبة بزاوية " + brush.angle + " درجة"}>
                 <g transform={"translate(35 24) rotate(" + brush.angle + ")"}>
-                  <rect x="-26" y="-4" width="52" height="8" rx="2"
-                    fill="currentColor" className="text-primary" />
+                  {brush.nibShape==="ellipse" ?
+                    <ellipse rx={24} ry={24*(brush.nibRatio??.18)} fill="currentColor" className="text-primary"/> :
+                    <rect x={-24} y={-24*(brush.nibRatio??.18)} width={48} height={48*(brush.nibRatio??.18)}
+                      rx={brush.nibShape==="square"?0:2} fill="currentColor" className="text-primary"/>}
                 </g>
               </svg>
               <p className="text-[11px] leading-5 text-muted-foreground">
