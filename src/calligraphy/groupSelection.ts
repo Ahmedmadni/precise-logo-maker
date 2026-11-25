@@ -70,3 +70,51 @@ export function transformGlyphSelection(items:LetteringItem[],ids:readonly strin
   }
   return next;
 }
+
+
+export type GlyphArrangeAxis="x"|"y";
+export type GlyphArrangeMode="min"|"center"|"max"|"distribute";
+export type GlyphArrangeResult={ok:true;items:LetteringItem[];gap:number|null;changed:boolean}|{ok:false;reason:"selection"|"bridge"|"overlap"|"invalid"};
+
+/** Arrange actual transformed outline bounds, not glyph origins or advances.
+ * Distribution keeps the outer edges fixed, and refuses negative gaps.
+ * Live joins may only move rigidly, never stretch as a side effect. */
+export function arrangeGlyphSelection(items:LetteringItem[],ids:readonly string[],axis:GlyphArrangeAxis,mode:GlyphArrangeMode):GlyphArrangeResult{
+  const selected=new Set(ids);
+  if(selected.size<(mode==="distribute"?3:2)||selected.size>400)return {ok:false,reason:"selection"};
+  if((axis!=="x"&&axis!=="y")||!(["min","center","max","distribute"] as const).includes(mode))return {ok:false,reason:"invalid"};
+  const targets=items.filter(i=>selected.has(i.id)&&!i.hidden&&i.kind==="outline");
+  if(targets.length!==selected.size)return {ok:false,reason:"selection"};
+  const rows=targets.map(i=>{
+    const b=preciseGlyphBounds(i);
+    return b?{id:i.id,min:b[axis],extent:axis==="x"?b.width:b.height}:null;
+  });
+  if(rows.some(r=>!r||!Number.isFinite(r.min)||!Number.isFinite(r.extent)||r.extent<0))return {ok:false,reason:"invalid"};
+  const sorted=rows.filter((r):r is NonNullable<typeof r>=>!!r).sort((a,b)=>a.min-b.min||a.extent-b.extent||a.id.localeCompare(b.id));
+  const low=sorted[0]!.min,high=Math.max(...sorted.map(r=>r.min+r.extent));
+  const offsets=new Map<string,number>();
+  let gap:number|null=null,cursor=low;
+  if(mode==="distribute"){
+    // Keep the end-to-end span fixed and preserve the order of outlines.
+    gap=(high-low-sorted.reduce((sum,r)=>sum+r.extent,0))/(sorted.length-1);
+    if(gap < -1e-7)return {ok:false,reason:"overlap"};
+    gap=Math.max(0,gap);
+  }
+  for(const row of sorted){
+    const position=mode==="min"?low:mode==="max"?high-row.extent:mode==="center"?(low+high-row.extent)/2:cursor;
+    offsets.set(row.id,position-row.min);
+    if(gap!==null)cursor+=row.extent+gap;
+  }
+  for(const i of items){
+    if(i.kind==="bridge"&&!i.hidden&&i.ribbon){
+      const a=offsets.get(i.ribbon.sourceGlyphId)??0,b=offsets.get(i.ribbon.targetGlyphId)??0;
+      if(Math.abs(a-b)>1e-7)return {ok:false,reason:"bridge"};
+    }
+  }
+  const next=items.map(i=>{
+    const delta=offsets.get(i.id)??(i.kind==="haraka"&&i.attachedToGlyphId?offsets.get(i.attachedToGlyphId):undefined)??0;
+    return Math.abs(delta)<=1e-7?i:{...i,[axis]:i[axis]+delta};
+  });
+  if(next.some(i=>!Number.isFinite(i.x)||!Number.isFinite(i.y)))return {ok:false,reason:"invalid"};
+  return {ok:true,items:next,gap,changed:next.some((i,j)=>i!==items[j])};
+}
