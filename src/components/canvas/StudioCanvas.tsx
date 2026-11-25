@@ -89,6 +89,7 @@ export function StudioCanvas() {
   const measurement = useStudio((s) => s.measurement);
   const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
+  const pathControlSelection=useStudio(s=>s.pathControlSelection);
   const paint = useStudio((s) => s.paint);
   const trace = useStudio((s) => s.trace);
   const brush = useStudio((s) => s.brush);
@@ -643,7 +644,8 @@ export function StudioCanvas() {
         const guideBlocked =
           !!target?.guide && (guideLayer.locked || guideLayer.hidden);
         if (target && !target.locked && target.visible && !guideBlocked) {
-          const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom);
+          const edge=pathControlSelection?.objectId===target.id?pathControlSelection.edge:undefined;
+          const h = pickHandle(target.geometry, world, HANDLE_PIXELS / view.zoom,edge);
           if (h) {
             setHandleDrag({
               objectId: target.id,
@@ -837,7 +839,7 @@ export function StudioCanvas() {
           : snapped;
         setHandleDrag({
           ...handleDrag,
-          geometry: applyHandle(base.geometry, handleDrag.handleId, target),
+          geometry: applyHandle(base.geometry, handleDrag.handleId, target,pathControlSelection?.objectId===base.id?pathControlSelection.mode:"free"),
         });
       }
       return;
@@ -1071,6 +1073,7 @@ export function StudioCanvas() {
         handleDrag && handleDrag.objectId === editTarget.id
           ? handleDrag.geometry
           : editTarget.geometry,
+        pathControlSelection?.objectId===editTarget.id?pathControlSelection.edge:undefined,
       )
     : [];
   const selectionBounds =
@@ -1398,6 +1401,7 @@ export function StudioCanvas() {
             </g>
           )}
           {/* Edit handles for a single selected object */}
+          {editHandles.filter(h=>h.role==="control"&&h.anchor).map(h=><line key={"link-"+h.id} x1={h.anchor!.x} y1={h.anchor!.y} x2={h.point.x} y2={h.point.y} stroke="var(--color-primary)" strokeDasharray="4 3" strokeOpacity=".7" vectorEffect="non-scaling-stroke" pointerEvents="none"/>)}
           {editHandles.map((h) => {
             // Guide handles are drawn larger (touch-friendly) and in guide blue.
             const guideHandle = !!editTarget?.guide;
@@ -1410,7 +1414,7 @@ export function StudioCanvas() {
               y={h.point.y - half}
               width={half * 2}
               height={half * 2}
-              rx={h.role === "center" ? half : 1 / view.zoom}
+              rx={h.role === "center" || h.role==="control" ? half : 1 / view.zoom}
               fill={handleDrag?.handleId === h.id ? accent : "var(--color-background)"}
               stroke={accent}
               strokeWidth={1.25}
