@@ -285,3 +285,44 @@ export function bakeRibbonAsOutline(items:LetteringItem[],bridgeId:string):BakeR
         bakedSourceIds:sourceIds}};
   }catch{return {ok:false,reason:"فشل دمج هذه السلسلة هندسيًا؛ لم يتغير المشروع"};}
 }
+
+
+export type InkIntersection={a:string;b:string;area:number;ratio:number;path:string};
+export type InkAnalysis={pairs:InkIntersection[];checked:number;skipped:number;limited:boolean};
+export const INK_CURVE_TOLERANCE=CURVE_TOLERANCE;
+
+/** Compare filled outlines without changing the document. Reuse the existing
+ * winding-aware flattening pipeline, cache each outline for this calculation
+ * and bound work for tablet responsiveness. Stroke-weighted outlines are
+ * unsupported and counted as skipped, never as clear. */
+export function analyzeGlyphInk(items:LetteringItem[],candidates:readonly {a:string;b:string}[]):InkAnalysis{
+  const result:InkAnalysis={pairs:[],checked:0,skipped:0,limited:false};
+  const byId=new Map(items.map(i=>[i.id,i]));
+  const cache=new Map<string,{geom:Geom;area:number}|null>();
+  const get=(id:string)=>{
+    if(cache.has(id))return cache.get(id)??null;
+    const item=byId.get(id);
+    const geom=item&&!item.hidden?filledGlyph(item):null;
+    const value=geom?{geom,area:polygonArea(geom)}:null;
+    const valid=value&&Number.isFinite(value.area)&&value.area>0?value:null;
+    cache.set(id,valid);return valid;
+  };
+  for(const pair of candidates){
+    if(result.checked+result.skipped>=120||cache.size+new Set([pair.a,pair.b].filter(id=>!cache.has(id))).size>40){result.limited=true;break;}
+    try{
+      const a=get(pair.a),b=get(pair.b);
+      if(!a||!b){result.skipped++;continue;}
+      const geo=intersection(a.geom,b.geom);
+      const size=polygonArea(geo);
+      if(!Number.isFinite(size)){result.skipped++;continue;}
+      if(size>0.01){
+        const path=(geo as number[][][][]).flatMap(poly=>poly.map(r=>r.slice(0,-1).map(([x,y],i)=>(i?"L ":"M ")+format(x!)+" "+format(y!)).join(" ")+" Z")).join(" ");
+        if(path.length>100000){result.skipped++;continue;}
+        result.pairs.push({a:pair.a,b:pair.b,area:size,ratio:Math.min(1,size/Math.min(a.area,b.area)),path});
+      }
+      result.checked++;
+    }catch{result.skipped++;}
+  }
+  result.pairs.sort((a,b)=>b.area-a.area);
+  return result;
+}
