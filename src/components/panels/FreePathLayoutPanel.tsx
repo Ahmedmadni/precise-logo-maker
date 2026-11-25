@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { letteringTransform, safeColor, safePath, type LetteringItem } from "../../calligraphy/model";
 import { preciseGlyphBounds } from "../../calligraphy/morph";
-import { composeWordGroupsOnPath, composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
+import { wordEnvelopeOverlaps, composeWordGroupsOnPath, composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
 import { useStudio } from "../../store/studioStore";
 
 const STORAGE_KEY="logo-studio.free-path-presets.v1";
@@ -58,12 +58,14 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
   const activeGroups=selectedGroups.filter(id=>availableGroups.some(g=>g.id===id));
   const count=wordMode?activeGroups.length:siblings.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text")).length;
   const scope=wordMode?(allItems??[]).filter(g=>g.groupId&&activeGroups.includes(g.groupId)):siblings;
-  const options={scale,margin,reverse,tangent,upright};
+  const [sizeAware,setSizeAware]=useState(true);
+  const [wordGap,setWordGap]=useState(.2);
+  const options={scale,margin,reverse,tangent,upright,sizeAware,wordGap};
   const samples=useMemo(()=>open?sampleGuide(guide,count,margin,reverse):[],[open,guide,count,margin,reverse]);
   const [showOutlines,setShowOutlines]=useState(true);
   const composition=useMemo(()=>{
     if(!open)return null;
-    const patches=wordMode?composeWordGroupsOnPath(allItems??[],activeGroups,guide,{scale,margin,reverse,tangent,upright}):composeFreePath(scope,guide,{scale,margin,reverse,tangent,upright});
+    const patches=wordMode?composeWordGroupsOnPath(allItems??[],activeGroups,guide,{scale,margin,reverse,tangent,upright,sizeAware,wordGap}):composeFreePath(scope,guide,{scale,margin,reverse,tangent,upright});
     if(!patches.length)return null;
     const byId=new Map(patches.map(p=>[p.id,p.patch]));
     const glyphs=scope.filter(g=>!g.hidden&&g.kind==="outline"&&byId.has(g.id)).map(g=>({...g,...byId.get(g.id)}));
@@ -74,8 +76,8 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
     const padding=Math.max(4,Math.max(right-left,bottom-top)*.12,...glyphs.map(g=>Math.max(0,Math.min(20,g.weight??0))*Math.max(1,Math.abs(g.scaleX??1),Math.abs(g.scaleY??1))*4));
     const viewBox=[left-padding,top-padding,right-left+2*padding,bottom-top+2*padding];
     if(!viewBox.every(Number.isFinite))return null;
-    return {glyphs,viewBox:viewBox.join(" ")};
-  },[open,scope,allItems,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright]);
+    return {glyphs,viewBox:viewBox.join(" "),overlaps:wordMode?wordEnvelopeOverlaps(glyphs):[]};
+  },[open,scope,allItems,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright,sizeAware,wordGap]);
   const canApply=!!composition;
   const update=(i:number,axis:"x"|"y",value:number)=>{
     setGuide(old=>moveGuidePoint(old,i,{...old[i]!,[axis]:value},smooth));
@@ -114,12 +116,14 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
           {availableGroups.map((g,i)=><label key={g.id} className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={activeGroups.includes(g.id)} disabled={!activeGroups.includes(g.id)&&activeGroups.length>=30} onChange={e=>setSelectedGroups(old=>e.target.checked?[...old,g.id]:old.filter(id=>id!==g.id))}/><span>{g.label} · {i+1}</span>{activeGroups.includes(g.id)&&<span className="ms-auto font-mono">{activeGroups.indexOf(g.id)+1}</span>}</label>)}
         </div>
         <p>الكلمات المختارة: {activeGroups.length} / 30</p>
+        <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={sizeAware} onChange={e=>setSizeAware(e.target.checked)}/> توزيع حسب حجم حدود الكلمات</label>
+        {sizeAware&&<label className="block"><span className="flex justify-between"><span>وزن المسافة الموحدة</span><span>{Math.round(wordGap*100)}%</span></span><input type="range" min={0} max={1} step={.05} value={wordGap} onChange={e=>setWordGap(Number(e.target.value))} className="w-full"/><span className="text-muted-foreground">رفع القيمة يجعل نسب المسافات بين المراكز أكثر انتظامًا؛ لضبط الاتساع الكلي غيّر حجم المسار.</span></label>}
       </div>}
-      <p className="text-muted-foreground">حرّك المراسي والمقابض؛ يمكن تقسيم أي منحنى إلى جزأين دون تغيير شكله. النقاط الصغيرة تمثل مراكز وحدات التوزيع وليس شكلها النهائي.</p>
+      <p className="text-muted-foreground">حرّك المراسي والمقابض؛ يمكن تقسيم أي منحنى إلى جزأين دون تغيير شكله. النقاط الصغيرة تمثل المراكز في التوزيع المتساوي؛ في التوزيع حسب الحجم راجع المعاينة الفعلية.</p>
       <svg ref={svg} viewBox="-6 -6 112 112" className="block h-48 w-full touch-none rounded-lg border border-border bg-background" onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}} role="img" aria-label="تحرير منحنى المسار الحر">
         {segmentIds.map(i=><path key={i} d={`M ${guide[i*3]!.x} ${guide[i*3]!.y} L ${guide[i*3+1]!.x} ${guide[i*3+1]!.y} M ${guide[i*3+2]!.x} ${guide[i*3+2]!.y} L ${guide[i*3+3]!.x} ${guide[i*3+3]!.y}`} stroke="currentColor" strokeOpacity={i===segment?".6":".25"} strokeDasharray="2 2" fill="none"/>)}
         <path d={guidePath} stroke="currentColor" strokeWidth="1.2" fill="none"/>
-        {samples.map((s,i)=><circle key={i} cx={s.point.x} cy={s.point.y} r="1.4" fill="currentColor" opacity=".65"/>)}
+        {(!wordMode||!sizeAware)&&samples.map((s,i)=><circle key={i} cx={s.point.x} cy={s.point.y} r="1.4" fill="currentColor" opacity=".65"/>)}
         {guide.map((p,i)=><g key={i} onPointerDown={event=>{event.preventDefault();drag.current=i;svg.current?.setPointerCapture(event.pointerId);}} className="cursor-grab">
           <circle cx={p.x} cy={p.y} r="7" fill="transparent"/>
           <circle cx={p.x} cy={p.y} r="3" fill={i%3===0?"currentColor":"none"} stroke="currentColor"/>
@@ -128,6 +132,10 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
       <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={showOutlines} onChange={e=>setShowOutlines(e.target.checked)}/> معاينة أشكال الحروف الفعلية</label>
       {showOutlines&&<div className="rounded-lg border border-border bg-background p-2">
         <p className="font-medium">التركيب المقترح</p>
+        {wordMode&&composition&&<div role="status" className="rounded border border-border p-2 text-xs">
+          {composition.overlaps.length>0?<><p className="font-medium">تنبيه: {composition.overlaps.length} زوج من الكلمات ذات حدود متداخلة.</p><p>جرّب زيادة حجم المسار أو تعديل المنحنى. يمكنك اعتماد التداخل إذا كان مقصودًا.</p></>:<p>لا يظهر تداخل بين مستطيلات حدود الكلمات المحددة.</p>}
+          <p className="text-muted-foreground">فحص تقريبي للحدود فقط، دون الحركات والزخارف والوصلات أو سماكة الحدود.</p>
+        </div>
         {composition?<svg viewBox={composition.viewBox} className="block h-40 w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="معاينة توزيع مسارات الحروف الفعلية">
           {composition.glyphs.map(g=>{
             const size=Number.isFinite(g.size)?Math.max(1,Math.min(1000,g.size)):48;
