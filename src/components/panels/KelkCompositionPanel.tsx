@@ -8,6 +8,7 @@ import {
   composeWordLayout,
   createKashidaItem,
   buildKashidaOutline,
+  createConnectedKashida,
   type KashidaStyle,
   type KelkLayoutStyle,
 } from "../../calligraphy/kelkComposition";
@@ -52,6 +53,19 @@ export function KelkCompositionPanel({ selected, siblings }: {
     style: kashidaStyle,
   };
   const kashidaPath = buildKashidaOutline(kashidaOptions);
+  const [targetId, setTargetId] = useState("");
+  const eligibleTargets = siblings.filter(item => item.id !== selected.id && item.kind === "outline" && !item.hidden && !!item.pathData);
+  const target = eligibleTargets.find(item => item.id === targetId);
+  const [connectionError, setConnectionError] = useState(false);
+  const insertConnected = () => {
+    commitPreview();
+    const latest = useStudio.getState().doc.lettering ?? [];
+    const source = latest.find(item => item.id === selected.id);
+    const destination = latest.find(item => item.id === targetId);
+    const item = source && destination ? createConnectedKashida(source, destination, kashidaOptions) : null;
+    setConnectionError(!item);
+    if (item) addLettering(item);
+  };
 
   const onSlant = (preset: { skewX: number; rotation: number; label: string }) => {
     commitPreview();
@@ -188,8 +202,20 @@ export function KelkCompositionPanel({ selected, siblings }: {
           </svg>
         </div>
         <button type="button" disabled={!kashidaPath} className={`${btn} w-full font-semibold`} onClick={onInsertKashida}>
-          إدراج كشيدة
+          إدراج كشيدة مستقلة
         </button>
+        {eligibleTargets.length > 0 && <div className="space-y-2 rounded-lg border border-border p-2">
+          <label className="block space-y-1 text-xs">
+            <span>كشيدة مرتبطة بحرف آخر</span>
+            <select className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" value={target?.id ?? ""} onChange={e => { setTargetId(e.target.value); setConnectionError(false); }}>
+              <option value="">اختر الحرف المستهدف</option>
+              {eligibleTargets.map((item, i) => <option key={item.id} value={item.id}>{item.sourceText ?? "حرف"} · {i + 1}</option>)}
+            </select>
+          </label>
+          <p className="text-[11px] leading-5 text-muted-foreground">الطول حسب المسافة بين نقطتي الخروج والدخول. تبقى الوصلة مرتبطة بالحرفين عند تحريكهما.</p>
+          <button type="button" className={`${btn} w-full`} disabled={!target} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
+          {connectionError && <p role="alert" className="text-xs text-destructive">تعذر إنشاء الوصلة. راجع نقطتي الاتصال والمسافة بين الحرفين.</p>}
+        </div>}
       </div>
     </details>
   );
