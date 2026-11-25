@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {PathGeometry,Point} from "../core/geometry/types";
-import {splitShape,splitShapeAtAngle,angledCutGuide} from "./splitShape";
+import {splitShape,splitShapeAtAngle,angledCutGuide,knifeLineParameters} from "./splitShape";
 const box=(x:number,y:number,w:number,h:number):Point[]=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
 const area=(ring:Point[])=>Math.abs(ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length]!;return sum+p.x*q.y-q.x*p.y;},0)/2);
 const filled=(g:PathGeometry)=>area(g.points)-(g.holes??[]).reduce((s,r)=>s+area(r),0);
@@ -49,5 +49,25 @@ describe("angled shape splitting",()=>{
     expect(splitShapeAtAngle(path,NaN,.5)).toEqual({ok:false,reason:"invalid"});
     expect(splitShapeAtAngle(path,30,1)).toEqual({ok:false,reason:"invalid"});
     expect(path.holes?.[0]).toEqual(box(10,10,20,20));
+  });
+});
+
+describe("knife gesture geometry",()=>{
+  it("maps a vertical drawn line to the same cut as the inspector",()=>{
+    const p=knifeLineParameters(path,{x:40,y:-20},{x:40,y:120});
+    expect(p?.degrees).toBeCloseTo(0);
+    expect(p?.fraction).toBeCloseTo(.4);
+  });
+  it("produces the same cut line when the gesture direction reverses",()=>{
+    const a=knifeLineParameters(path,{x:10,y:0},{x:90,y:100})!;
+    const b=knifeLineParameters(path,{x:90,y:100},{x:10,y:0})!;
+    expect(a.fraction+b.fraction).toBeCloseTo(1);
+    const result=splitShapeAtAngle(path,a.degrees,a.fraction);
+    expect(result.ok).toBe(true);
+    if(result.ok)expect(result.parts.reduce((s,p)=>s+filled(p),0)).toBeCloseTo(filled(path),6);
+  });
+  it("rejects degenerate and out-of-bounds cuts",()=>{
+    expect(knifeLineParameters(path,{x:20,y:20},{x:20,y:20})).toBeNull();
+    expect(knifeLineParameters(path,{x:120,y:0},{x:120,y:100})).toBeNull();
   });
 });
