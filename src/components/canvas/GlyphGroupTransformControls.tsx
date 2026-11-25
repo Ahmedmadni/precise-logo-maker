@@ -17,7 +17,7 @@ export function GlyphGroupTransformControls(){
   const applySpacing=useStudio(s=>s.spaceGlyphMulti);
   const guideEdit=useStudio(s=>s.guideLayer.edit);
   const [open,setOpen]=useState(false);
-  const [tab,setTab]=useState<"transform"|"arrange"|"spacing">("transform");
+  const [tab,setTab]=useState<"transform"|"arrange"|"spacing"|"balance"|"tiers">("transform");
   const [axis,setAxis]=useState<GlyphArrangeAxis>("x");
   const [mode,setMode]=useState<GlyphArrangeMode>("distribute");
   const [gap,setGap]=useState("0");
@@ -40,7 +40,7 @@ export function GlyphGroupTransformControls(){
   const inkKey=JSON.stringify([ids,axis,gap]);
   const currentInk=ink?.source===source&&ink.key===inkKey?ink:null;
   const shownInk=currentInk?(spacing?.ok?currentInk.after:currentInk.before):null;
-  const next=open?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
+  const next=open&&tab!=="balance"&&tab!=="tiers"?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
   const visible=(next??source).filter(i=>!i.hidden&&((ids.includes(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&ids.includes(i.attachedToGlyphId))||i.kind==="bridge"&&i.ribbon&&ids.includes(i.ribbon.sourceGlyphId)&&ids.includes(i.ribbon.targetGlyphId)));
   const boxes=[...source,...(next??[])].filter(i=>ids.includes(i.id)).map(preciseGlyphBounds).filter((b):b is NonNullable<typeof b>=>!!b);
   const minX=Math.min(...boxes.map(b=>b.x)),minY=Math.min(...boxes.map(b=>b.y)),maxX=Math.max(...boxes.map(b=>b.x+b.width)),maxY=Math.max(...boxes.map(b=>b.y+b.height));
@@ -48,11 +48,9 @@ export function GlyphGroupTransformControls(){
   const viewBox=[minX-pad,minY-pad,maxX-minX+2*pad,maxY-minY+2*pad].join(" ");
   return <div className="mt-1 border-t border-border pt-1">
     <button type="button" className="min-h-9 w-full rounded border border-border text-xs" aria-expanded={open} onClick={()=>{setOpen(!open);setNotice("");}}>تنسيق الحروف ({ids.length})</button>
-    <GlyphBalanceControls/>
-    <GlyphTierControls/>
     {open&&<div className="max-h-[35dvh] w-full max-w-[300px] space-y-1 overflow-y-auto pt-2">
-      <div className="grid grid-cols-3 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة"},{id:"spacing",label:"التداخل"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
-      {tab==="spacing"?<>
+      <div className="grid grid-cols-3 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة"},{id:"spacing",label:"التداخل"},{id:"balance",label:"التوازن"},{id:"tiers",label:"التكوين والقوالب"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
+      {tab==="balance"?<GlyphBalanceControls/>:tab==="tiers"?<GlyphTierControls/>:tab==="spacing"?<>
         <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>setAxis(v.id)}>{v.label}</button>)}</div>
         <label className="block text-xs">الفاصل بين الحدود (px)<input type="number" value={gap} step={1} min={-10000} max={10000} onChange={e=>{setGap(e.target.value);setNotice("");}} className="min-h-10 w-full rounded border border-border bg-background px-2" dir="ltr"/></label>
         <div className="grid grid-cols-3 gap-1">{[-5,0,5].map(v=><button type="button" key={v} className="min-h-9 rounded border border-border text-xs" onClick={()=>setGap(String(v))}>{v===-5?"تراكب":v===0?"تماس":"فصل"}</button>)}</div>
