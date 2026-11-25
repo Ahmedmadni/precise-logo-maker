@@ -49,3 +49,21 @@ export function splitShape(g:Geometry,axis:SplitAxis,fraction:number):SplitResul
   if(axis!=="x"&&axis!=="y")return {ok:false,reason:"invalid"};
   return splitShapeAtAngle(g,axis==="x"?0:90,fraction);
 }
+
+
+/** Convert a drawn line to the same normal-angle/offset representation used
+ * by the inspector. The infinite extension of the line is the cut. */
+export function knifeLineParameters(g:Geometry,start:Point,end:Point):{degrees:number;fraction:number}|null{
+  if(![start.x,start.y,end.x,end.y].every(Number.isFinite))return null;
+  const dx=end.x-start.x,dy=end.y-start.y,length=Math.hypot(dx,dy);
+  if(length<1e-6)return null;
+  const nx=dy/length,ny=-dx/length;
+  const b=geometryBounds(g);
+  if(![b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite))return null;
+  const cx=(b.minX+b.maxX)/2,cy=(b.minY+b.maxY)/2;
+  const radius=(Math.abs(nx)*(b.maxX-b.minX)+Math.abs(ny)*(b.maxY-b.minY))/2;
+  if(radius<=1e-8)return null;
+  const fraction=.5+((start.x-cx)*nx+(start.y-cy)*ny)/(2*radius);
+  if(!Number.isFinite(fraction)||fraction<=0||fraction>=1)return null;
+  return {degrees:Math.atan2(ny,nx)*180/Math.PI,fraction};
+}
