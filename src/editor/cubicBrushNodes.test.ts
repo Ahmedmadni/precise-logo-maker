@@ -2,6 +2,7 @@ import { describe,it,expect } from "vitest";
 import type { PathGeometry } from "../core/geometry/types";
 import { buildBrushStroke, DEFAULT_BRUSH } from "../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../core/tracing/brushPreview";
+import { handlesOf, pickHandle, applyHandle } from "./handles";
 import { geometryToPathData } from "../objects/render";
 import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl } from "./path-nodes";
 
@@ -59,5 +60,23 @@ describe("direct cubic handle editing",()=>{
   it("aligns the opposing control while preserving its original length",()=>{
     const moved=movePathControl(path,0,"control1",{x:0,y:8},"aligned");
     expect(moved.cubicSegments?.[3]?.control2).toEqual({x:0,y:-4});
+  });
+});
+
+
+describe("canvas cubic handles",()=>{
+  it("shows only the two controls for the requested edge",()=>{
+    expect(handlesOf(path).filter(h=>h.role==="control")).toEqual([]);
+    expect(handlesOf(path,0).filter(h=>h.role==="control").map(h=>h.id)).toEqual(["c0:1","c0:2"]);
+    expect(handlesOf(path,1).filter(h=>h.role==="control")).toEqual([]);
+  });
+  it("picks a visible control and applies the selected coupling mode",()=>{
+    const shape=movePathControl(path,0,"control1",{x:2,y:5});
+    const h=pickHandle(shape,{x:2,y:5},.5,0);
+    expect(h?.id).toBe("c0:1");
+    const moved=applyHandle(shape,h!.id,{x:4,y:6},"symmetric") as PathGeometry;
+    expect(moved.cubicSegments?.[0]?.control1).toEqual({x:4,y:6});
+    expect(moved.cubicSegments?.[3]?.control2).toEqual({x:-4,y:-6});
+    expect(moved.points).toEqual(path.points);
   });
 });
