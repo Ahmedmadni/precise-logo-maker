@@ -63,7 +63,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
   const [showOutlines,setShowOutlines]=useState(true);
   const composition=useMemo(()=>{
     if(!open)return null;
-    const patches=wordMode?composeWordGroupsOnPath(scope,activeGroups,guide,{scale,margin,reverse,tangent:false,upright}):composeFreePath(scope,guide,{scale,margin,reverse,tangent,upright});
+    const patches=wordMode?composeWordGroupsOnPath(allItems??[],activeGroups,guide,{scale,margin,reverse,tangent,upright}):composeFreePath(scope,guide,{scale,margin,reverse,tangent,upright});
     if(!patches.length)return null;
     const byId=new Map(patches.map(p=>[p.id,p.patch]));
     const glyphs=scope.filter(g=>!g.hidden&&g.kind==="outline"&&byId.has(g.id)).map(g=>({...g,...byId.get(g.id)}));
@@ -75,7 +75,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
     const viewBox=[left-padding,top-padding,right-left+2*padding,bottom-top+2*padding];
     if(!viewBox.every(Number.isFinite))return null;
     return {glyphs,viewBox:viewBox.join(" ")};
-  },[open,scope,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright]);
+  },[open,scope,allItems,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright]);
   const canApply=!!composition;
   const update=(i:number,axis:"x"|"y",value:number)=>{
     setGuide(old=>moveGuidePoint(old,i,{...old[i]!,[axis]:value},smooth));
@@ -97,7 +97,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
     const latest=useStudio.getState().doc.lettering??[];
     const patches=wordMode?composeWordGroupsOnPath(latest,activeGroups,guide,options):composeFreePath(latest.filter(g=>ids.has(g.id)),guide,options);
     if(!patches.length){setNotice("تعذر توزيع الحروف على المسار الحالي.");return;}
-    useStudio.getState().updateLetteringMany(patches,"تركيب على مسار حر");
+    useStudio.getState().updateLetteringMany(patches,"تركيب على مسار حر",wordMode);
     setNotice("تم تطبيق التركيب؛ يمكن التراجع بخطوة واحدة.");
   };
   return <details className="rounded-lg border border-border p-2" onToggle={e=>setOpen(e.currentTarget.open)}>
@@ -108,7 +108,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
         <button type="button" aria-pressed={wordMode} onClick={()=>setWordMode(true)} className={`min-h-10 rounded-lg border border-border ${wordMode?"bg-secondary font-bold":""}`}>كلمات كاملة</button>
       </div>
       {wordMode&&<div className="space-y-1 rounded-lg border border-border p-2">
-        <p className="text-muted-foreground">اختر كلمتين أو أكثر بالترتيب المطلوب على المسار. تنتقل كل كلمة كوحدة دون تدوير حروفها.</p>
+        <p className="text-muted-foreground">اختر كلمتين أو أكثر بالترتيب المطلوب على المسار. تتحرك كل كلمة كوحدة متكاملة. عند تفعيل المماس، تدور الكلمة وحركاتها التابعة معًا.</p>
         {availableGroups.length<2&&<p>أضف مجموعات كلمات متجهية أولاً.</p>}
         <div className="max-h-40 overflow-y-auto">
           {availableGroups.map((g,i)=><label key={g.id} className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={activeGroups.includes(g.id)} disabled={!activeGroups.includes(g.id)&&activeGroups.length>=30} onChange={e=>setSelectedGroups(old=>e.target.checked?[...old,g.id]:old.filter(id=>id!==g.id))}/><span>{g.label} · {i+1}</span>{activeGroups.includes(g.id)&&<span className="ms-auto font-mono">{activeGroups.indexOf(g.id)+1}</span>}</label>)}
@@ -177,8 +177,9 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
       <label className="block"><span className="flex justify-between"><span>حجم المسار</span><span dir="ltr">{scale.toFixed(1)}×</span></span><input type="range" min={.5} max={3} step={.1} value={scale} onChange={e=>setScale(Number(e.target.value))} className="w-full"/></label>
       <label className="block"><span className="flex justify-between"><span>هامش الطرفين</span><span>{Math.round(margin*100)}%</span></span><input type="range" min={0} max={.4} step={.05} value={margin} onChange={e=>setMargin(Number(e.target.value))} className="w-full"/></label>
       <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={reverse} onChange={e=>setReverse(e.target.checked)}/> عكس ترتيب المسار</label>
-      <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={!wordMode&&tangent} disabled={wordMode} onChange={e=>setTangent(e.target.checked)}/> تدوير وفق المماس</label>
-      <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={upright} disabled={wordMode||!tangent} onChange={e=>setUpright(e.target.checked)}/> إبقاء الحروف دون انقلاب</label>
+      <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={tangent} onChange={e=>setTangent(e.target.checked)}/> تدوير وفق المماس</label>
+      <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={upright} disabled={!tangent} onChange={e=>setUpright(e.target.checked)}/> إبقاء اتجاه الوحدة دون انقلاب</label>
+      {wordMode&&tangent&&<p className="text-[11px] text-muted-foreground">تتحول الحركات المرتبطة تلقائيًا إلى الوضع اليدوي عند تدوير الكلمة، للحفاظ على مواضعها النسبية. لا تُغيّر أشكال الحروف الأصلية.</p>}
       <div className="grid grid-cols-2 gap-1">
         <button type="button" onClick={()=>{setGuide(DEFAULT_GUIDE);setSegment(0);setNotice("");}} className="min-h-10 rounded-lg border border-border">إعادة المسار</button>
         <button type="button" disabled={!canApply} onClick={apply} className="min-h-10 rounded-lg bg-primary text-primary-foreground disabled:opacity-40">تطبيق التركيب</button>
