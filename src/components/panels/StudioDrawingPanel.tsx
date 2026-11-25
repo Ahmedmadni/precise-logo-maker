@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DEFAULT_BRUSH, brushIsValid, brushPressureWidth, type BrushSettings } from "../../core/tracing/vectorBrush";
-import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline, SlidersHorizontal, Gauge, BookOpen, Check } from "lucide-react";
+import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline, SlidersHorizontal, Gauge, BookOpen, Check, Lasso } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 import { BrushPresetPreview } from "./BrushPresetPreview";
@@ -30,6 +30,8 @@ function readPens(): SavedPen[] {
 export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | undefined }) {
   const selected = useStudio((s) => s.tool);
   const setTool = useStudio((s) => s.setTool);
+  const lasso=useStudio(s=>s.lassoActive);
+  const setLasso=useStudio(s=>s.setLassoActive);
   const brush = useStudio((s) => s.brush);
   const setBrush = useStudio((s) => s.setBrush);
   const [pens, setPens] = useState<SavedPen[]>(readPens);
@@ -61,12 +63,13 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           {group.ids.map(id=>{
             const item=tools.find(t=>t.id===id)!;
             const Icon=item.icon;
-            return <button key={id} type="button" aria-pressed={selected===id} title={item.description}
-              className={`flex min-h-12 min-w-0 items-center gap-2 rounded-lg border px-2 text-start text-xs ${selected===id?"border-primary bg-primary/10 font-semibold":"border-border bg-background hover:bg-accent"}`}
+            return <button key={id} type="button" aria-pressed={selected===id&&!lasso} title={item.description}
+              className={`flex min-h-12 min-w-0 items-center gap-2 rounded-lg border px-2 text-start text-xs ${selected===id&&!lasso?"border-primary bg-primary/10 font-semibold":"border-border bg-background hover:bg-accent"}`}
               onClick={()=>{setTool(id);if(id!=="brush")onChoose?.();}}>
-              <Icon className="h-5 w-5 shrink-0" aria-hidden="true"/><span className="min-w-0 flex-1">{item.label}</span>{selected===id&&<Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>}
+              <Icon className="h-5 w-5 shrink-0" aria-hidden="true"/><span className="min-w-0 flex-1">{item.label}</span>{selected===id&&!lasso&&<Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>}
             </button>;
           })}
+          {group.title==="التحديد والتنقل"&&<button type="button" aria-pressed={lasso} title="التحديد الحر بالقلم أو الفأرة" className={`flex min-h-12 min-w-0 items-center gap-2 rounded-lg border px-2 text-xs ${lasso?"border-primary bg-primary/10 font-semibold":"border-border bg-background hover:bg-accent"}`} onClick={()=>{setLasso(!lasso);if(!lasso)onChoose?.();}}><Lasso className="h-5 w-5 shrink-0" aria-hidden="true"/><span>تحديد حر</span></button>}
         </div>
       </section>)}
       {selected === "brush" && (
