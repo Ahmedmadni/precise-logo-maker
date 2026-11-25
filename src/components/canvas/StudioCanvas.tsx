@@ -14,11 +14,12 @@ import {
   pt,
   unionBounds,
 } from "../../core/geometry/math";
-import type { Geometry, Point, VectorObject } from "../../core/geometry/types";
+import type { Geometry, Point, VectorObject, PathGeometry } from "../../core/geometry/types";
 import { knifeLineParameters, splitShapeAtAngle, angledCutGuide, type SplitResult } from "../../objects/splitShape";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
 import { constrainPoint } from "../../core/precision/constraints";
 import { applyHandle, constrainHandle, handlesOf, pickHandle } from "../../editor/handles";
+import {nudgePathNodes} from "../../editor/path-nodes";
 
 import { draftReadout, formatAngle, formatLength, measure } from "../../core/precision/measure";
 import { buildGridGeometry } from "../../grids";
@@ -29,7 +30,7 @@ import { appendBrushSamples, brushPressure, buildBrushStroke, type BrushSample }
 import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import { geometryToPathData } from "../../objects/render";
-import {lassoHits,combineLassoSelection,type LassoMode} from "../../editor/lassoSelection";
+import {lassoHits,combineLassoSelection,lassoNodeIndices,combineNodeSelection,type LassoMode} from "../../editor/lassoSelection";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
@@ -94,11 +95,18 @@ export function StudioCanvas() {
   const pathControlSelection=useStudio(s=>s.pathControlSelection);
   const lassoActive=useStudio(s=>s.lassoActive);
   const lassoEnabled=lassoActive&&tool==="select";
+  const nodeLassoId=useStudio(s=>s.nodeLassoTargetId);
+  const nodeSelection=useStudio(s=>s.pathNodeSelection);
+  const nodeTarget=lassoEnabled&&nodeLassoId&&selection.length===1&&selection[0]===nodeLassoId?doc.objects.find(o=>o.id===nodeLassoId&&!o.locked&&o.visible&&!o.guide&&o.geometry.kind==="path"&&!o.geometry.holes?.length):undefined;
+  const nodePath=nodeTarget?.geometry.kind==="path"?nodeTarget.geometry:null;
+  const selectedAnchors=nodeSelection&&nodeSelection.objectId===nodeTarget?.id&&nodeSelection.geometry===nodePath?nodeSelection.indices:[];
+  const groupDrag=useRef<{id:string;source:PathGeometry;indices:number[];start:Point}|null>(null);
+  const [groupPreview,setGroupPreview]=useState<{id:string;source:PathGeometry;next:PathGeometry}|null>(null);
   const [lassoMode,setLassoMode]=useState<LassoMode>("replace");
   const [lassoTrail,setLassoTrail]=useState<Point[]>([]);
   const [lassoNotice,setLassoNotice]=useState("");
   const lassoDrag=useRef<{points:Point[];mode:LassoMode}|null>(null);
-  useEffect(()=>{lassoDrag.current=null;setLassoTrail([]);setLassoNotice("");},[lassoEnabled]);
+  useEffect(()=>{lassoDrag.current=null;groupDrag.current=null;setGroupPreview(null);setLassoTrail([]);setLassoNotice("");},[lassoEnabled,nodeLassoId]);
   const knifeTargetId=useStudio(s=>s.knifeTargetId);
   const knifeTarget=tool==="select"&&selection.length===1&&selection[0]===knifeTargetId&&!doc.objects.find(o=>o.id===knifeTargetId)?.guide
     ?doc.objects.find(o=>o.id===knifeTargetId&&o.visible&&!o.locked&&o.cellKey===undefined&&(o.geometry.kind==="circle"||(o.geometry.kind==="path"&&o.geometry.closed))):undefined;
@@ -434,7 +442,7 @@ export function StudioCanvas() {
     setLetterOffset(null);
     setDragOffset(null);
     setBox(null);
-    lassoDrag.current=null;setLassoTrail([]);setLassoNotice("");
+    lassoDrag.current=null;groupDrag.current=null;setGroupPreview(null);setLassoTrail([]);setLassoNotice("");
     setHandleDrag(null);
     knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");
     penActiveRef.current = false;
@@ -511,6 +519,11 @@ export function StudioCanvas() {
 
     if(lassoEnabled){
       if(guideLayer.edit){setLassoNotice("اخرج من تحرير الأدلة أولًا.");return;}
+      if(nodeLassoId&&!nodePath){setLassoNotice("حدد مسارًا صالحًا لتحرير النقاط.");return;}
+      if(nodeTarget&&nodePath&&!e.shiftKey&&!e.altKey&&selectedAnchors.some(i=>nodePath.points[i]&&dist(nodePath.points[i]!,world)*view.zoom<=10)){
+        groupDrag.current={id:nodeTarget.id,source:nodePath,indices:[...selectedAnchors],start:world};
+        setGroupPreview({id:nodeTarget.id,source:nodePath,next:nodePath});return;
+      }
       lassoDrag.current={points:[world],mode:e.shiftKey?"add":e.altKey?"subtract":lassoMode};
       setLassoTrail([world]);setLassoNotice("");
       return;
@@ -742,6 +755,11 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if(groupDrag.current){
+      const drag=groupDrag.current;
+      if(nodePath===drag.source)setGroupPreview({id:drag.id,source:drag.source,next:nudgePathNodes(drag.source,drag.indices,world.x-drag.start.x,world.y-drag.start.y)});
+      return;
+    }
     if(lassoDrag.current){
       const drag=lassoDrag.current;
       if(dist(drag.points.at(-1)!,world)*view.zoom>=3){
@@ -917,6 +935,15 @@ export function StudioCanvas() {
     activePointerRef.current = null;
     activePointerTypeRef.current = null;
     panRef.current = null;
+    if(groupDrag.current){
+      const drag=groupDrag.current;groupDrag.current=null;setGroupPreview(null);
+      if(!e)return;
+      const end=toWorld(e.clientX,e.clientY);
+      if(dist(end,drag.start)*view.zoom<1)return;
+      const ok=useStudio.getState().moveSelectedPathNodes(drag.id,drag.source,drag.indices,end.x-drag.start.x,end.y-drag.start.y);
+      setLassoNotice(ok?"تم تحريك النقاط المحددة.":"تغير المسار؛ أعد التحديد.");
+      return;
+    }
     if(lassoDrag.current){
       const drag=lassoDrag.current;lassoDrag.current=null;setLassoTrail([]);
       const state=useStudio.getState();
@@ -926,6 +953,16 @@ export function StudioCanvas() {
       if(points.length<3){setLassoNotice("ارسم مساحة مغلقة حول العناصر.");return;}
       const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
       if((Math.max(...xs)-Math.min(...xs))*view.zoom<6||(Math.max(...ys)-Math.min(...ys))*view.zoom<6){setLassoNotice("مساحة التحديد صغيرة جدًا.");return;}
+      if(state.nodeLassoTargetId){
+        const target=state.doc.objects.find(o=>o.id===state.nodeLassoTargetId);
+        if(!target||target.locked||!target.visible||target.guide||target.geometry.kind!=="path"||target.geometry.holes?.length||state.selection.length!==1||state.selection[0]!==target.id)return;
+        const current=state.pathNodeSelection;
+        const before=current?.objectId===target.id&&current.geometry===target.geometry?current.indices:[];
+        const indices=combineNodeSelection(before,lassoNodeIndices(target.geometry.points,points),drag.mode);
+        state.setPathNodeSelection({objectId:target.id,geometry:target.geometry,indices});
+        setLassoNotice(`تم تحديد ${indices.length} نقطة؛ اسحب إحداها لتحريك المجموعة.`);
+        return;
+      }
       const hits=lassoHits(state.doc.objects,points);
       const next=combineLassoSelection(state.selection,hits,drag.mode);
       setSelection(next);setLassoNotice(`تم تحديد ${next.length} عنصر`);
@@ -1279,7 +1316,7 @@ export function StudioCanvas() {
                       : undefined
                   }
                   d={geometryToPathData(
-                    handleDrag && handleDrag.objectId === o.id ? handleDrag.geometry : o.geometry,
+                    groupPreview?.id===o.id&&groupPreview.source===o.geometry?groupPreview.next:handleDrag && handleDrag.objectId === o.id ? handleDrag.geometry : o.geometry,
                   )}
 
                   fillRule={o.geometry.kind==="path"&&o.geometry.holes?.length?"evenodd":"nonzero"}
@@ -1513,6 +1550,9 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {nodeTarget&&nodePath&&<g pointerEvents="none">
+            {(groupPreview?.id===nodeTarget.id&&groupPreview.source===nodePath?groupPreview.next:nodePath).points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={(selectedAnchors.includes(i)?5:3)/view.zoom} fill={selectedAnchors.includes(i)?"var(--color-primary)":"var(--color-background)"} stroke="var(--color-primary)" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/>)}
+          </g>}
           {lassoEnabled&&lassoTrail.length>1&&<polygon points={lassoTrail.map(p=>`${p.x},${p.y}`).join(" ")} fill="var(--color-primary)" fillOpacity=".1" fillRule="evenodd" stroke="var(--color-primary)" strokeDasharray="5 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" pointerEvents="none"/>}
           {/* Box selection */}
           {box && (
@@ -1563,10 +1603,10 @@ export function StudioCanvas() {
       </svg>
       <CanvasZoomControls />
       {lassoEnabled&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[95%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
-        <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||"التحديد الحر: ارسم حول الأشكال"}</p>
+        <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||(nodeLassoId?"حدد النقاط بالرسم حولها، ثم اسحب نقطة محددة.":"التحديد الحر: ارسم حول الأشكال")}</p>
         <div className="flex flex-wrap gap-1">
           {([{id:"replace",label:"جديد"},{id:"add",label:"إضافة"},{id:"subtract",label:"استبعاد"}] as const).map(m=><button key={m.id} type="button" aria-pressed={lassoMode===m.id} className={`min-h-10 rounded border px-2 text-xs ${lassoMode===m.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setLassoMode(m.id);setLassoNotice("");}}>{m.label}</button>)}
-          <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>useStudio.getState().setLassoActive(false)}>إنهاء</button>
+          <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>{const s=useStudio.getState();if(nodeLassoId)s.setNodeLassoTarget(null);else s.setLassoActive(false);}}>إنهاء</button>
         </div>
       </div>}
       {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
