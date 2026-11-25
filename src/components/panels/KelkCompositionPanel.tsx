@@ -27,7 +27,9 @@ const LAYOUT_OPTIONS: { id: KelkLayoutStyle; label: string }[] = [
   { id: "cascade", label: "تدرّج ثلثي" },
   { id: "interlock", label: "تراكب متداخل" },
   { id: "arch", label: "قوس خطّي" },
-  { id: "reset", label: "استعادة السطر" },
+  { id: "vertical", label: "تركيب رأسي" },
+  { id: "circle", label: "تركيب دائري" },
+  { id: "reset", label: "تصفير الميل والارتفاع" },
 ];
 
 const KASHIDA_STYLES: { id: KashidaStyle; label: string }[] = [
@@ -104,7 +106,9 @@ export function KelkCompositionPanel({ selected, siblings }: {
 
   const onLayout = (style: KelkLayoutStyle, label: string) => {
     commitPreview();
-    const patches = composeWordLayout((hasWordGroup ? siblings : [selected]).filter(item => !item.hidden), style, layoutIntensity);
+    const latest = useStudio.getState().doc.lettering ?? [];
+    const ids = new Set((hasWordGroup ? siblings : [selected]).map(item => item.id));
+    const patches = composeWordLayout(latest.filter(item => ids.has(item.id) && !item.hidden), style, layoutIntensity);
     if (patches.length) updateMany(patches, label);
   };
 
@@ -178,6 +182,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
           </span>
           <input type="range" min={0.25} max={3} step={0.25} value={layoutIntensity} onChange={e => setLayoutIntensity(Number(e.target.value))} disabled={!hasWordGroup} className="w-full" />
         </label>
+        <p className="text-[11px] text-muted-foreground">التركيب الرأسي والدائري يعيد توزيع الحروف كعناصر زخرفية مستقلة؛ قد يفصل الوصلات الطبيعية للكلمة. لاستعادة المواضع السابقة استخدم التراجع.</p>
         <div className="grid grid-cols-2 gap-1">
           {LAYOUT_OPTIONS.map((opt) => (
             <button
