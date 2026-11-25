@@ -20,8 +20,8 @@ describe("cubic paths", () => {
     expect(closestPointOnGeometry(curve,{x:6,y:9})).toEqual({x:6,y:9});
     expect(sampledPathSegments(curve)).toHaveLength(24);
   });
-  it("encloses the control hull", () => {
-    expect(geometryBounds(curve)).toEqual({minX:0,minY:0,maxX:12,maxY:12});
+  it("bounds the actual curve rather than its control hull", () => {
+    expect(geometryBounds(curve)).toEqual({minX:0,minY:0,maxX:12,maxY:9});
   });
   it("translates controls", () => {
     const g=translateGeometry(curve,3,4);
@@ -38,5 +38,22 @@ describe("cubic paths", () => {
   it("flattens curved edges for polygon operations", () => {
     expect(geometryToRing(curve)).toHaveLength(25);
     expect(geometryToRing(curve)[12]).toEqual({x:6,y:9});
+  });
+});
+
+describe("cubic bounds regressions", () => {
+  it("includes the curved closing edge of a two-anchor path", () => {
+    const g: PathGeometry = {...curve, closed:true, cubicSegments:[null,{control1:{x:12,y:-12},control2:{x:0,y:-12}}]};
+    expect(geometryBounds(g)).toEqual({minX:0,minY:-9,maxX:12,maxY:0});
+    expect(sampledPathSegments(g)).toHaveLength(25);
+  });
+  it("ignores non-finite control points", () => {
+    const g: PathGeometry = {...curve,cubicSegments:[{control1:{x:NaN,y:12},control2:{x:12,y:12}}]};
+    expect(geometryBounds(g)).toEqual({minX:0,minY:0,maxX:12,maxY:0});
+    expect(sampledPathSegments(g)).toHaveLength(1);
+  });
+  it("ignores unused controls on an open path", () => {
+    const g: PathGeometry = {...curve,cubicSegments:[null,{control1:{x:100,y:100},control2:{x:200,y:200}}]};
+    expect(geometryBounds(g)).toEqual({minX:0,minY:0,maxX:12,maxY:0});
   });
 });
