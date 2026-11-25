@@ -149,6 +149,11 @@ export function appendBrushSamples(
     const last = result.at(-1);
     if (last && distance(last, sample) * zoom < 1.3) {
       if (finish && i === incoming.length - 1) result[result.length - 1] = sample;
+      // Pressure can change even while the stylus is nearly stationary.
+      // Retain a stronger local impression without adding duplicate vertices.
+      else if (sample.pressure > last.pressure + 0.02) {
+        result[result.length - 1] = { ...last, pressure: sample.pressure };
+      }
       continue;
     }
     if (result.length === maxSamples) {
@@ -247,7 +252,9 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     raw.some((sample) => !valid(sample))) return null;
   const clean: BrushSample[] = [];
   for (const sample of raw) {
-    if (!clean.length || distance(sample, clean[clean.length - 1]!) > 0.15) clean.push(sample);
+    const previous = clean.at(-1);
+    if (!previous || distance(sample, previous) > 0.15) clean.push(sample);
+    else if (sample.pressure > previous.pressure) clean[clean.length - 1] = { ...previous, pressure: sample.pressure };
   }
   if (!clean.length) return null;
 
@@ -339,7 +346,12 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
       // parallel creates a hairline. Previously the directions were reversed.
       const mag = Math.hypot(normal.x, normal.y) || 1;
       const ratio = settings.nibRatio ?? 0.18;
-      halfWidth *= ratio + (1 - ratio) * Math.abs((normal.x * nibEdge.x + normal.y * nibEdge.y) / mag);
+      const alignment = clamp(Math.abs((normal.x * nibEdge.x + normal.y * nibEdge.y) / mag), 0, 1);
+      // Smooth the response around a hairline so a slight change of heading
+      // does not create a sharp kink in a broad-nib stroke.
+      const epsilon = 0.025;
+      const response = (Math.hypot(alignment,epsilon)-epsilon)/(Math.hypot(1,epsilon)-epsilon);
+      halfWidth *= ratio + (1 - ratio) * response;
     } else if (settings.preset === "taper") {
       const t = cumulative[i]! / strokeLength;
       halfWidth *= 0.16 + 0.84 * Math.pow(Math.sin(Math.PI * t), 0.5);
