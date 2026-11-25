@@ -154,7 +154,13 @@ export function sampleRibbon(
   const result: RibbonSample[] = [];
   const nibScore = (tangent: { x: number; y: number }) => {
     const theta = Math.atan2(tangent.y, tangent.x);
-    return 0.25 + 0.75 * Math.abs(Math.sin(theta - nibAngle));
+    // Rounded nib response removes the sharp cusp when the stroke crosses
+    // the nib direction, while retaining the same normalized range.
+    const sine = Math.sin(theta - nibAngle);
+    const epsilon = 0.025;
+    const response = (Math.hypot(sine, epsilon) - epsilon) /
+      (Math.hypot(1, epsilon) - epsilon);
+    return 0.25 + 0.75 * response;
   };
   const endpointNib0 = nibScore(tangent0);
   const endpointNib1 = nibScore(tangent1);
@@ -184,7 +190,9 @@ export function sampleRibbon(
     const endpointBaseline = endpointNib0 * (1 - t) + endpointNib1 * t;
     // The envelope vanishes at both caps to preserve the EXACT configured
     // start/end widths for seam matching, whatever the nib angle.
-    const envelope = 4 * t * (1 - t);
+    // Zero value AND derivative at the caps: keep the transition smooth
+    // where the ribbon meets the neighboring glyph.
+    const envelope = 16 * t * t * s * s;
     const modulation = Math.max(0.25, Math.min(1.75,
       1 + nibContrast * (orientation - endpointBaseline) * 1.6 * envelope));
     const width = baseWidth * modulation;
@@ -209,8 +217,18 @@ const cubicEdge = (points: { x: number; y: number }[]) => {
   return d;
 };
 
+/** Spend more samples only on high-curvature / angled joins, retaining
+ * the legacy 16-point resolution for simple straight connections. */
+export function ribbonRenderSteps(spec: RibbonLink): number {
+  if (!isValidRibbon(spec)) return 16;
+  const complexity = Math.abs(spec.curvature) * 2 +
+    (Math.abs(spec.startAngle ?? 0) + Math.abs(spec.endAngle ?? 0)) / 140 +
+    (spec.nibContrast ?? 0) * 0.5;
+  return Math.min(64, 16 + 8 * Math.ceil(complexity * 2));
+}
+
 export function buildRibbonPath(item: LetteringItem, all: LetteringItem[]): string | null {
-  const samples = sampleRibbon(item, all);
+  const samples = sampleRibbon(item, all, item.ribbon ? ribbonRenderSteps(item.ribbon) : 16);
   if (!samples) return null;
   const edge = (side: 1 | -1) => samples.map(({ center, normal, width }) =>
     add(center, mul(normal, side * width / 2)));
