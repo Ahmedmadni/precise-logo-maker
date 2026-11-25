@@ -2,12 +2,16 @@ import type { LetteringItem } from "./model";
 import { worldJoinAnchor } from "./contourComposer";
 import { sampleRibbon, type RibbonLink } from "./ribbonJoin";
 
-export type RibbonHandleId = "start" | "end" | "bend";
+export type RibbonHandleId = "start" | "end" | "bend" | "start-width" | "end-width";
 export type WorldPoint = { x: number; y: number };
 export interface RibbonHandleGeometry {
   start: WorldPoint;
   end: WorldPoint;
   bend: WorldPoint;
+  startWidth: WorldPoint;
+  endWidth: WorldPoint;
+  startWidthNormal: WorldPoint;
+  endWidthNormal: WorldPoint;
   /** The actual ribbon centerline points, for editor-only guide rendering. */
   centerline: WorldPoint[];
   /** Centers of the two caps; the tangent handles are offset from these. */
@@ -54,7 +58,17 @@ export function ribbonHandleGeometry(
     x: cap.x + Math.cos(chordAngle + radians(direction)) * radius * sign,
     y: cap.y + Math.sin(chordAngle + radians(direction)) * radius * sign,
   });
+  const startWidthNormal = samples[0]!.normal;
+  const endNormal = samples[16]!.normal;
+  const endWidthNormal = { x: -endNormal.x, y: -endNormal.y };
+  const widthHandle = (cap: WorldPoint, normal: WorldPoint, width: number): WorldPoint => ({
+    x: cap.x + normal.x * Math.max(18,width/2),
+    y: cap.y + normal.y * Math.max(18,width/2),
+  });
   return {
+    startWidth: widthHandle(startCap,startWidthNormal,spec.startWidth),
+    endWidth: widthHandle(endCap,endWidthNormal,spec.endWidth),
+    startWidthNormal, endWidthNormal,
     start: handle(startCap, spec.startAngle ?? 0, 1),
     end: handle(endCap, spec.endAngle ?? 0, -1),
     bend: samples[8]!.center,
@@ -69,6 +83,14 @@ export function ribbonHandleDragPatch(
   handle: RibbonHandleId, pointer: WorldPoint,
 ): Partial<RibbonLink> | null {
   if (!Number.isFinite(pointer.x) || !Number.isFinite(pointer.y)) return null;
+  if (handle === "start-width" || handle === "end-width") {
+    const start = handle === "start-width";
+    const origin = start ? geometry.startWidth : geometry.endWidth;
+    const normal = start ? geometry.startWidthNormal : geometry.endWidthNormal;
+    const delta = (pointer.x-origin.x)*normal.x + (pointer.y-origin.y)*normal.y;
+    const width = Number(clamp((start?spec.startWidth:spec.endWidth)+2*delta,0.8,150).toFixed(2));
+    return start ? {startWidth:width} : {endWidth:width};
+  }
   if (handle === "bend") {
     const dx = pointer.x - geometry.bend.x;
     const dy = pointer.y - geometry.bend.y;
