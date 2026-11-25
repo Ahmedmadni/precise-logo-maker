@@ -38,7 +38,7 @@ import { createConcentricGrid, createGrid, createSquareGrid, type Grid } from ".
 import { cleanStroke } from "../core/tracing/simplify";
 import type { GridCell } from "../grids/cells";
 import type { ReferenceImage } from "../objects/reference";
-import { booleanGeometry, type BooleanOp } from "../objects/boolean";
+import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 
 export type ToolId =
   "select" | "line" | "circle" | "arc" | "pen" | "brush" | "cell" | "polygon" | "measure" | "pan" | "lettering";
@@ -288,7 +288,7 @@ export interface StudioState {
   scaleSelection: (factor: number) => void;
   setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
   /** Pathfinder: combine the selected shapes into one outline. */
-  booleanSelection: (op: BooleanOp) => void;
+  booleanSelection: (op: BooleanOp) => {ok:true;count:number}|{ok:false;reason:"selection"|"invalid"|"holes"|"empty"|"complexity"|"protected"};
 
   setSnapEnabled: (enabled: boolean) => void;
   toggleSnapType: (type: SnapType) => void;
@@ -1154,13 +1154,13 @@ export const useStudio = create<StudioState>()((set, get) => {
     booleanSelection: (op) => {
       const ids = get().selection;
       const doc = get().doc;
-      const sources = doc.objects.filter((o) => ids.includes(o.id) && !o.locked);
-      if (sources.length < 2) return;
-      const parts = booleanGeometry(
-        sources.map((o) => o.geometry),
-        op,
-      );
-      if (parts.length === 0) return;
+      const sources = doc.objects.filter((o) => ids.includes(o.id));
+      if (sources.length < 2) return {ok:false,reason:"selection"};
+      if(sources.some(o=>o.locked||!o.visible||o.guide||o.cellKey!==undefined))return {ok:false,reason:"protected"};
+      const result=booleanGeometryChecked(sources.map(o=>o.geometry),op);
+      if(!result.ok)return result;
+      const parts=result.parts;
+      const sourceIds=new Set(sources.map(o=>o.id));
       const base = sources[0]!;
       const newIds: string[] = [];
       const labels: Record<BooleanOp, string> = {
@@ -1182,9 +1182,10 @@ export const useStudio = create<StudioState>()((set, get) => {
             cellKey: undefined,
           };
         });
-        return { ...d, objects: [...d.objects.filter((o) => !ids.includes(o.id)), ...made] };
+        return { ...d, objects: [...d.objects.filter((o) => !sourceIds.has(o.id)), ...made] };
       });
-      set({ selection: newIds });
+      set({ selection: newIds,pathControlSelection:null });
+      return {ok:true,count:parts.length};
     },
 
     setSelectionStyle: (patch, label = "Change style") => {
