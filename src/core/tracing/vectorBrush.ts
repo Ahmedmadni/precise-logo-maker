@@ -15,6 +15,8 @@ export interface BrushSettings {
   /** Minimum width ratio at zero stylus pressure; legacy presets use 30%. */
   pressureFloor?: number;
   nibRatio?: number;
+  /** Opt-in cubic boundary fitting, including saved vector geometry. */
+  smoothCurves?: boolean;
 }
 export interface BrushSample extends Point { pressure: number }
 
@@ -174,6 +176,7 @@ export function brushPressure(pointerPressure: number, pointerType: string): num
 
 export function brushIsValid(config: BrushSettings): boolean {
   return ["round", "qalam", "taper"].includes(config.preset) &&
+    (config.smoothCurves===undefined||typeof config.smoothCurves==="boolean") &&
     Number.isFinite(config.size) && config.size >= 1 && config.size <= 200 &&
     Number.isFinite(config.angle) && Math.abs(config.angle) <= 180 &&
     Number.isFinite(config.smoothing) && config.smoothing >= 0 && config.smoothing <= 0.9 &&
@@ -407,4 +410,11 @@ export function fitBrushCubics(path: PathGeometry): PathGeometry {
     return { control1: {x:a.x+t.x*k,y:a.y+t.y*k}, control2:{x:b.x-u.x*k,y:b.y-u.y*k} };
   });
   return { ...path, cubicSegments };
+}
+
+
+/** Final and preview strokes share the exact same optional fitting policy. */
+export function buildBrushStroke(samples:BrushSample[],settings:BrushSettings):PathGeometry|null{
+  const shape=vectorBrushOutline(samples,settings);
+  return shape&&settings.smoothCurves?fitBrushCubics(shape):shape;
 }
