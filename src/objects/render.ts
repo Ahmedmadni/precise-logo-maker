@@ -19,7 +19,9 @@ export const geometryToPathData = (g: Geometry): string => {
       const parts = rest.map(edge);
       if (g.closed && g.cubicSegments?.[g.points.length - 1]) parts.push(edge(first, g.points.length - 1));
       const body = parts.join(" ");
-      return `M ${f(first.x)} ${f(first.y)}${body ? ` ${body}` : ""}${g.closed ? " Z" : ""}`;
+      const outer=`M ${f(first.x)} ${f(first.y)}${body ? ` ${body}` : ""}${g.closed ? " Z" : ""}`;
+      const holes=g.closed?(g.holes??[]).filter(r=>r.length>=3).map(r=>`M ${f(r[0]!.x)} ${f(r[0]!.y)} ${r.slice(1).map(p=>`L ${f(p.x)} ${f(p.y)}`).join(" ")} Z`):[];
+      return [outer,...holes].join(" ");
     }
     case "circle": {
       const { center: c, radius: r } = g;
