@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {LetteringItem} from "./model";
-import {glyphLassoHits,groupMoveIds,translateGlyphSelection,glyphGroupPivot,transformGlyphSelection} from "./groupSelection";
+import {glyphLassoHits,groupMoveIds,translateGlyphSelection,glyphGroupPivot,transformGlyphSelection,arrangeGlyphSelection} from "./groupSelection";
 const glyph=(id:string,x:number):LetteringItem=>({id,kind:"outline",x,y:0,size:100,rotation:0,color:"#000",unitsPerEm:100,pathData:"M 0 0 L 10 0 L 10 10 L 0 10 Z"});
 const a=glyph("a",0),b=glyph("b",40);
 const mark:LetteringItem={id:"mark",kind:"haraka",x:5,y:-20,size:12,rotation:0,color:"#000",mark:"fatha",attachedToGlyphId:"a",anchorMode:"manual"};
@@ -59,5 +59,39 @@ describe("group similarity transforms",()=>{
     expect(transformGlyphSelection([{...a,size:900}],["a"],{scale:2,degrees:0})).toBeNull();
     const thick={...bridge,ribbon:{...bridge.ribbon!,startWidth:100}};
     expect(transformGlyphSelection([a,b,thick],["a","b"],{scale:2,degrees:0})).toBeNull();
+  });
+});
+
+
+describe("group outline alignment and distribution",()=>{
+  it("aligns real outline edges and translates attached marks by the same amount",()=>{
+    const raised={...b,y:20};
+    const result=arrangeGlyphSelection([a,raised,mark],["a","b"],"y","max");
+    expect(result.ok).toBe(true);
+    if(result.ok){
+      expect(result.items[0]?.y).toBeCloseTo(20);
+      expect(result.items[1]).toBe(raised);
+      expect(result.items[2]?.y).toBeCloseTo(0);
+    }
+  });
+  it("distributes unequal-width glyphs by gaps rather than centers",()=>{
+    const middle={...glyph("middle",15),size:200};
+    const right=glyph("right",80);
+    const result=arrangeGlyphSelection([a,middle,right],["a","middle","right"],"x","distribute");
+    expect(result.ok).toBe(true);
+    if(result.ok){
+      expect(result.gap).toBeCloseTo(25);
+      expect(result.items[0]).toBe(a);
+      expect(result.items[1]?.x).toBeCloseTo(35);
+      expect(result.items[2]).toBe(right);
+    }
+  });
+  it("refuses insufficient space rather than forcing overlapping gaps",()=>{
+    expect(arrangeGlyphSelection([a,glyph("c",3),glyph("d",6)],["a","c","d"],"x","distribute")).toEqual({ok:false,reason:"overlap"});
+  });
+  it("protects live joins when alignment would change their relative endpoints",()=>{
+    expect(arrangeGlyphSelection([a,b,bridge],["a","b"],"x","min")).toEqual({ok:false,reason:"bridge"});
+    const result=arrangeGlyphSelection([a,b,bridge],["a","b"],"y","min");
+    expect(result.ok&&result.changed).toBe(false);
   });
 });
