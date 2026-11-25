@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { FreePathLayoutPanel } from "./FreePathLayoutPanel";
 import { measureOpticalGaps, suggestOpticalArrangement } from "../../calligraphy/opticalSpacing";
-import { Minimize2, Maximize2, Spline, Sparkles } from "lucide-react";
+import { Minimize2, Maximize2, Spline, LayoutGrid, MoveHorizontal, Waypoints } from "lucide-react";
 import { letteringTransform, safePath, safeColor, type LetteringItem } from "../../calligraphy/model";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { outlineNodes } from "../../calligraphy/pathEditor";
@@ -48,6 +48,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const addLettering = useStudio((s) => s.addLettering);
   const commitPreview = useStudio((s) => s.commitLetteringPreview);
   const moveScope = useStudio((s) => s.letteringMoveScope);
+  const [section,setSection]=useState<"layout"|"spacing"|"paths"|"kashida">("layout");
   const [kashidaStyle, setKashidaStyle] = useState<KashidaStyle>("arch");
   const [kashidaLength, setKashidaLength] = useState(650);
   const [kashidaArch, setKashidaArch] = useState(110);
@@ -124,7 +125,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const [arrangementNotice, setArrangementNotice] = useState("");
   const [showGapAnalysis, setShowGapAnalysis] = useState(false);
   const [opticalStrength, setOpticalStrength] = useState(100);
-  const opticalProposal = useMemo(() => showGapAnalysis ? suggestOpticalArrangement(siblings, opticalStrength/100) : null, [showGapAnalysis, siblings, opticalStrength]);
+  const opticalProposal = useMemo(() => showGapAnalysis && section==="spacing" ? suggestOpticalArrangement(siblings, opticalStrength/100) : null, [showGapAnalysis, section, siblings, opticalStrength]);
   const applyOpticalArrangement = () => {
     commitPreview();
     const ids = new Set(siblings.map(item => item.id));
@@ -134,7 +135,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
     updateMany(proposed.patches, "موازنة الفراغات بين الحروف");
     setArrangementNotice("تم تطبيق توزيع قابل للتراجع.");
   };
-  const opticalGaps = useMemo(() => showGapAnalysis ? measureOpticalGaps(siblings) : [], [showGapAnalysis, siblings]);
+  const opticalGaps = useMemo(() => showGapAnalysis && section==="spacing" ? measureOpticalGaps(siblings) : [], [showGapAnalysis, section, siblings]);
   const onArrange = (mode: "equal-spacing" | "baseline" | "bounds") => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
@@ -158,12 +159,13 @@ export function KelkCompositionPanel({ selected, siblings }: {
   };
 
   return (
-    <details open className="space-y-2.5 rounded-lg border border-border bg-card/70 p-2.5">
-      <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-bold text-foreground">
-        <Sparkles className="h-3.5 w-3.5" />
-        تركيب كيلك: الميل والتراكب والكشيدة
-      </summary>
-
+    <section className="space-y-3 rounded-lg border border-border bg-card/70 p-2.5" aria-label="أدوات التكوين الخطاطي">
+      <nav className="grid grid-cols-2 gap-1.5" aria-label="مجموعات أدوات التكوين">
+        {([{id:"layout",label:"التركيب",icon:LayoutGrid},{id:"spacing",label:"التباعد",icon:MoveHorizontal},{id:"paths",label:"المسار الحر",icon:Waypoints},{id:"kashida",label:"الكشيدة",icon:Spline}] as const).map(({id,label,icon:Icon})=>
+          <button key={id} type="button" aria-pressed={section===id} onClick={()=>{commitPreview();setSection(id);}} className={`${btn} min-h-11 ${section===id?"border-primary bg-primary/15 font-semibold text-primary":""}`}><Icon className="h-4 w-4 shrink-0" aria-hidden="true"/>{label}</button>
+        )}
+      </nav>
+      <div className={section==="layout"?"space-y-3":"hidden"}>
       <div className="space-y-1.5">
         <span className="text-[11px] font-medium text-muted-foreground">
           قوالب ميل الخط ({moveScope === "word" && hasWordGroup ? "الكلمة كاملة" : "الحرف المحدد"})
@@ -184,7 +186,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
       </div>
 
       <div className="space-y-1.5 border-t border-border pt-2">
-        <span className="text-[11px] font-medium text-muted-foreground">تراكب وتداخل الكلمة</span>
+        <span className="text-[11px] font-medium text-muted-foreground">قوالب تركيب الكلمة</span>
         <label className="block space-y-1">
           <span className="flex justify-between text-[11px] text-muted-foreground">
             <span>شدة التركيب</span><span dir="ltr">{layoutIntensity.toFixed(2)}×</span>
@@ -227,7 +229,12 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </button>
           ))}
         </div>
+      </div>
+      </div>
+      <div className={section==="paths"?"space-y-2":"hidden"}>
         <FreePathLayoutPanel siblings={siblings}/>
+      </div>
+      <div className={section==="spacing"?"space-y-2":"hidden"}>
         <div className="grid grid-cols-2 gap-1">
           <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onArrange("baseline")}>محاذاة السطر</button>
           <button type="button" className={btn} disabled={siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length < 3} onClick={() => onArrange("equal-spacing")}>توزيع المراسي</button>
@@ -277,7 +284,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-border pt-2">
+      <div className={section==="kashida"?"space-y-2":"hidden"}>
         <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
           <Spline className="h-3.5 w-3.5" /> كشيدة خطّية قابلة للتعديل
         </span>
@@ -381,6 +388,6 @@ export function KelkCompositionPanel({ selected, siblings }: {
           {connectionError && <p role="alert" className="text-xs text-destructive">تعذر إنشاء الوصلة. راجع نقطتي الاتصال والمسافة بين الحرفين.</p>}
         </div>}
       </div>
-    </details>
+    </section>
   );
 }
