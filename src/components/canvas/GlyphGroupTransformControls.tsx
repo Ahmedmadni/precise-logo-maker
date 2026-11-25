@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {useStudio} from "../../store/studioStore";
-import {glyphGroupPivot,groupMoveIds,transformGlyphSelection,arrangeGlyphSelection,type GlyphArrangeAxis,type GlyphArrangeMode} from "../../calligraphy/groupSelection";
+import {glyphGroupPivot,groupMoveIds,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,glyphOverlapCandidates,type GlyphArrangeAxis,type GlyphArrangeMode} from "../../calligraphy/groupSelection";
 import {preciseGlyphBounds} from "../../calligraphy/morph";
 import {LetteringGlyph} from "./LetteringGlyph";
 
@@ -9,11 +9,13 @@ export function GlyphGroupTransformControls(){
   const ids=useStudio(s=>s.glyphMultiIds);
   const apply=useStudio(s=>s.transformGlyphMulti);
   const applyArrangement=useStudio(s=>s.arrangeGlyphMulti);
+  const applySpacing=useStudio(s=>s.spaceGlyphMulti);
   const guideEdit=useStudio(s=>s.guideLayer.edit);
   const [open,setOpen]=useState(false);
-  const [tab,setTab]=useState<"transform"|"arrange">("transform");
+  const [tab,setTab]=useState<"transform"|"arrange"|"spacing">("transform");
   const [axis,setAxis]=useState<GlyphArrangeAxis>("x");
   const [mode,setMode]=useState<GlyphArrangeMode>("distribute");
+  const [gap,setGap]=useState("0");
   const [scale,setScale]=useState(100);
   const [degrees,setDegrees]=useState(0);
   const [notice,setNotice]=useState("");
@@ -21,7 +23,10 @@ export function GlyphGroupTransformControls(){
   const allowed=groupMoveIds(source,ids);
   const pivot=glyphGroupPivot(source,ids);
   const arrangement=open&&tab==="arrange"?arrangeGlyphSelection(source,ids,axis,mode):null;
-  const next=open?(tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
+  const spacing=open&&tab==="spacing"?spaceGlyphSelection(source,ids,axis,gap.trim()?Number(gap):NaN):null;
+  const beforeOverlaps=open&&tab==="spacing"?glyphOverlapCandidates(source,ids):[];
+  const afterOverlaps=spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[];
+  const next=open?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
   const visible=(next??source).filter(i=>!i.hidden&&((ids.includes(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&ids.includes(i.attachedToGlyphId))||i.kind==="bridge"&&i.ribbon&&ids.includes(i.ribbon.sourceGlyphId)&&ids.includes(i.ribbon.targetGlyphId)));
   const boxes=[...source,...(next??[])].filter(i=>ids.includes(i.id)).map(preciseGlyphBounds).filter((b):b is NonNullable<typeof b>=>!!b);
   const minX=Math.min(...boxes.map(b=>b.x)),minY=Math.min(...boxes.map(b=>b.y)),maxX=Math.max(...boxes.map(b=>b.x+b.width)),maxY=Math.max(...boxes.map(b=>b.y+b.height));
@@ -30,8 +35,23 @@ export function GlyphGroupTransformControls(){
   return <div className="mt-1 border-t border-border pt-1">
     <button type="button" className="min-h-9 w-full rounded border border-border text-xs" aria-expanded={open} onClick={()=>{setOpen(!open);setNotice("");}}>تنسيق الحروف ({ids.length})</button>
     {open&&<div className="max-h-[35dvh] w-full max-w-[300px] space-y-1 overflow-y-auto pt-2">
-      <div className="grid grid-cols-2 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة والتوزيع"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
-      {tab==="arrange"?<>
+      <div className="grid grid-cols-3 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة"},{id:"spacing",label:"التداخل"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
+      {tab==="spacing"?<>
+        <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>setAxis(v.id)}>{v.label}</button>)}</div>
+        <label className="block text-xs">الفاصل بين الحدود (px)<input type="number" value={gap} step={1} min={-10000} max={10000} onChange={e=>{setGap(e.target.value);setNotice("");}} className="min-h-10 w-full rounded border border-border bg-background px-2" dir="ltr"/></label>
+        <div className="grid grid-cols-3 gap-1">{[-5,0,5].map(v=><button type="button" key={v} className="min-h-9 rounded border border-border text-xs" onClick={()=>setGap(String(v))}>{v===-5?"تراكب":v===0?"تماس":"فصل"}</button>)}</div>
+        {boxes.length>0&&<svg viewBox={viewBox} className="h-28 w-full rounded border border-border bg-background" aria-label="معاينة التداخل">
+          {visible.map(i=><LetteringGlyph key={i.id} item={i} selected={false} allItems={next??source}/>)}
+          {(spacing?.ok?afterOverlaps:beforeOverlaps).slice(0,100).map((b,i)=><rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="#f59e0b" fillOpacity=".18" stroke="#f59e0b" strokeDasharray="3 2" vectorEffect="non-scaling-stroke"/>)}
+        </svg>}
+        <p className="text-xs">تداخلات الحدود: {beforeOverlaps.length}{spacing?.ok?` ← ${afterOverlaps.length}`:""}</p>
+        {spacing&&!spacing.ok&&<p className="text-xs text-muted-foreground">{{selection:"حدد حرفين على الأقل وحتى 400 حرف.",bridge:"التباعد يغير وصلة حية؛ ألغِ الوصلة أولًا أو حافظ على ترتيبها.",overlap:"التراكب كبير ويعكس ترتيب الحروف.",invalid:"أدخل مسافة صالحة."}[spacing.reason]}</p>}
+        <div className="grid grid-cols-2 gap-1">
+          <button type="button" disabled={!spacing?.ok||!spacing.changed||guideEdit} className="min-h-10 rounded bg-primary text-xs text-primary-foreground disabled:opacity-40" onClick={()=>{if(applySpacing(source,ids,axis,Number(gap)))setOpen(false);else setNotice("تعذر اعتماد التباعد.");}}>اعتماد</button>
+          <button type="button" className="min-h-10 rounded border border-border text-xs" onClick={()=>setOpen(false)}>إلغاء</button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">القيم السالبة تراكب مقصود. المناطق الملونة تداخل مستطيلات الحدود، لا اصطدام الحبر نفسه. تبقى نقطة منتصف المجموعة ثابتة.</p>
+      </>:tab==="arrange"?<>
         <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setAxis(v.id);setNotice("");}}>{v.label}</button>)}</div>
         <div className="grid grid-cols-2 gap-1">{([{id:"min",label:axis==="x"?"يسار":"أعلى"},{id:"center",label:"منتصف"},{id:"max",label:axis==="x"?"يمين":"أسفل"},{id:"distribute",label:"مسافات متساوية"}] as const).map(v=><button type="button" key={v.id} aria-pressed={mode===v.id} disabled={ids.length<(v.id==="distribute"?3:2)} className={`min-h-10 rounded border text-xs disabled:opacity-40 ${mode===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setMode(v.id);setNotice("");}}>{v.label}</button>)}</div>
         {boxes.length>0&&<svg viewBox={viewBox} className="h-24 w-full rounded border border-border bg-background" aria-label="معاينة المحاذاة والتوزيع">
