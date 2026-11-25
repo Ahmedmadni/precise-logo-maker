@@ -167,6 +167,8 @@ export interface StudioState {
   letteringPreview: { id: string; patch: Partial<LetteringItem> } | null;
   setLetteringPreview: (id: string, patch: Partial<LetteringItem>) => void;
   commitLetteringPreview: () => void;
+  pathControlSelection: {objectId:string;edge:number;mode:"free"|"aligned"|"symmetric"} | null;
+  setPathControlSelection: (value:StudioState["pathControlSelection"])=>void;
   editGlyphNodes: boolean;
   setEditGlyphNodes: (editing: boolean) => void;
   showAllGlyphNodes: boolean;
@@ -369,6 +371,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    pathControlSelection:null,
+    setPathControlSelection:(pathControlSelection)=>set({pathControlSelection}),
     letteringMoveScope: "glyph",
     glyphInspectorTab: "basic",
     setGlyphInspectorTab: (glyphInspectorTab) => {
@@ -679,7 +683,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     brush: DEFAULT_BRUSH,
     setBrush: (patch) => set((s) => ({ brush: { ...s.brush, ...patch } })),
     setView: (view) => set({ view }),
-    setTool: (tool) => set({ tool }),
+    setTool: (tool) => set((s)=>({ tool, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
     setCursor: (cursor) => set({ cursor }),
     viewport: { width: 1200, height: 800 },
     setViewport: (viewport) => set({ viewport }),
@@ -936,7 +940,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     setSelection: (ids) => {
       get().commitLetteringPreview();
       set({
-        selection: ids, selectedLetteringId: null, selectedGlyphNodeId: null,
+        selection: ids, pathControlSelection:null, selectedLetteringId: null, selectedGlyphNodeId: null,
         selectedContourIndex: null, editGlyphNodes: false,
         editGlyphContours: false, editJoinAnchors: false,
       });
@@ -952,7 +956,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           : [...s.selection, id],
       }));
     },
-    clearSelection: () => set({ selection: [] }),
+    clearSelection: () => set({ selection: [],pathControlSelection:null }),
 
     translateSelection: (dx, dy) => {
       const ids = get().selection;
