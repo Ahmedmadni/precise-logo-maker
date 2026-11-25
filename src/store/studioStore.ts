@@ -43,6 +43,7 @@ import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
 import { nudgePathNodes } from "../editor/path-nodes";
+import {translateGlyphSelection} from "../calligraphy/groupSelection";
 import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
 
 export type ToolId =
@@ -172,6 +173,11 @@ export interface StudioState {
   letteringPreview: { id: string; patch: Partial<LetteringItem> } | null;
   setLetteringPreview: (id: string, patch: Partial<LetteringItem>) => void;
   commitLetteringPreview: () => void;
+  glyphLassoActive:boolean;
+  glyphMultiIds:string[];
+  setGlyphLassoActive:(active:boolean)=>void;
+  setGlyphMultiIds:(ids:string[])=>void;
+  moveGlyphMulti:(source:LetteringItem[],ids:string[],dx:number,dy:number)=>boolean;
   nodeLassoTargetId:string|null;
   pathNodeSelection:{objectId:string;geometry:PathGeometry;indices:number[]}|null;
   setNodeLassoTarget:(id:string|null)=>void;
@@ -388,9 +394,24 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    glyphLassoActive:false,
+    glyphMultiIds:[],
+    setGlyphLassoActive:(active)=>{
+      get().commitLetteringPreview();
+      set({glyphLassoActive:active,glyphMultiIds:[],lassoActive:active,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null,tool:"select",selection:[],selectedLetteringId:null,selectedGlyphNodeId:null,selectedContourIndex:null,editGlyphNodes:false,editGlyphContours:false,editJoinAnchors:false,joinGuide:null});
+    },
+    setGlyphMultiIds:(ids)=>set({glyphMultiIds:[...new Set(ids)]}),
+    moveGlyphMulti:(source,ids,dx,dy)=>{
+      const s=get();
+      if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
+      const next=translateGlyphSelection(source,ids,dx,dy);
+      if(!next)return false;
+      commit("Move selected Arabic glyphs",d=>({...d,lettering:next}));
+      return true;
+    },
     nodeLassoTargetId:null,
     pathNodeSelection:null,
-    setNodeLassoTarget:(nodeLassoTargetId)=>set({nodeLassoTargetId,lassoActive:!!nodeLassoTargetId,tool:"select",knifeTargetId:null,pathControlSelection:null}),
+    setNodeLassoTarget:(nodeLassoTargetId)=>set({nodeLassoTargetId,glyphLassoActive:false,glyphMultiIds:[],lassoActive:!!nodeLassoTargetId,tool:"select",knifeTargetId:null,pathControlSelection:null}),
     setPathNodeSelection:(pathNodeSelection)=>set({pathNodeSelection}),
     moveSelectedPathNodes:(objectId,source,indices,dx,dy)=>{
       const s=get(),o=s.doc.objects.find(o=>o.id===objectId);
@@ -402,9 +423,9 @@ export const useStudio = create<StudioState>()((set, get) => {
       return true;
     },
     lassoActive:false,
-    setLassoActive:(lassoActive)=>set({lassoActive,nodeLassoTargetId:null,pathNodeSelection:null,tool:"select",knifeTargetId:null,pathControlSelection:null}),
+    setLassoActive:(lassoActive)=>set({lassoActive,glyphLassoActive:false,glyphMultiIds:[],nodeLassoTargetId:null,pathNodeSelection:null,tool:"select",knifeTargetId:null,pathControlSelection:null}),
     knifeTargetId:null,
-    setKnifeTargetId:(knifeTargetId)=>set({knifeTargetId,tool:"select",lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,pathControlSelection:null}),
+    setKnifeTargetId:(knifeTargetId)=>set({knifeTargetId,tool:"select",glyphLassoActive:false,glyphMultiIds:[],lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,pathControlSelection:null}),
     pathControlSelection:null,
     setPathControlSelection:(pathControlSelection)=>set({pathControlSelection}),
     letteringMoveScope: "glyph",
@@ -479,7 +500,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     selectLettering: (id) => {
       if (get().selectedLetteringId !== id) get().commitLetteringPreview();
       set({
-        selectedLetteringId: id, selection: [], selectedGlyphNodeId: null,
+        selectedLetteringId: id, selection: [], glyphLassoActive:false,glyphMultiIds:[],lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null, selectedGlyphNodeId: null,
         selectedContourIndex: null, letteringPreview: null,
         editGlyphNodes: false, editGlyphContours: false, editJoinAnchors: false,
         joinGuide: null,
@@ -717,7 +738,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     brush: DEFAULT_BRUSH,
     setBrush: (patch) => set((s) => ({ brush: { ...s.brush, ...patch } })),
     setView: (view) => set({ view }),
-    setTool: (tool) => set((s)=>({ tool, lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
+    setTool: (tool) => set((s)=>({ tool, glyphLassoActive:false,glyphMultiIds:[],lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
     setCursor: (cursor) => set({ cursor }),
     viewport: { width: 1200, height: 800 },
     setViewport: (viewport) => set({ viewport }),
@@ -974,7 +995,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     setSelection: (ids) => {
       get().commitLetteringPreview();
       set({
-        selection: ids, nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null, selectedLetteringId: null, selectedGlyphNodeId: null,
+        selection: ids, glyphLassoActive:false,glyphMultiIds:[],nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null, selectedLetteringId: null, selectedGlyphNodeId: null,
         selectedContourIndex: null, editGlyphNodes: false,
         editGlyphContours: false, editJoinAnchors: false,
       });
