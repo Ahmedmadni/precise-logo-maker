@@ -120,3 +120,43 @@ export const GUIDE_PRESETS:{name:string;guide:GuideChain}[]=[
   {name:"قوس سفلي",guide:[{x:90,y:30},{x:75,y:95},{x:25,y:95},{x:10,y:30}]},
   {name:"قطري",guide:[{x:90,y:15},{x:65,y:35},{x:35,y:65},{x:10,y:85}]},
 ];
+
+
+/** Translate complete word groups along a guide in explicit selection order.
+ * No individual glyph rotation or resizing: relative geometry stays intact.
+ * The store handles attached marks and dynamic ribbon paths after the move.
+ */
+export function composeWordGroupsOnPath(items:LetteringItem[],groupIds:string[],guide:GuideChain,options:FreePathOptions):LetteringPatchEntry[]{
+  const ids=[...new Set(groupIds)];
+  if(ids.length<2||ids.length>30||!Number.isFinite(options.scale))return [];
+  const groups=ids.map(id=>items.filter(g=>g.groupId===id));
+  const metrics=groups.map(group=>{
+    const visible=group.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text"));
+    if(!visible.length||visible.some(g=>g.kind!=="outline"||!g.pathData))return null;
+    const bounds=visible.map(preciseGlyphBounds);
+    if(bounds.some(b=>!b))return null;
+    const left=Math.min(...bounds.map(b=>b!.x)),right=Math.max(...bounds.map(b=>b!.x+b!.width));
+    const top=Math.min(...bounds.map(b=>b!.y)),bottom=Math.max(...bounds.map(b=>b!.y+b!.height));
+    return {x:(left+right)/2,y:(top+bottom)/2,diameter:Math.hypot(right-left,bottom-top)};
+  });
+  if(metrics.some(m=>!m||!Number.isFinite(m.diameter)||m.diameter<=0))return [];
+  const samples=sampleGuide(guide,ids.length,options.margin,options.reverse);
+  if(samples.length!==ids.length)return [];
+  const cx=metrics.reduce((s,m)=>s+m!.x,0)/ids.length,cy=metrics.reduce((s,m)=>s+m!.y,0)/ids.length;
+  const mx=samples.reduce((s,p)=>s+p.point.x,0)/ids.length,my=samples.reduce((s,p)=>s+p.point.y,0)/ids.length;
+  const scale=Math.max(...metrics.map(m=>m!.diameter))*ids.length/100*Math.max(.5,Math.min(3,options.scale));
+  const patches:LetteringPatchEntry[]=[];
+  for(let i=0;i<groups.length;i++){
+    const dx=cx+(samples[i]!.point.x-mx)*scale-metrics[i]!.x;
+    const dy=cy+(samples[i]!.point.y-my)*scale-metrics[i]!.y;
+    if(![dx,dy].every(Number.isFinite))return [];
+    for(const g of groups[i]!){
+      // Attached harakat follow their anchors in relayoutHarakat; ribbons are
+      // world-space links and do not need coordinate patches.
+      if(g.kind==="bridge"||(g.kind==="haraka"&&g.attachedToGlyphId))continue;
+      if(![g.x,g.y].every(Number.isFinite))return [];
+      patches.push({id:g.id,patch:{x:g.x+dx,y:g.y+dy}});
+    }
+  }
+  return patches;
+}
