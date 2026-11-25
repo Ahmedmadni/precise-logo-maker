@@ -60,6 +60,8 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const [orbitStart, setOrbitStart] = useState(-90);
   const [orbitClockwise, setOrbitClockwise] = useState(false);
   const [orbitTangent, setOrbitTangent] = useState(false);
+  const [orbitEqualArc, setOrbitEqualArc] = useState(true);
+  const [orbitUpright, setOrbitUpright] = useState(true);
   const [spacingStep, setSpacingStep] = useState(6);
   const kashidaOptions = {
     length: kashidaLength,
@@ -114,7 +116,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
     const ids = new Set((hasWordGroup ? siblings : [selected]).map(item => item.id));
-    const patches = composeWordLayout(latest.filter(item => ids.has(item.id) && !item.hidden), style, layoutIntensity, { aspect:orbitAspect, radiusScale:orbitRadius, startAngle:orbitStart, clockwise:orbitClockwise, tangent:orbitTangent });
+    const patches = composeWordLayout(latest.filter(item => ids.has(item.id) && !item.hidden), style, layoutIntensity, { aspect:orbitAspect, radiusScale:orbitRadius, startAngle:orbitStart, clockwise:orbitClockwise, tangent:orbitTangent, equalArc:orbitEqualArc, keepUpright:orbitUpright });
     if (patches.length) updateMany(patches, label);
   };
 
@@ -206,7 +208,9 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </label>
             <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitClockwise} onChange={e=>setOrbitClockwise(e.target.checked)}/> مع عقارب الساعة</label>
             <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitTangent} onChange={e=>setOrbitTangent(e.target.checked)}/> تدوير الحروف وفق مماس المسار</label>
-            <p className="text-[11px] text-muted-foreground">تطبق الإعدادات عند اختيار التركيب الدائري أو البيضاوي؛ وقد تنقلب بعض الحروف عند اختيار اتجاه المماس.</p>
+            <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitEqualArc} onChange={e=>setOrbitEqualArc(e.target.checked)}/> توزيع متساوٍ حسب طول القوس البيضاوي</label>
+            <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitUpright} disabled={!orbitTangent} onChange={e=>setOrbitUpright(e.target.checked)}/> منع دوران الحروف رأسًا على عقب</label>
+            <p className="text-[11px] text-muted-foreground">تطبق الإعدادات عند اختيار التركيب الدائري أو البيضاوي. مساواة طول القوس لا تعني مساواة الفراغ بين حواف الحروف المختلفة.</p>
           </div>
         </details>
         <div className="grid grid-cols-2 gap-1">
