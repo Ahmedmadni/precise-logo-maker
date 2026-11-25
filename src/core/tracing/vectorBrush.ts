@@ -1,6 +1,7 @@
 import type { Point, PathGeometry } from "../geometry/types";
 
 export type BrushPreset = "round" | "qalam" | "taper";
+export type BrushNibShape = "chisel" | "ellipse" | "square";
 export type BrushEndStyle = "flat" | "soft" | "sharp";
 export interface BrushSettings {
   preset: BrushPreset;
@@ -15,6 +16,8 @@ export interface BrushSettings {
   /** Minimum width ratio at zero stylus pressure; legacy presets use 30%. */
   pressureFloor?: number;
   nibRatio?: number;
+  /** Optional nib geometry; absent means the original chisel. */
+  nibShape?: BrushNibShape;
   /** Opt-in cubic boundary fitting, including saved vector geometry. */
   smoothCurves?: boolean;
 }
@@ -189,6 +192,7 @@ export function brushIsValid(config: BrushSettings): boolean {
     (config.pressureCurve === undefined || ["soft", "linear", "firm"].includes(config.pressureCurve)) &&
     (config.pressureFloor === undefined || (Number.isFinite(config.pressureFloor) && config.pressureFloor >= 0.05 && config.pressureFloor <= 1)) &&
     typeof config.pressure === "boolean" &&
+    (config.nibShape === undefined || ["chisel","ellipse","square"].includes(config.nibShape)) &&
     (config.nibRatio === undefined || (Number.isFinite(config.nibRatio) && config.nibRatio >= 0.05 && config.nibRatio <= 0.8)) &&
     /^#[0-9a-fA-F]{6}$/.test(config.color);
 }
@@ -283,6 +287,14 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
     }
     // A chisel makes a short angled nib imprint rather than a round dot.
     const thin = Math.max(0.2, radius * (settings.nibRatio ?? 0.18));
+    if (settings.nibShape === "ellipse" || settings.nibShape === "square") {
+      const uv = settings.nibShape === "ellipse"
+        ? Array.from({length:24},(_,i)=>{const t=i*2*Math.PI/24;return [radius*Math.cos(t),thin*Math.sin(t)];})
+        : [[radius,thin],[-radius,thin],[-radius,-thin],[radius,-thin]];
+      return {kind:"path",closed:true,points:uv.map(([u,v])=>({
+        x:point.x+along.x*u!+across.x*v!,y:point.y+along.y*u!+across.y*v!,
+      }))};
+    }
     const points = [
       [radius, thin * 0.55], [radius * 0.82, thin], [-radius * 0.82, thin], [-radius, thin * 0.55],
       [-radius, -thin * 0.55], [-radius * 0.82, -thin], [radius * 0.82, -thin], [radius, -thin * 0.55],
@@ -351,7 +363,12 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
       // does not create a sharp kink in a broad-nib stroke.
       const epsilon = 0.025;
       const response = (Math.hypot(alignment,epsilon)-epsilon)/(Math.hypot(1,epsilon)-epsilon);
-      halfWidth *= ratio + (1 - ratio) * response;
+      const perpendicularAlignment = Math.abs((-normal.x*nibEdge.y + normal.y*nibEdge.x)/mag);
+      const across = clamp(perpendicularAlignment,0,1);
+      const shape = settings.nibShape ?? "chisel";
+      halfWidth *= shape === "ellipse" ? Math.hypot(alignment, ratio*across)
+        : shape === "square" ? alignment + ratio*across
+        : ratio + (1 - ratio) * response;
     } else if (settings.preset === "taper") {
       const t = cumulative[i]! / strokeLength;
       halfWidth *= 0.16 + 0.84 * Math.pow(Math.sin(Math.PI * t), 0.5);
