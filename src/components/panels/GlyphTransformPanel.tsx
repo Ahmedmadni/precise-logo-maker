@@ -12,6 +12,7 @@ import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
 import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 import { GlyphNodeTopologyActions } from "./GlyphNodeTopologyActions";
 import { KelkCompositionPanel } from "./KelkCompositionPanel";
+import { DecorationPlacementPanel } from "./DecorationPlacementPanel";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
@@ -196,6 +197,7 @@ export function GlyphTransformPanel({ selected, siblings }: {
         </label>
       )}
       <GlyphAnchorInspector selected={selected} />
+      {(selected.kind==="haraka"||selected.kind==="ornament")&&<DecorationPlacementPanel key={selected.id} selected={selected}/>}
       <label className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border px-3 text-xs font-semibold">
         لون العنصر
         <input type="color" className="h-10 w-20 cursor-pointer rounded-lg border border-border bg-background p-1"
