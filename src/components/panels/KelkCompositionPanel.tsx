@@ -59,12 +59,14 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const target = eligibleTargets.find(item => item.id === targetId);
   const [connectionError, setConnectionError] = useState(false);
   const [autoFitCaps, setAutoFitCaps] = useState(false);
+  const [nibAngle, setNibAngle] = useState(35);
+  const [nibContrast, setNibContrast] = useState(0);
   const insertConnected = () => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
     const source = latest.find(item => item.id === selected.id);
     const destination = latest.find(item => item.id === targetId);
-    const item = source && destination ? createConnectedKashida(source, destination, kashidaOptions) : null;
+    const item = source && destination ? createConnectedKashida(source, destination, { ...kashidaOptions, nibAngle, nibContrast: nibContrast / 100 }) : null;
     setConnectionError(!item);
     if (item) {
       const fit = autoFitCaps ? suggestRibbonCapFit(item, latest) : null;
@@ -218,6 +220,27 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </select>
           </label>
           <p className="text-[11px] leading-5 text-muted-foreground">الطول حسب المسافة بين نقطتي الخروج والدخول. تبقى الوصلة مرتبطة بالحرفين عند تحريكهما.</p>
+          <details className="rounded-lg border border-border p-2">
+            <summary className="cursor-pointer py-2 text-xs font-medium">سن القلم وتفاوت السماكة</summary>
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-3 gap-1">
+                {[{label:"محايد",angle:35,contrast:0},{label:"قلم عريض",angle:45,contrast:45},{label:"قلم مائل",angle:60,contrast:60}].map(preset => (
+                  <button type="button" key={preset.label} className={btn}
+                    aria-pressed={nibAngle === preset.angle && nibContrast === preset.contrast}
+                    onClick={() => { setNibAngle(preset.angle); setNibContrast(preset.contrast); }}>{preset.label}</button>
+                ))}
+              </div>
+              <label className="block space-y-1 text-xs">
+                <span className="flex justify-between"><span>زاوية السن</span><span dir="ltr">{nibAngle}°</span></span>
+                <input type="range" min={-180} max={180} step={5} value={nibAngle} onChange={e => setNibAngle(Number(e.target.value))} className="w-full" />
+              </label>
+              <label className="block space-y-1 text-xs">
+                <span className="flex justify-between"><span>تفاوت السماكة</span><span dir="ltr">{nibContrast}%</span></span>
+                <input type="range" min={0} max={80} step={5} value={nibContrast} onChange={e => setNibContrast(Number(e.target.value))} className="w-full" />
+              </label>
+              <p className="text-[11px] leading-5 text-muted-foreground">يؤثر سن القلم على عرض الوصلة بين طرفيها دون تغيير السماكة المحددة عند الاتصال. هذه الإعدادات تخص الوصلة المرتبطة فقط.</p>
+            </div>
+          </details>
           <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-2 text-xs">
             <input type="checkbox" checked={autoFitCaps} onChange={e => setAutoFitCaps(e.target.checked)} />
             مطابقة سُمك واتجاه الطرفين تلقائيًا
