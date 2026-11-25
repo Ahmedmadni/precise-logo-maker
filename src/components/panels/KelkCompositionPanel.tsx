@@ -7,6 +7,7 @@ import { buildRibbonPath } from "../../calligraphy/ribbonJoin";
 import {
   KELK_SLANT_PRESETS,
   adjustGroupOverlap,
+  arrangeWordAnchors,
   applyGroupSlant,
   composeWordLayout,
   createKashidaItem,
@@ -105,6 +106,14 @@ export function KelkCompositionPanel({ selected, siblings }: {
     if (patches.length) updateMany(patches, label);
   };
 
+  const onArrange = (mode: "equal-spacing" | "baseline") => {
+    commitPreview();
+    const latest = useStudio.getState().doc.lettering ?? [];
+    const ids = new Set(siblings.map(item => item.id));
+    const patches = arrangeWordAnchors(latest.filter(item => ids.has(item.id)), mode);
+    if (patches.length) updateMany(patches, mode === "baseline" ? "محاذاة السطر" : "توزيع الحروف");
+  };
+
   const onOverlap = (deltaPx: number) => {
     commitPreview();
     const patches = adjustGroupOverlap(siblings.filter(item => !item.hidden), deltaPx);
@@ -164,6 +173,11 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </button>
           ))}
         </div>
+        <div className="grid grid-cols-2 gap-1">
+          <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onArrange("baseline")}>محاذاة السطر</button>
+          <button type="button" className={btn} disabled={siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length < 3} onClick={() => onArrange("equal-spacing")}>توزيع المراسي</button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">التوزيع يساوي المسافات بين مراسي الحروف، وليس الفراغ البصري بين حوافها.</p>
         <label className="block space-y-1">
           <span className="flex justify-between text-[11px] text-muted-foreground">
             <span>خطوة التباعد</span><span dir="ltr">{spacingStep} px</span>
