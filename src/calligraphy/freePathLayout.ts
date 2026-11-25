@@ -20,7 +20,7 @@ export function splitGuideSegment(chain:GuideChain,index:number):GuideChain{
   const ab=mid(a,b),bc=mid(b,c),cd=mid(c,d),abc=mid(ab,bc),bcd=mid(bc,cd),m=mid(abc,bcd);
   return [...chain.slice(0,offset),a,ab,abc,m,bcd,cd,d,...chain.slice(offset+4)];
 }
-export function sampleGuide(chain:GuideChain,count:number,margin=0,reverse=false):{point:GuidePoint;angle:number}[]{
+export function sampleGuide(chain:GuideChain,count:number,margin=0,reverse=false,fractions?:number[]):{point:GuidePoint;angle:number}[]{
   if(!Number.isInteger(count)||count<2||count>200||!Number.isFinite(margin)||
      chain.length<4||chain.length>25||(chain.length-1)%3!==0||
      chain.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))return [];
@@ -34,9 +34,11 @@ export function sampleGuide(chain:GuideChain,count:number,margin=0,reverse=false
   const length=distances.at(-1)!;
   if(!Number.isFinite(length)||length<1e-6)return [];
   const inset=Math.max(0,Math.min(.45,margin));
+  if(fractions&&(fractions.length!==count||fractions.some((v,i)=>!Number.isFinite(v)||v<0||v>1||(i>0&&v<fractions[i-1]!))))return [];
+  const positions=fractions?(reverse?[...fractions].reverse().map(v=>1-v):fractions):Array.from({length:count},(_,i)=>i/(count-1));
   let j=1;
   const samples=Array.from({length:count},(_,i)=>{
-    const d=length*(inset+(1-2*inset)*i/(count-1));
+    const d=length*(inset+(1-2*inset)*positions[i]!);
     while(j<points.length-1&&(distances[j]!<d||distances[j]===distances[j-1]))j++;
     const span=distances[j]!-distances[j-1]!;
     const t=span>0?(d-distances[j-1]!)/span:0;
@@ -49,7 +51,7 @@ export function sampleGuide(chain:GuideChain,count:number,margin=0,reverse=false
   return reverse?samples.reverse():samples;
 }
 
-export interface FreePathOptions {scale:number;margin:number;reverse:boolean;tangent:boolean;upright:boolean}
+export interface FreePathOptions {scale:number;margin:number;reverse:boolean;tangent:boolean;upright:boolean;sizeAware?:boolean;wordGap?:number}
 export function composeFreePath(items:LetteringItem[],guide:GuideChain,options:FreePathOptions):LetteringPatchEntry[]{
   const glyphs=items.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text"));
   if(glyphs.length<2||glyphs.length>200||glyphs.some(g=>g.kind!=="outline"||!g.pathData)||!Number.isFinite(options.scale))return [];
@@ -141,7 +143,9 @@ export function composeWordGroupsOnPath(items:LetteringItem[],groupIds:string[],
     return {x:(left+right)/2,y:(top+bottom)/2,diameter:Math.hypot(right-left,bottom-top)};
   });
   if(metrics.some(m=>!m||!Number.isFinite(m.diameter)||m.diameter<=0))return [];
-  const samples=sampleGuide(guide,ids.length,options.margin,options.reverse);
+  const diameters=metrics.map(m=>m!.diameter);
+  const fractions=options.sizeAware?wordSpacingFractions(diameters,options.wordGap):undefined;
+  const samples=sampleGuide(guide,ids.length,options.margin,options.reverse,fractions);
   if(samples.length!==ids.length)return [];
   const cx=metrics.reduce((s,m)=>s+m!.x,0)/ids.length,cy=metrics.reduce((s,m)=>s+m!.y,0)/ids.length;
   const mx=samples.reduce((s,p)=>s+p.point.x,0)/ids.length,my=samples.reduce((s,p)=>s+p.point.y,0)/ids.length;
@@ -177,4 +181,37 @@ export function composeWordGroupsOnPath(items:LetteringItem[],groupIds:string[],
     }
   }
   return patches;
+}
+
+
+/** Relative center spacing based on conservative word outline diameters.
+ * A larger word gets more path length on both sides. */
+export function wordSpacingFractions(diameters:number[],gap=0.2):number[]{
+  if(diameters.length<2||diameters.some(d=>!Number.isFinite(d)||d<=0)||!Number.isFinite(gap))return [];
+  const average=diameters.reduce((s,d)=>s+d,0)/diameters.length;
+  const extra=average*Math.max(0,Math.min(1,gap));
+  const distances=[0];
+  for(let i=1;i<diameters.length;i++)distances.push(distances[i-1]!+(diameters[i-1]!+diameters[i]!)/2+extra);
+  const total=distances.at(-1)!;
+  return Number.isFinite(total)&&total>0?distances.map(d=>d/total):[];
+}
+
+/** Axis-aligned group outline envelopes, not filled-shape intersections.
+ * Decorations, stroke expansion, bridges and other artboard objects are excluded. */
+export function wordEnvelopeOverlaps(items:LetteringItem[]):{first:string;second:string}[]{
+  const boxes=new Map<string,{left:number;right:number;top:number;bottom:number}>();
+  for(const g of items){
+    if(!g.groupId||g.hidden||g.kind!=="outline")continue;
+    const b=preciseGlyphBounds(g);
+    if(!b)continue;
+    const old=boxes.get(g.groupId);
+    boxes.set(g.groupId,{left:Math.min(old?.left??Infinity,b.x),right:Math.max(old?.right??-Infinity,b.x+b.width),
+      top:Math.min(old?.top??Infinity,b.y),bottom:Math.max(old?.bottom??-Infinity,b.y+b.height)});
+  }
+  const entries=[...boxes.entries()],overlaps:{first:string;second:string}[]=[];
+  for(let i=0;i<entries.length;i++)for(let j=i+1;j<entries.length;j++){
+    const [first,a]=entries[i]!,[second,b]=entries[j]!;
+    if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>.01&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.01)overlaps.push({first,second});
+  }
+  return overlaps;
 }
