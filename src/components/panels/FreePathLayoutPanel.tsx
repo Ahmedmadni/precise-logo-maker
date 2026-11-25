@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { letteringTransform, safeColor, safePath, type LetteringItem } from "../../calligraphy/model";
 import { preciseGlyphBounds } from "../../calligraphy/morph";
 import { suggestWordPathExpansion, wordEnvelopeOverlaps, composeWordGroupsOnPath, composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
+import { COMPOSITION_PRESETS, guideSvgPath, type CompositionPreset } from "../../calligraphy/compositionPresets";
 import { useStudio } from "../../store/studioStore";
 
 const STORAGE_KEY="logo-studio.free-path-presets.v1";
@@ -79,6 +80,14 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
     return {glyphs,viewBox:viewBox.join(" "),overlaps:wordMode?wordEnvelopeOverlaps(glyphs):[]};
   },[open,scope,allItems,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright,sizeAware,wordGap]);
   const canApply=!!composition;
+  const [activePreset,setActivePreset]=useState("");
+  const choosePreset=(preset:CompositionPreset)=>{
+    loadGuide(preset.guide);
+    setScale(preset.options.scale);setMargin(preset.options.margin);setTangent(preset.options.tangent);
+    setReverse(preset.options.reverse);setUpright(preset.options.upright);setSizeAware(preset.options.sizeAware??true);setWordGap(preset.options.wordGap??.2);
+    setActivePreset(preset.id);setShowOutlines(true);
+    setNotice("تم تحميل إعدادات القالب إلى المعاينة دون تعديل اللوحة.");
+  };
   const improveSpacing=()=>{
     const result=suggestWordPathExpansion(allItems??[],activeGroups,guide,options);
     if(!result){setNotice("لم نجد اتساعًا أفضل ضمن النطاق الحالي. جرّب تعديل شكل المسار أو الهوامش.");return;}
@@ -122,6 +131,17 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
           {availableGroups.map((g,i)=><label key={g.id} className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={activeGroups.includes(g.id)} disabled={!activeGroups.includes(g.id)&&activeGroups.length>=30} onChange={e=>setSelectedGroups(old=>e.target.checked?[...old,g.id]:old.filter(id=>id!==g.id))}/><span>{g.label} · {i+1}</span>{activeGroups.includes(g.id)&&<span className="ms-auto font-mono">{activeGroups.indexOf(g.id)+1}</span>}</label>)}
         </div>
         <p>الكلمات المختارة: {activeGroups.length} / 30</p>
+        <details className="rounded-lg border border-border p-2">
+          <summary className="cursor-pointer py-1 font-medium">مكتبة التكوينات المركبة</summary>
+          <p className="py-1 text-muted-foreground">قوالب هندسية قابلة للتحرير، وليست أشكال خطوط تاريخية جاهزة. اختر الكلمات أولاً ثم القالب.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {COMPOSITION_PRESETS.map(p=><button key={p.id} type="button" disabled={activeGroups.length<p.minWords} onClick={()=>choosePreset(p)} className={`min-h-24 rounded-lg border border-border p-2 text-start disabled:opacity-40 ${activePreset===p.id?"bg-secondary":""}`}>
+              <svg viewBox="-4 -4 108 108" className="mx-auto h-16 w-full" aria-hidden="true"><path d={guideSvgPath(p.guide)} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>{sampleGuide(p.guide,p.minWords,p.options.margin).map((s,i)=><circle key={i} cx={s.point.x} cy={s.point.y} r="3" fill="currentColor"/>)}</svg>
+              <span className="block font-medium">{p.name}</span><span className="block text-[10px] text-muted-foreground">{p.minWords} كلمات فأكثر</span>
+            </button>)}
+          </div>
+          {activePreset&&<p className="pt-1 text-muted-foreground">{COMPOSITION_PRESETS.find(p=>p.id===activePreset)?.description} يمكن تعديل المقابض والإعدادات قبل التطبيق.</p>}
+        </details>
         <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={sizeAware} onChange={e=>setSizeAware(e.target.checked)}/> توزيع حسب حجم حدود الكلمات</label>
         {sizeAware&&<label className="block"><span className="flex justify-between"><span>وزن المسافة الموحدة</span><span>{Math.round(wordGap*100)}%</span></span><input type="range" min={0} max={1} step={.05} value={wordGap} onChange={e=>setWordGap(Number(e.target.value))} className="w-full"/><span className="text-muted-foreground">رفع القيمة يجعل نسب المسافات بين المراكز أكثر انتظامًا؛ لضبط الاتساع الكلي غيّر حجم المسار.</span></label>}
       </div>}
