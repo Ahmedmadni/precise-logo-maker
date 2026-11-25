@@ -2,6 +2,8 @@ import {useState} from "react";
 import {useStudio} from "../../store/studioStore";
 import {glyphGroupPivot,groupMoveIds,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,glyphOverlapCandidates,type GlyphArrangeAxis,type GlyphArrangeMode} from "../../calligraphy/groupSelection";
 import {preciseGlyphBounds} from "../../calligraphy/morph";
+import {analyzeGlyphInk,INK_CURVE_TOLERANCE,type InkAnalysis} from "../../calligraphy/bakeUnion";
+import type {LetteringItem} from "../../calligraphy/model";
 import {LetteringGlyph} from "./LetteringGlyph";
 
 export function GlyphGroupTransformControls(){
@@ -19,6 +21,7 @@ export function GlyphGroupTransformControls(){
   const [scale,setScale]=useState(100);
   const [degrees,setDegrees]=useState(0);
   const [notice,setNotice]=useState("");
+  const [ink,setInk]=useState<{source:LetteringItem[];key:string;before:InkAnalysis;after:InkAnalysis|null}|null>(null);
   if(!source||!ids.length)return null;
   const allowed=groupMoveIds(source,ids);
   const pivot=glyphGroupPivot(source,ids);
@@ -26,6 +29,9 @@ export function GlyphGroupTransformControls(){
   const spacing=open&&tab==="spacing"?spaceGlyphSelection(source,ids,axis,gap.trim()?Number(gap):NaN):null;
   const beforeOverlaps=open&&tab==="spacing"?glyphOverlapCandidates(source,ids):[];
   const afterOverlaps=spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[];
+  const inkKey=JSON.stringify([ids,axis,gap]);
+  const currentInk=ink?.source===source&&ink.key===inkKey?ink:null;
+  const shownInk=currentInk?(spacing?.ok?currentInk.after:currentInk.before):null;
   const next=open?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
   const visible=(next??source).filter(i=>!i.hidden&&((ids.includes(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&ids.includes(i.attachedToGlyphId))||i.kind==="bridge"&&i.ribbon&&ids.includes(i.ribbon.sourceGlyphId)&&ids.includes(i.ribbon.targetGlyphId)));
   const boxes=[...source,...(next??[])].filter(i=>ids.includes(i.id)).map(preciseGlyphBounds).filter((b):b is NonNullable<typeof b>=>!!b);
@@ -42,15 +48,23 @@ export function GlyphGroupTransformControls(){
         <div className="grid grid-cols-3 gap-1">{[-5,0,5].map(v=><button type="button" key={v} className="min-h-9 rounded border border-border text-xs" onClick={()=>setGap(String(v))}>{v===-5?"تراكب":v===0?"تماس":"فصل"}</button>)}</div>
         {boxes.length>0&&<svg viewBox={viewBox} className="h-28 w-full rounded border border-border bg-background" aria-label="معاينة التداخل">
           {visible.map(i=><LetteringGlyph key={i.id} item={i} selected={false} allItems={next??source}/>)}
-          {(spacing?.ok?afterOverlaps:beforeOverlaps).slice(0,100).map((b,i)=><rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="#f59e0b" fillOpacity=".18" stroke="#f59e0b" strokeDasharray="3 2" vectorEffect="non-scaling-stroke"/>)}
+          {!shownInk&&(spacing?.ok?afterOverlaps:beforeOverlaps).slice(0,100).map((b,i)=><rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="#f59e0b" fillOpacity=".18" stroke="#f59e0b" strokeDasharray="3 2" vectorEffect="non-scaling-stroke"/>)}
+          {shownInk?.pairs.slice(0,100).map((p,i)=><path key={i} d={p.path} fill="#ef4444" fillOpacity=".65" fillRule="evenodd" stroke="#ef4444" strokeWidth="1" vectorEffect="non-scaling-stroke"/>)}
         </svg>}
         <p className="text-xs">تداخلات الحدود: {beforeOverlaps.length}{spacing?.ok?` ← ${afterOverlaps.length}`:""}</p>
+        <button type="button" disabled={ids.length<2||ids.length>400} className="min-h-10 w-full rounded border border-border text-xs disabled:opacity-40" onClick={()=>setInk({source,key:inkKey,before:analyzeGlyphInk(source,beforeOverlaps),after:spacing?.ok?analyzeGlyphInk(spacing.items,afterOverlaps):null})}>فحص تداخل الحبر</button>
+        {currentInk&&<div className="space-y-1 text-xs" role="status">
+          <p>أزواج الحبر المتداخل: {currentInk.before.pairs.length}{currentInk.after?` ← ${currentInk.after.pairs.length}`:""}</p>
+          <p>مجموع مساحات التقاطع الزوجية: {currentInk.before.pairs.reduce((s,p)=>s+p.area,0).toFixed(2)}{currentInk.after?` ← ${currentInk.after.pairs.reduce((s,p)=>s+p.area,0).toFixed(2)}`:""} px²</p>
+          {(currentInk.before.skipped>0||currentInk.before.limited||currentInk.after?.skipped||currentInk.after?.limited)?<p className="text-muted-foreground">الفحص غير مكتمل: مسارات غير مدعومة أو بلوغ حد الحساب (40 حرفًا / 120 زوجًا لكل فحص).</p>:null}
+          <p className="text-muted-foreground">تقريب حدود الحبر ({INK_CURVE_TOLERANCE} px)، دون السماكة الإضافية أو التشكيلات والوصلات.</p>
+        </div>}
         {spacing&&!spacing.ok&&<p className="text-xs text-muted-foreground">{{selection:"حدد حرفين على الأقل وحتى 400 حرف.",bridge:"التباعد يغير وصلة حية؛ ألغِ الوصلة أولًا أو حافظ على ترتيبها.",overlap:"التراكب كبير ويعكس ترتيب الحروف.",invalid:"أدخل مسافة صالحة."}[spacing.reason]}</p>}
         <div className="grid grid-cols-2 gap-1">
           <button type="button" disabled={!spacing?.ok||!spacing.changed||guideEdit} className="min-h-10 rounded bg-primary text-xs text-primary-foreground disabled:opacity-40" onClick={()=>{if(applySpacing(source,ids,axis,Number(gap)))setOpen(false);else setNotice("تعذر اعتماد التباعد.");}}>اعتماد</button>
           <button type="button" className="min-h-10 rounded border border-border text-xs" onClick={()=>setOpen(false)}>إلغاء</button>
         </div>
-        <p className="text-[10px] text-muted-foreground">القيم السالبة تراكب مقصود. المناطق الملونة تداخل مستطيلات الحدود، لا اصطدام الحبر نفسه. تبقى نقطة منتصف المجموعة ثابتة.</p>
+        <p className="text-[10px] text-muted-foreground">القيم السالبة تراكب مقصود. البرتقالي تداخل الحدود المستطيلة؛ الأحمر تقاطع مساحات الحبر بعد الفحص. تبقى نقطة منتصف المجموعة ثابتة.</p>
       </>:tab==="arrange"?<>
         <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setAxis(v.id);setNotice("");}}>{v.label}</button>)}</div>
         <div className="grid grid-cols-2 gap-1">{([{id:"min",label:axis==="x"?"يسار":"أعلى"},{id:"center",label:"منتصف"},{id:"max",label:axis==="x"?"يمين":"أسفل"},{id:"distribute",label:"مسافات متساوية"}] as const).map(v=><button type="button" key={v.id} aria-pressed={mode===v.id} disabled={ids.length<(v.id==="distribute"?3:2)} className={`min-h-10 rounded border text-xs disabled:opacity-40 ${mode===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setMode(v.id);setNotice("");}}>{v.label}</button>)}</div>
