@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { measureOpticalGaps } from "../../calligraphy/opticalSpacing";
+import { measureOpticalGaps, suggestOpticalArrangement } from "../../calligraphy/opticalSpacing";
 import { Minimize2, Maximize2, Spline, Sparkles } from "lucide-react";
 import { letteringTransform, safePath, safeColor, type LetteringItem } from "../../calligraphy/model";
 import { letteringGroupBounds } from "../../calligraphy/morph";
@@ -110,6 +110,17 @@ export function KelkCompositionPanel({ selected, siblings }: {
 
   const [arrangementNotice, setArrangementNotice] = useState("");
   const [showGapAnalysis, setShowGapAnalysis] = useState(false);
+  const [opticalStrength, setOpticalStrength] = useState(100);
+  const opticalProposal = useMemo(() => showGapAnalysis ? suggestOpticalArrangement(siblings, opticalStrength/100) : null, [showGapAnalysis, siblings, opticalStrength]);
+  const applyOpticalArrangement = () => {
+    commitPreview();
+    const ids = new Set(siblings.map(item => item.id));
+    const latest = (useStudio.getState().doc.lettering ?? []).filter(item => ids.has(item.id));
+    const proposed = suggestOpticalArrangement(latest, opticalStrength/100);
+    if (!proposed) { setArrangementNotice("لا يوجد اقتراح آمن يحسن توزيع الفراغات."); return; }
+    updateMany(proposed.patches, "موازنة الفراغات بين الحروف");
+    setArrangementNotice("تم تطبيق توزيع قابل للتراجع.");
+  };
   const opticalGaps = useMemo(() => showGapAnalysis ? measureOpticalGaps(siblings) : [], [showGapAnalysis, siblings]);
   const onArrange = (mode: "equal-spacing" | "baseline" | "bounds") => {
     commitPreview();
@@ -193,6 +204,17 @@ export function KelkCompositionPanel({ selected, siblings }: {
         {showGapAnalysis && <div className="space-y-2 rounded-lg border border-border p-2 text-[11px]">
           <p className="text-muted-foreground">قياس تقريبي عبر 32 مقطعًا أفقيًا لكل زوج متجاور. القيم السالبة تشير إلى تداخل الامتداد الأفقي، وليس بالضرورة تصادم المسارات.</p>
           {opticalGaps.length === 0 && <p>لا توجد أزواج ذات مقاطع مشتركة قابلة للقياس.</p>}
+          <label className="block space-y-1">
+            <span className="flex justify-between"><span>شدة موازنة الفراغات</span><span dir="ltr">{opticalStrength}%</span></span>
+            <input type="range" min={10} max={100} step={5} value={opticalStrength} onChange={e => setOpticalStrength(Number(e.target.value))} className="w-full"/>
+          </label>
+          {opticalProposal && <div className="rounded-md bg-secondary/50 p-2">
+            <p>تفاوت وسيط الفراغات قبل وبعد الاقتراح</p>
+            <p dir="ltr" className="font-mono">{opticalProposal.beforeSpread.toFixed(1)} → {opticalProposal.afterSpread.toFixed(1)} px</p>
+            <p>الشدة الممكنة هندسيًا: {Math.round(opticalProposal.appliedStrength*100)}%</p>
+          </div>}
+          <button type="button" className={`${btn} w-full`} disabled={!opticalProposal} onClick={applyOpticalArrangement}>تطبيق موازنة الفراغات</button>
+          {!opticalProposal && <p className="text-muted-foreground">لا يتوفر توزيع محسّن ضمن القيود الحالية.</p>}
           {opticalGaps.map((gap,i) => <div key={gap.rightId+"-"+gap.leftId} className="rounded-md bg-secondary/50 p-2">
             <p className="font-medium">الزوج {i+1}</p>
             <div className="grid grid-cols-2 gap-1">
