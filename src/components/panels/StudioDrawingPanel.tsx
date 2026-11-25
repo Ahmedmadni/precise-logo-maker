@@ -97,7 +97,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
                 { label: "قلم دائري", preset: "round", size: 6, angle: 0, smoothing: 0.3, endStyle: "soft" },
               ] as const).map(({ label, ...settings }) => (
                 <button key={label} type="button" className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs hover:border-primary"
-                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", pressureFloor:.3, nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
+                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", pressureFloor:.3, smoothCurves:false, nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
               ))}
             </div>
           </div>
@@ -107,7 +107,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               <input aria-label="اسم القلم" placeholder="اسم القلم الجديد" maxLength={40} value={penName} onChange={(e) => setPenName(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" />
               <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { if(pens.some(p=>p.name===penName.trim())){setPenMessage("الاسم مستخدم بالفعل");return;} if(persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]))setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
               {pens.map((pen, i) => <div key={i} className="flex items-center gap-2">
-                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", pressureFloor:pen.settings.pressureFloor??.3, nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
+                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", pressureFloor:pen.settings.pressureFloor??.3, smoothCurves:pen.settings.smoothCurves??false, nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
                 <button type="button" aria-label={"حذف " + pen.name} className="min-h-11 rounded-lg border border-border px-2 text-xs" onClick={() => persistPens(pens.filter((_, index) => index !== i))}>حذف</button>
               </div>)}
               <p role="status" className="text-[11px] text-muted-foreground">{penMessage}</p>
@@ -185,6 +185,8 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
           </div>}
           </div>
           <div className={brushTab==="dynamics"?"space-y-3":"hidden"}>
+          <label className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-xs">تنعيم الحدود بمنحنيات Bézier<input type="checkbox" checked={brush.smoothCurves??false} onChange={e=>setBrush({smoothCurves:e.target.checked})}/></label>
+          <p className="text-[11px] text-muted-foreground">يُحفظ التنعيم مع الضربات الجديدة في المسار المتجهي. الزوايا الحادة تبقى خطية؛ الضربات السابقة لا تتغير.</p>
           <label className="block space-y-1 text-xs">
             <span className="flex justify-between"><span>تنعيم حركة اليد</span><span dir="ltr">{Math.round(brush.smoothing * 100)}%</span></span>
             <input className="w-full accent-[var(--color-primary)]" type="range" min={0} max={80}
