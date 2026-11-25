@@ -123,8 +123,9 @@ export const GUIDE_PRESETS:{name:string;guide:GuideChain}[]=[
 
 
 /** Translate complete word groups along a guide in explicit selection order.
- * No individual glyph rotation or resizing: relative geometry stays intact.
- * The store handles attached marks and dynamic ribbon paths after the move.
+ * Optional rigid rotation uses a stable reference glyph, so repeated application
+ * does not accumulate rotation. Explicitly transformed attached marks are
+ * preserved by the caller when committing the batch.
  */
 export function composeWordGroupsOnPath(items:LetteringItem[],groupIds:string[],guide:GuideChain,options:FreePathOptions):LetteringPatchEntry[]{
   const ids=[...new Set(groupIds)];
@@ -146,16 +147,33 @@ export function composeWordGroupsOnPath(items:LetteringItem[],groupIds:string[],
   const mx=samples.reduce((s,p)=>s+p.point.x,0)/ids.length,my=samples.reduce((s,p)=>s+p.point.y,0)/ids.length;
   const scale=Math.max(...metrics.map(m=>m!.diameter))*ids.length/100*Math.max(.5,Math.min(3,options.scale));
   const patches:LetteringPatchEntry[]=[];
+  const processed=new Set<string>();
+  const normal=(angle:number)=>((angle+180)%360+360)%360-180;
   for(let i=0;i<groups.length;i++){
-    const dx=cx+(samples[i]!.point.x-mx)*scale-metrics[i]!.x;
-    const dy=cy+(samples[i]!.point.y-my)*scale-metrics[i]!.y;
-    if(![dx,dy].every(Number.isFinite))return [];
-    for(const g of groups[i]!){
-      // Attached harakat follow their anchors in relayoutHarakat; ribbons are
-      // world-space links and do not need coordinate patches.
-      if(g.kind==="bridge"||(g.kind==="haraka"&&g.attachedToGlyphId))continue;
-      if(![g.x,g.y].every(Number.isFinite))return [];
-      patches.push({id:g.id,patch:{x:g.x+dx,y:g.y+dy}});
+    const center=metrics[i]!;
+    const tx=cx+(samples[i]!.point.x-mx)*scale,ty=cy+(samples[i]!.point.y-my)*scale;
+    const group=groups[i]!;
+    const reference=group.filter(g=>!g.hidden&&g.kind==="outline").sort((a,b)=>(a.glyphIndex??Number.MAX_SAFE_INTEGER)-(b.glyphIndex??Number.MAX_SAFE_INTEGER)||a.id.localeCompare(b.id))[0];
+    if(!reference)return [];
+    let target=normal(samples[i]!.angle);
+    if(options.upright){if(target>90)target-=180;else if(target< -90)target+=180;}
+    const delta=options.tangent?normal(target-reference.rotation):0;
+    const radians=delta*Math.PI/180,cos=Math.cos(radians),sin=Math.sin(radians);
+    if(![tx,ty,delta].every(Number.isFinite))return [];
+    const anchors=new Set(group.filter(g=>g.kind==="outline").map(g=>g.id));
+    const members=[...group.filter(g=>!(g.kind==="haraka"&&g.attachedToGlyphId&&!anchors.has(g.attachedToGlyphId))),
+      ...items.filter(g=>g.kind==="haraka"&&g.attachedToGlyphId&&anchors.has(g.attachedToGlyphId)&&!group.some(q=>q.id===g.id))];
+    for(const g of members){
+      if(processed.has(g.id)||g.kind==="bridge")continue;
+      processed.add(g.id);
+      if(![g.x,g.y,g.rotation].every(Number.isFinite))return [];
+      const x=g.x-center.x,y=g.y-center.y;
+      const patch:Partial<LetteringItem>={x:tx+x*cos-y*sin,y:ty+x*sin+y*cos};
+      if(options.tangent)patch.rotation=normal(g.rotation+delta);
+      // Auto placement is artboard-oriented, not word-local. Preserve the
+      // rotated position by switching attached marks to manual only on rotation.
+      if(g.kind==="haraka"&&g.attachedToGlyphId)patch.anchorMode=options.tangent&&Math.abs(delta)>1e-8?"manual":g.anchorMode??"auto";
+      patches.push({id:g.id,patch});
     }
   }
   return patches;
