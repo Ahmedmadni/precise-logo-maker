@@ -170,6 +170,8 @@ export interface StudioState {
   letteringPreview: { id: string; patch: Partial<LetteringItem> } | null;
   setLetteringPreview: (id: string, patch: Partial<LetteringItem>) => void;
   commitLetteringPreview: () => void;
+  lassoActive:boolean;
+  setLassoActive:(active:boolean)=>void;
   knifeTargetId:string|null;
   setKnifeTargetId:(id:string|null)=>void;
   pathControlSelection: {objectId:string;edge:number;mode:"free"|"aligned"|"symmetric"} | null;
@@ -379,8 +381,10 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    lassoActive:false,
+    setLassoActive:(lassoActive)=>set({lassoActive,tool:"select",knifeTargetId:null,pathControlSelection:null}),
     knifeTargetId:null,
-    setKnifeTargetId:(knifeTargetId)=>set({knifeTargetId,tool:"select",pathControlSelection:null}),
+    setKnifeTargetId:(knifeTargetId)=>set({knifeTargetId,tool:"select",lassoActive:false,pathControlSelection:null}),
     pathControlSelection:null,
     setPathControlSelection:(pathControlSelection)=>set({pathControlSelection}),
     letteringMoveScope: "glyph",
@@ -693,7 +697,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     brush: DEFAULT_BRUSH,
     setBrush: (patch) => set((s) => ({ brush: { ...s.brush, ...patch } })),
     setView: (view) => set({ view }),
-    setTool: (tool) => set((s)=>({ tool, knifeTargetId:null, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
+    setTool: (tool) => set((s)=>({ tool, lassoActive:false,knifeTargetId:null, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
     setCursor: (cursor) => set({ cursor }),
     viewport: { width: 1200, height: 800 },
     setViewport: (viewport) => set({ viewport }),
