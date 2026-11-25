@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronsLeft, ChevronsRight, CircleDashed, Hand, PaintBucket, Paintbrush, PenTool, Ruler,
   Minus, MousePointer2, Spline, Waypoints, Type, Sparkles,
@@ -53,6 +53,13 @@ export function ToolRail({
   const section = useStudio((s) => s.workspaceSection);
   const setSection = useStudio((s) => s.setWorkspaceSection);
   const [twoColumns, setTwoColumns] = useState(false);
+  // On short landscape screens use two columns unless manually overridden.
+  useEffect(()=>{
+    const query=window.matchMedia("(max-height: 560px)");
+    const sync=()=>setTwoColumns(query.matches);
+    sync();query.addEventListener("change",sync);
+    return ()=>query.removeEventListener("change",sync);
+  },[]);
 
   const handleSelect = (item: RailItem) => {
     if (item.panel) {
@@ -70,7 +77,7 @@ export function ToolRail({
       dir="rtl"
       className={cn(
         "flex h-full shrink-0 flex-col items-center overflow-y-auto overscroll-contain border-s border-border bg-card py-1.5 select-none [scrollbar-width:none]",
-        twoColumns ? "w-[4.75rem] px-1.5" : "w-11 px-1",
+        twoColumns ? "w-[6.25rem] px-1.5" : "w-[3.25rem] px-1",
       )}
     >
       <button
@@ -79,7 +86,7 @@ export function ToolRail({
         title={twoColumns ? "عمود واحد" : "عمودان"}
         aria-label={twoColumns ? "تبديل إلى عمود واحد" : "تبديل إلى عمودين"}
         aria-pressed={twoColumns}
-        className="mb-1.5 flex h-5 w-full items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="mb-1.5 flex min-h-8 w-full shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         {twoColumns ? (
           <ChevronsRight className="h-3.5 w-3.5" aria-hidden />
@@ -110,13 +117,13 @@ export function ToolRail({
                   aria-label={item.label}
                   aria-pressed={active}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-primary",
                     active
                       ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className="h-5 w-5" aria-hidden />
                 </button>
               );
             })}
