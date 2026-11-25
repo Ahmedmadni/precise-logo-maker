@@ -30,6 +30,9 @@ export function LetteringPanel({ section, onCreated }: {
 } = {}) {
   const doc = useStudio((s) => s.doc);
   const selectedId = useStudio((s) => s.selectedLetteringId);
+  const glyphLasso=useStudio(s=>s.glyphLassoActive);
+  const glyphMultiIds=useStudio(s=>s.glyphMultiIds);
+  const setGlyphLasso=useStudio(s=>s.setGlyphLassoActive);
   const select = useStudio((s) => s.selectLettering);
   const insert = useStudio((s) => s.addLettering);
   const insertBatch = useStudio((s) => s.addLetteringBatch);
@@ -400,6 +403,8 @@ export function LetteringPanel({ section, onCreated }: {
 
       {mode === "layers" && (
         <section className="space-y-3">
+          <button type="button" aria-pressed={glyphLasso} className={button+" w-full"} onClick={()=>{setGlyphLasso(!glyphLasso);if(!glyphLasso)onCreated?.();}}>{glyphLasso?`إنهاء التحديد الجماعي (${glyphMultiIds.length})`:"تحديد الحروف جماعيًا على اللوحة"}</button>
+          {glyphLasso&&<p className="text-xs text-muted-foreground">ارسم حول مراكز الحروف المتجهية، ثم اسحب أحد الحروف المحددة. التشكيلات المرتبطة تتحرك معها.</p>}
           <div className="relative">
             <Search className="absolute start-3 top-3.5 h-4 w-4 text-muted-foreground" aria-hidden="true"/>
             <input type="search" className={field+" ps-9"} aria-label="البحث في عناصر التصميم" placeholder="ابحث عن كلمة أو نوع عنصر" value={layerSearch} onChange={e=>setLayerSearch(e.target.value)}/>
