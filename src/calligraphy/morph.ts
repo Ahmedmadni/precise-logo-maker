@@ -118,3 +118,62 @@ export function adjustOutlineRegionWidth(d: string, direction: MorphDirection, f
     return segment.cmd + v.map(round).join(" ");
   }).join(" ");
 }
+
+
+/** Tight bounds of the transformed vector outline (not its control polygon).
+ * Affine glyph transforms preserve the degree of quadratic/cubic Béziers.
+ * Include endpoints and all internal roots of each coordinate derivative.
+ */
+export function preciseGlyphBounds(item: LetteringItem): { x:number; y:number; width:number; height:number } | null {
+  if (item.kind !== "outline" || !item.pathData) return null;
+  const segments = parseOutline(item.pathData);
+  if (!segments?.length) return null;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  const include=(p:CoordinatePair)=>{
+    minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+  };
+  const roots=(p:number[]):number[]=>{
+    const [a,b,c,d]=p;
+    if(a===undefined||b===undefined||c===undefined)return [];
+    if(d===undefined) {
+      const denominator=a-2*b+c;
+      return Math.abs(denominator)<1e-10?[]:[(a-b)/denominator];
+    }
+    const A=-a+3*b-3*c+d,B=2*(a-2*b+c),C=b-a;
+    if(Math.abs(A)<1e-10)return Math.abs(B)<1e-10?[]:[-C/B];
+    const disc=B*B-4*A*C;
+    if(disc<0)return [];
+    const s=Math.sqrt(disc);
+    return [(-B-s)/(2*A),(-B+s)/(2*A)];
+  };
+  const world=(x:number,y:number)=>glyphPointToWorld(item,x,y);
+  let cursor:CoordinatePair|null=null, origin:CoordinatePair|null=null;
+  for(const seg of segments){
+    const v=seg.values;
+    if(seg.cmd==="Z"){ if(origin){cursor=origin;include(origin);} continue; }
+    const points:CoordinatePair[]=[];
+    for(let j=0;j<v.length;j+=2)points.push(world(v[j]!,v[j+1]!));
+    if(points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return null;
+    const end=points.at(-1);
+    if(!end)return null;
+    if(seg.cmd==="M"){cursor=end;origin=end;include(end);continue;}
+    if(!cursor)return null;
+    include(cursor);include(end);
+    if(seg.cmd==="Q"||seg.cmd==="C"){
+      const controls=[cursor,...points];
+      const times=[...roots(controls.map(p=>p.x)),...roots(controls.map(p=>p.y))];
+      for(const t of times){
+        if(!(t>0&&t<1))continue;
+        let level=controls;
+        while(level.length>1)level=level.slice(0,-1).map((p,i)=>({
+          x:p.x+(level[i+1]!.x-p.x)*t,y:p.y+(level[i+1]!.y-p.y)*t,
+        }));
+        include(level[0]!);
+      }
+    }
+    cursor=end;
+  }
+  if(![minX,minY,maxX,maxY].every(Number.isFinite))return null;
+  return {x:minX,y:minY,width:maxX-minX,height:maxY-minY};
+}
