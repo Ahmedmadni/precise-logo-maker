@@ -326,3 +326,42 @@ export function analyzeGlyphInk(items:LetteringItem[],candidates:readonly {a:str
   result.pairs.sort((a,b)=>b.area-a.area);
   return result;
 }
+
+
+export type InkBalance={ok:true;area:number;centroid:Point;bounds:{minX:number;minY:number;maxX:number;maxY:number};quadrants:[number,number,number,number];density:number}|{ok:false;reason:"selection"|"unsupported"|"complexity"};
+
+/** Measure the union of filled glyphs so overlapping ink is counted once.
+ * Quadrants are top-left, top-right, bottom-left, bottom-right, split at
+ * the union's bounding-box center. Holes subtract both area and moments. */
+export function analyzeInkBalance(items:LetteringItem[],ids:readonly string[]):InkBalance{
+  const selected=new Set(ids);
+  if(!selected.size||selected.size>20)return {ok:false,reason:"selection"};
+  const targets=items.filter(i=>selected.has(i.id)&&!i.hidden&&i.kind==="outline");
+  if(targets.length!==selected.size||targets.some(i=>!i.pathData||i.pathData.length>30000||(i.weight??0)!==0))return {ok:false,reason:"unsupported"};
+  try{
+    const geoms=targets.map(filledGlyph);
+    if(geoms.some(g=>!g))return {ok:false,reason:"unsupported"};
+    const valid=geoms.filter((g):g is Geom=>!!g);
+    const geo=union(valid[0]!,...valid.slice(1));
+    let mass=0,mx=0,my=0,minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity,count=0;
+    for(const poly of geo)for(let j=0;j<poly.length;j++){
+      const ring=poly[j]!;
+      let twice=0,cx=0,cy=0;
+      for(let k=0;k<ring.length-1;k++){
+        const a=ring[k]!,b=ring[k+1]!,cross=a[0]*b[1]-b[0]*a[1];
+        twice+=cross;cx+=(a[0]+b[0])*cross;cy+=(a[1]+b[1])*cross;
+        minX=Math.min(minX,a[0]);minY=Math.min(minY,a[1]);maxX=Math.max(maxX,a[0]);maxY=Math.max(maxY,a[1]);
+        if(++count>40000)return {ok:false,reason:"complexity"};
+      }
+      if(Math.abs(twice)<=1e-9)continue;
+      const signed=(j===0?1:-1)*Math.abs(twice)/2;
+      mass+=signed;mx+=signed*cx/(3*twice);my+=signed*cy/(3*twice);
+    }
+    const width=maxX-minX,height=maxY-minY;
+    if(![mass,mx,my,width,height].every(Number.isFinite)||mass<=0||width<=0||height<=0)return {ok:false,reason:"unsupported"};
+    const x=(minX+maxX)/2,y=(minY+maxY)/2;
+    const part=(x1:number,y1:number,x2:number,y2:number)=>polygonArea(intersection(geo,single([{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2}])))/mass;
+    const quadrants:[number,number,number,number]=[part(minX,minY,x,y),part(x,minY,maxX,y),part(minX,y,x,maxY),part(x,y,maxX,maxY)];
+    return {ok:true,area:mass,centroid:{x:mx/mass,y:my/mass},bounds:{minX,minY,maxX,maxY},quadrants,density:mass/(width*height)};
+  }catch{return {ok:false,reason:"complexity"};}
+}
