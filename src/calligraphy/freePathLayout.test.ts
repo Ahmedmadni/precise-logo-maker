@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath, composeWordGroupsOnPath, wordSpacingFractions, wordEnvelopeOverlaps } from "./freePathLayout";
+import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath, composeWordGroupsOnPath, wordSpacingFractions, wordEnvelopeOverlaps, suggestWordPathExpansion } from "./freePathLayout";
 import type { LetteringItem } from "./model";
 const glyph=(id:string,x:number,glyphIndex:number):LetteringItem=>({id,kind:"outline",x,y:100,size:100,rotation:0,color:"#111111",unitsPerEm:1000,pathData:"M 0 0 L 300 0 L 300 100 L 0 100 Z",glyphIndex});
 const straight=[{x:90,y:50},{x:65,y:50},{x:35,y:50},{x:10,y:50}];
@@ -101,5 +101,26 @@ describe("size-aware word spacing",()=>{
     const items=[{...glyph("a",0,0),groupId:"one"},{...glyph("b",10,1),groupId:"one"},{...glyph("c",35,0),groupId:"two"},{...glyph("d",200,0),groupId:"three"}];
     expect(wordEnvelopeOverlaps(items)).toEqual([{first:"one",second:"two"}]);
     expect(wordEnvelopeOverlaps(items.map(g=>g.id==="c"?{...g,hidden:true}:g))).toEqual([]);
+  });
+});
+
+
+describe("suggested word path expansion",()=>{
+  const items=[{...glyph("a",0,0),groupId:"one"},{...glyph("b",100,0),groupId:"two"}];
+  const opts={scale:.5,margin:0,reverse:false,tangent:false,upright:true};
+  it("finds a larger scale with fewer overlapping word envelopes",()=>{
+    const result=suggestWordPathExpansion(items,["one","two"],straight,opts);
+    expect(result?.before).toBe(1);
+    expect(result?.after).toBe(0);
+    expect(result?.scale).toBeGreaterThan(.5);
+    expect(result?.scale).toBeLessThanOrEqual(3);
+    expect(items[0]!.x).toBe(0);
+  });
+  it("does not change an already separated composition",()=>{
+    expect(suggestWordPathExpansion(items,["one","two"],straight,{...opts,scale:2})).toBeNull();
+  });
+  it("returns no suggestion for a closed guide with coincident endpoint centers",()=>{
+    const closed=[{x:50,y:50},{x:90,y:10},{x:10,y:10},{x:50,y:50}];
+    expect(suggestWordPathExpansion(items,["one","two"],closed,opts)).toBeNull();
   });
 });
