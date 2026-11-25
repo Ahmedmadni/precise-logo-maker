@@ -4,7 +4,14 @@ import { worldJoinAnchor } from "./contourComposer";
 import { preciseGlyphBounds } from "./morph";
 
 export type KelkSlantPresetId = "vertical" | "thuluth" | "ruqaa" | "nastaliq";
-export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset" | "vertical" | "circle";
+export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset" | "vertical" | "circle" | "ellipse";
+export interface OrbitLayoutOptions {
+  aspect?: number;
+  radiusScale?: number;
+  startAngle?: number;
+  clockwise?: boolean;
+  tangent?: boolean;
+}
 export type KashidaStyle = "flat" | "arch" | "wave";
 
 export interface KelkSlantPreset {
@@ -54,6 +61,7 @@ export function composeWordLayout(
   items: LetteringItem[],
   style: KelkLayoutStyle,
   intensity = 1,
+  orbit: OrbitLayoutOptions = {},
 ): LetteringPatchEntry[] {
   const glyphs = sortRtl(items.filter((i) => i.kind === "outline" || i.kind === "text"));
   if (glyphs.length === 0 || (glyphs.length < 2 && style !== "reset")) return [];
@@ -98,7 +106,7 @@ export function composeWordLayout(
     });
   }
 
-  if (style === "vertical" || style === "circle") {
+  if (style === "vertical" || style === "circle" || style === "ellipse") {
     // Fontkit emits RTL runs in visual LTR order, with increasing glyphIndex.
     // Stable indexes avoid reshuffling the word on repeated circular layouts.
     const indexed = glyphs.every(g => Number.isInteger(g.glyphIndex)) &&
@@ -106,8 +114,9 @@ export function composeWordLayout(
     const ordered = indexed ? [...glyphs].sort((a,b) => b.glyphIndex! - a.glyphIndex!) :
       items.filter(g => glyphs.includes(g));
     if (ordered.some(g => !Number.isFinite(g.x) || !Number.isFinite(g.y) || !Number.isFinite(g.size))) return [];
-    const cx = ordered.reduce((sum,g)=>sum+g.x,0)/ordered.length;
-    const cy = ordered.reduce((sum,g)=>sum+g.y,0)/ordered.length;
+    const centers = ordered.map(g => { const b=preciseGlyphBounds(g); return b ? {x:b.x+b.width/2,y:b.y+b.height/2} : {x:g.x,y:g.y-g.size/2}; });
+    const cx = centers.reduce((sum,p)=>sum+p.x,0)/ordered.length;
+    const cy = centers.reduce((sum,p)=>sum+p.y,0)/ordered.length;
     const metrics = ordered.map(g => {
       const b = preciseGlyphBounds({...g,x:0,y:0,rotation:0});
       return b ? {x:b.x+b.width/2,y:b.y+b.height/2,diameter:Math.hypot(b.width,b.height)} :
@@ -115,12 +124,20 @@ export function composeWordLayout(
     });
     const diameter = Math.max(1,...metrics.map(m=>m.diameter));
     const separation = diameter*(1+0.15*k);
-    const radius = separation/(2*Math.sin(Math.PI/ordered.length));
+    const bounded = (n:number|undefined,fallback:number,min:number,max:number) => Number.isFinite(n) ? Math.max(min,Math.min(max,n!)) : fallback;
+    const ratio = style==="ellipse" ? bounded(orbit.aspect,1.5,0.5,2.5) : 1;
+    const radius = separation/(2*Math.sin(Math.PI/ordered.length))*bounded(orbit.radiusScale,1,1,3);
+    const rx=radius*Math.max(1,ratio), ry=radius*Math.max(1,1/ratio);
+    const direction=orbit.clockwise?1:-1;
+    const start=bounded(orbit.startAngle,-90,-180,180)*Math.PI/180;
     return ordered.map((g,i)=>{
-      const theta = -Math.PI/2-i*2*Math.PI/ordered.length;
-      const px=style==="vertical"?cx:cx+radius*Math.cos(theta);
-      const py=style==="vertical"?cy+(i-(ordered.length-1)/2)*separation:cy+radius*Math.sin(theta);
-      return {id:g.id,patch:{x:round(px-metrics[i]!.x),y:round(py-metrics[i]!.y),rotation:0}};
+      const theta = start+direction*i*2*Math.PI/ordered.length;
+      const px=style==="vertical"?cx:cx+rx*Math.cos(theta);
+      const py=style==="vertical"?cy+(i-(ordered.length-1)/2)*separation:cy+ry*Math.sin(theta);
+      const rotation=style!=="vertical"&&orbit.tangent ? round(Math.atan2(ry*Math.cos(theta),-rx*Math.sin(theta))*180/Math.PI) : 0;
+      const b=preciseGlyphBounds({...g,x:0,y:0,rotation});
+      const local=b?{x:b.x+b.width/2,y:b.y+b.height/2}:metrics[i]!;
+      return {id:g.id,patch:{x:round(px-local.x),y:round(py-local.y),rotation}};
     });
   }
 
