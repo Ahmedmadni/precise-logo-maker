@@ -53,3 +53,16 @@ export function combineLassoSelection(previous:string[],hits:string[],mode:Lasso
   const hitSet=new Set(hits);
   return mode==="subtract"?previous.filter(id=>!hitSet.has(id)):mode==="add"?[...new Set([...previous,...hits])]:[...hitSet];
 }
+
+
+/** Select anchors, not control handles or the filled area. */
+export function lassoNodeIndices(points:Point[],ring:Point[]):number[]{
+  if(ring.length<3||ring.length>512||ring.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return [];
+  const xs=ring.map(p=>p.x),ys=ring.map(p=>p.y);
+  if(Math.max(...xs)-Math.min(...xs)<=EPS||Math.max(...ys)-Math.min(...ys)<=EPS)return [];
+  return points.flatMap((p,i)=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&inside(p,ring)?[i]:[]);
+}
+export function combineNodeSelection(previous:number[],hits:number[],mode:LassoMode):number[]{
+  const hitSet=new Set(hits);
+  return (mode==="subtract"?previous.filter(i=>!hitSet.has(i)):mode==="add"?[...new Set([...previous,...hits])]:[...hitSet]).sort((a,b)=>a-b);
+}
