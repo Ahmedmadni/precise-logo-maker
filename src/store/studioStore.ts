@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import {trimUndo,jumpHistory} from "./historyBudget";
 import type { ControlLinkMode } from "../calligraphy/handleCoupling";
 import type { LetteringItem } from "../calligraphy/model";
 import {
@@ -361,7 +362,7 @@ const nextObjectId = (): string => {
   return `obj-${objectCounter}-${Math.floor(performance.now() % 100000)}`;
 };
 
-const HISTORY_LIMIT = 100;
+const resetHistoryInteraction = () => ({selection:[],selectedLetteringId:null,selectedGlyphNodeId:null,selectedContourIndex:null,letteringPreview:null,editGlyphNodes:false,editGlyphContours:false,editJoinAnchors:false,joinGuide:null,glyphLassoActive:false,glyphMultiIds:[],lassoActive:false,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null,measurement:null});
 
 /** Stroke colour shared by hand-drawn construction guides. */
 export const GUIDE_COLOR = "#5b7bb5";
@@ -385,11 +386,13 @@ export const useStudio = create<StudioState>()((set, get) => {
   const commit = (label: string, mutate: (doc: DocumentState) => DocumentState) => {
     const { doc, past, historyLog } = get();
     const next = mutate(doc);
+    if(next===doc)return;
+    const retained=trimUndo([...past,{label,state:doc}],next);
     set({
       doc: next,
-      past: [...past, { label, state: doc }].slice(-HISTORY_LIMIT),
+      past: retained,
       future: [],
-      historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
+      historyLog: [...historyLog,label].slice(-(retained.length+1)),
     });
   };
 
@@ -1372,11 +1375,13 @@ export const useStudio = create<StudioState>()((set, get) => {
 
     loadDocument: (next, label = "Open project") => {
       const { doc, past, historyLog } = get();
+      const retained=trimUndo([...past,{label,state:doc}],next);
       set({
+        ...resetHistoryInteraction(),
         doc: next,
-        past: [...past, { label, state: doc }].slice(-HISTORY_LIMIT),
+        past: retained,
         future: [],
-        historyLog: [...historyLog, label].slice(-HISTORY_LIMIT),
+        historyLog: [...historyLog,label].slice(-(retained.length+1)),
         selection: [],
         selectedLetteringId: null,
         selectedGlyphNodeId: null,
@@ -1399,6 +1404,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       const prev = past[past.length - 1];
       if (!prev) return;
       set({
+        ...resetHistoryInteraction(),
         doc: prev.state,
         past: past.slice(0, -1),
         future: [{ label: prev.label, state: doc }, ...future],
@@ -1410,30 +1416,21 @@ export const useStudio = create<StudioState>()((set, get) => {
       const { past, doc, future, historyLog } = get();
       const next = future[0];
       if (!next) return;
+      const retained=trimUndo([...past,{label:next.label,state:doc}],next.state);
       set({
+        ...resetHistoryInteraction(),
         doc: next.state,
-        past: [...past, { label: next.label, state: doc }],
+        past: retained,
         future: future.slice(1),
-        historyLog: [...historyLog, next.label],
+        historyLog: [...historyLog,next.label].slice(-(retained.length+1)),
       });
     },
 
     jumpTo: (index) => {
-      const { past, doc } = get();
-      if (index < 0 || index >= past.length) return;
-      const target = past[index];
-      if (!target) return;
-      set({
-        doc: target.state,
-        past: past.slice(0, index),
-        future: [
-          ...past.slice(index).map((e, i, arr) => ({
-            label: e.label,
-            state: arr[i + 1]?.state ?? doc,
-          })),
-        ],
-        historyLog: get().historyLog.slice(0, index + 1),
-      });
+      const {past,doc,future,historyLog}=get();
+      const result=jumpHistory(past,future,doc,index);
+      if(!result)return;
+      set({...resetHistoryInteraction(),doc:result.state,past:result.past,future:result.future,historyLog:historyLog.slice(0,index+1)});
     },
   };
 });
