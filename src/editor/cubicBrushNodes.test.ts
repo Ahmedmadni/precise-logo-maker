@@ -4,7 +4,7 @@ import { buildBrushStroke, DEFAULT_BRUSH } from "../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../core/tracing/brushPreview";
 import { handlesOf, pickHandle, applyHandle } from "./handles";
 import { geometryToPathData } from "../objects/render";
-import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl } from "./path-nodes";
+import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl,arrangePathNodes,nudgePathNodes,movePathNodes } from "./path-nodes";
 
 const path:PathGeometry={kind:"path",closed:true,points:[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],cubicSegments:[{control1:{x:0,y:10},control2:{x:10,y:10}},null,null,{control1:{x:-4,y:10},control2:{x:-4,y:0}}]};
 
@@ -78,5 +78,33 @@ describe("canvas cubic handles",()=>{
     expect(moved.cubicSegments?.[0]?.control1).toEqual({x:4,y:6});
     expect(moved.cubicSegments?.[3]?.control2).toEqual({x:-4,y:-6});
     expect(moved.points).toEqual(path.points);
+  });
+});
+
+
+describe("multi-anchor operations",()=>{
+  it("moves selected anchors and both neighboring controls without double movement",()=>{
+    const moved=nudgePathNodes(path,[0,1,0],3,4);
+    expect(moved.points.slice(0,2)).toEqual([{x:3,y:4},{x:13,y:4}]);
+    expect(moved.cubicSegments?.[0]).toEqual({control1:{x:3,y:14},control2:{x:13,y:14}});
+    expect(moved.cubicSegments?.[3]?.control2).toEqual({x:-1,y:4});
+    expect(moved.points[2]).toEqual(path.points[2]);
+  });
+  it("aligns selected points on the bounding center of their axis",()=>{
+    const result=arrangePathNodes(path,[0,1,2],"x","center");
+    expect(result.points.map(p=>p.x)).toEqual([5,5,5,0]);
+    expect(result.points.map(p=>p.y)).toEqual([0,0,10,10]);
+  });
+  it("distributes in spatial order and fixes the extreme positions",()=>{
+    const uneven:PathGeometry={kind:"path",closed:false,points:[{x:0,y:0},{x:9,y:2},{x:30,y:4},{x:7,y:8}]};
+    const result=arrangePathNodes(uneven,[2,1,0],"x","distribute");
+    expect(result.points.map(p=>p.x)).toEqual([0,15,30,7]);
+    expect(result.points.map(p=>p.y)).toEqual([0,2,4,8]);
+  });
+  it("rejects invalid or insufficient selections atomically",()=>{
+    expect(arrangePathNodes(path,[0,1],"x","distribute")).toBe(path);
+    expect(nudgePathNodes(path,[0,99],3,4)).toBe(path);
+    expect(movePathNodes(path,new Map([[0,{x:NaN,y:0}]]))).toBe(path);
+    expect(nudgePathNodes(path,[0],0,0)).toBe(path);
   });
 });
