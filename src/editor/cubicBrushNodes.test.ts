@@ -3,7 +3,7 @@ import type { PathGeometry } from "../core/geometry/types";
 import { buildBrushStroke, DEFAULT_BRUSH } from "../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../core/tracing/brushPreview";
 import { geometryToPathData } from "../objects/render";
-import { movePathNode,insertPathNode,deletePathNode } from "./path-nodes";
+import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl } from "./path-nodes";
 
 const path:PathGeometry={kind:"path",closed:true,points:[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],cubicSegments:[{control1:{x:0,y:10},control2:{x:10,y:10}},null,null,{control1:{x:-4,y:10},control2:{x:-4,y:0}}]};
 
@@ -34,5 +34,30 @@ describe("cubic path node operations",()=>{
     expect(geometryToPathData(result)).toContain(" C ");
     expect(vectorBrushPreviewOutline(samples,settings,1)).toEqual(result);
     expect(buildBrushStroke(samples,{...settings,smoothCurves:false})?.cubicSegments).toBeUndefined();
+  });
+});
+
+
+describe("direct cubic handle editing",()=>{
+  it("converts a straight edge to an equivalent cubic and back",()=>{
+    const straight:PathGeometry={kind:"path",closed:false,points:[{x:0,y:0},{x:12,y:0},{x:20,y:0}]};
+    const curved=setPathEdgeCurved(straight,0,true);
+    expect(curved.cubicSegments?.[0]).toEqual({control1:{x:4,y:0},control2:{x:8,y:0}});
+    expect(setPathEdgeCurved(curved,0,false).cubicSegments?.[0]).toBeNull();
+    expect(setPathEdgeCurved(straight,2,true)).toBe(straight);
+  });
+  it("keeps unrelated controls intact in free mode",()=>{
+    const moved=movePathControl(path,0,"control1",{x:3,y:4});
+    expect(moved.cubicSegments?.[0]?.control1).toEqual({x:3,y:4});
+    expect(moved.cubicSegments?.[3]).toEqual(path.cubicSegments?.[3]);
+  });
+  it("mirrors the opposing control at the closed seam",()=>{
+    const moved=movePathControl(path,0,"control1",{x:3,y:4},"symmetric");
+    expect(moved.cubicSegments?.[3]?.control2).toEqual({x:-3,y:-4});
+    expect(path.cubicSegments?.[3]?.control2).toEqual({x:-4,y:0});
+  });
+  it("aligns the opposing control while preserving its original length",()=>{
+    const moved=movePathControl(path,0,"control1",{x:0,y:8},"aligned");
+    expect(moved.cubicSegments?.[3]?.control2).toEqual({x:0,y:-4});
   });
 });
