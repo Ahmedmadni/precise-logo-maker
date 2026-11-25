@@ -11,22 +11,37 @@ function pointAt(p:CubicGuide,t:number):GuidePoint{
   return {x:u*u*u*p[0].x+3*u*u*t*p[1].x+3*u*t*t*p[2].x+t*t*t*p[3].x,
     y:u*u*u*p[0].y+3*u*u*t*p[1].y+3*u*t*t*p[2].y+t*t*t*p[3].y};
 }
-export function sampleGuide(p:CubicGuide,count:number,margin=0,reverse=false):{point:GuidePoint;angle:number}[]{
-  if(!Number.isInteger(count)||count<2||count>200||!Number.isFinite(margin)||p.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))return [];
-  const steps=512, points=Array.from({length:steps+1},(_,i)=>pointAt(p,i/steps));
+export type GuideChain = GuidePoint[];
+export function splitGuideSegment(chain:GuideChain,index:number):GuideChain{
+  const offset=index*3;
+  if(!Number.isInteger(index)||offset<0||offset+3>=chain.length||chain.length>=25)return chain;
+  const a=chain[offset]!,b=chain[offset+1]!,c=chain[offset+2]!,d=chain[offset+3]!;
+  const mid=(p:GuidePoint,q:GuidePoint)=>({x:(p.x+q.x)/2,y:(p.y+q.y)/2});
+  const ab=mid(a,b),bc=mid(b,c),cd=mid(c,d),abc=mid(ab,bc),bcd=mid(bc,cd),m=mid(abc,bcd);
+  return [...chain.slice(0,offset),a,ab,abc,m,bcd,cd,d,...chain.slice(offset+4)];
+}
+export function sampleGuide(chain:GuideChain,count:number,margin=0,reverse=false):{point:GuidePoint;angle:number}[]{
+  if(!Number.isInteger(count)||count<2||count>200||!Number.isFinite(margin)||
+     chain.length<4||chain.length>25||(chain.length-1)%3!==0||
+     chain.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))return [];
+  const steps=256, points:GuidePoint[]=[chain[0]!];
+  for(let i=0;i+3<chain.length;i+=3){
+    const cubic:CubicGuide=[chain[i]!,chain[i+1]!,chain[i+2]!,chain[i+3]!];
+    for(let j=1;j<=steps;j++)points.push(pointAt(cubic,j/steps));
+  }
   const distances=[0];
-  for(let i=1;i<=steps;i++)distances.push(distances[i-1]!+Math.hypot(points[i]!.x-points[i-1]!.x,points[i]!.y-points[i-1]!.y));
-  const length=distances[steps]!;
+  for(let i=1;i<points.length;i++)distances.push(distances[i-1]!+Math.hypot(points[i]!.x-points[i-1]!.x,points[i]!.y-points[i-1]!.y));
+  const length=distances.at(-1)!;
   if(!Number.isFinite(length)||length<1e-6)return [];
   const inset=Math.max(0,Math.min(.45,margin));
   let j=1;
   const samples=Array.from({length:count},(_,i)=>{
     const d=length*(inset+(1-2*inset)*i/(count-1));
-    while(j<steps&&distances[j]!<d)j++;
+    while(j<points.length-1&&(distances[j]!<d||distances[j]===distances[j-1]))j++;
     const span=distances[j]!-distances[j-1]!;
-    const t=(j-1+(span>0?(d-distances[j-1]!)/span:0))/steps;
-    const point=pointAt(p,t);
-    const a=pointAt(p,Math.max(0,t-1/steps)),b=pointAt(p,Math.min(1,t+1/steps));
+    const t=span>0?(d-distances[j-1]!)/span:0;
+    const a=points[j-1]!,b=points[j]!;
+    const point={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
     let angle=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
     if(reverse)angle=(angle+360)%360-180;
     return {point,angle};
@@ -35,7 +50,7 @@ export function sampleGuide(p:CubicGuide,count:number,margin=0,reverse=false):{p
 }
 
 export interface FreePathOptions {scale:number;margin:number;reverse:boolean;tangent:boolean;upright:boolean}
-export function composeFreePath(items:LetteringItem[],guide:CubicGuide,options:FreePathOptions):LetteringPatchEntry[]{
+export function composeFreePath(items:LetteringItem[],guide:GuideChain,options:FreePathOptions):LetteringPatchEntry[]{
   const glyphs=items.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text"));
   if(glyphs.length<2||glyphs.length>200||glyphs.some(g=>g.kind!=="outline"||!g.pathData)||!Number.isFinite(options.scale))return [];
   const indexed=glyphs.every(g=>Number.isInteger(g.glyphIndex))&&new Set(glyphs.map(g=>g.glyphIndex)).size===glyphs.length;
