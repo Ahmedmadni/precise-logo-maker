@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { measureOpticalGaps } from "../../calligraphy/opticalSpacing";
 import { Minimize2, Maximize2, Spline, Sparkles } from "lucide-react";
 import { letteringTransform, safePath, safeColor, type LetteringItem } from "../../calligraphy/model";
 import { letteringGroupBounds } from "../../calligraphy/morph";
@@ -108,6 +109,8 @@ export function KelkCompositionPanel({ selected, siblings }: {
   };
 
   const [arrangementNotice, setArrangementNotice] = useState("");
+  const [showGapAnalysis, setShowGapAnalysis] = useState(false);
+  const opticalGaps = useMemo(() => showGapAnalysis ? measureOpticalGaps(siblings) : [], [showGapAnalysis, siblings]);
   const onArrange = (mode: "equal-spacing" | "baseline" | "bounds") => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
@@ -184,6 +187,21 @@ export function KelkCompositionPanel({ selected, siblings }: {
         <button type="button" className={`${btn} w-full`} disabled={siblings.filter(item => !item.hidden && item.kind === "outline" && !!item.pathData).length < 3} onClick={() => onArrange("bounds")}>توزيع المسافات بين حدود الحروف</button>
         <p className="text-[11px] text-muted-foreground">توزيع الحدود يراعي العرض الهندسي لكل حرف مع تثبيت طرفي التركيب. لا يقيس الفراغ البصري بين المنحنيات مباشرة.</p>
         {arrangementNotice && <p role="status" className="text-xs text-muted-foreground">{arrangementNotice}</p>}
+        <button type="button" className={`${btn} w-full`} disabled={!hasWordGroup} aria-expanded={showGapAnalysis} onClick={() => setShowGapAnalysis(v => !v)}>
+          {showGapAnalysis ? "إخفاء فحص الفراغات" : "فحص الفراغات بين المنحنيات"}
+        </button>
+        {showGapAnalysis && <div className="space-y-2 rounded-lg border border-border p-2 text-[11px]">
+          <p className="text-muted-foreground">قياس تقريبي عبر 32 مقطعًا أفقيًا لكل زوج متجاور. القيم السالبة تشير إلى تداخل الامتداد الأفقي، وليس بالضرورة تصادم المسارات.</p>
+          {opticalGaps.length === 0 && <p>لا توجد أزواج ذات مقاطع مشتركة قابلة للقياس.</p>}
+          {opticalGaps.map((gap,i) => <div key={gap.rightId+"-"+gap.leftId} className="rounded-md bg-secondary/50 p-2">
+            <p className="font-medium">الزوج {i+1}</p>
+            <div className="grid grid-cols-2 gap-1">
+              <span>وسيط الفراغ <b dir="ltr">{gap.median.toFixed(1)} px</b></span>
+              <span>أقل فراغ <b dir="ltr">{gap.minimum.toFixed(1)} px</b></span>
+            </div>
+            <p className="text-muted-foreground">مقاطع متداخلة: {gap.overlapRows} / {gap.samples}</p>
+          </div>)}
+        </div>}
         <label className="block space-y-1">
           <span className="flex justify-between text-[11px] text-muted-foreground">
             <span>خطوة التباعد</span><span dir="ltr">{spacingStep} px</span>
