@@ -18,6 +18,9 @@ const f = (n: number) => Number(n.toFixed(3)).toString();
 export function parseOutline(d: string): Segment[] | null {
   if (!d || d.length > 500_000) return null;
   const ts = tokens(d);
+  // Reject unsupported text instead of silently dropping it and changing a glyph.
+  const compact = d.replace(/[\s,]/g, "");
+  if (!ts.length || ts.join("") !== compact || !/^[Mm]$/.test(ts[0]!)) return null;
   const result: Segment[] = [];
   let pos = 0, current = "M", x = 0, y = 0, sx = 0, sy = 0;
   let prev: Segment | null = null;
@@ -34,7 +37,8 @@ export function parseOutline(d: string): Segment[] | null {
     if (type === "Z") {
       const seg: Segment = { cmd: "Z", values: [] };
       result.push(seg); prev = seg; x = sx; y = sy;
-      current = "M"; // avoid infinite loop on invalid numbers after Z
+      if (pos < ts.length && !/^[a-zA-Z]$/.test(ts[pos]!)) return null;
+      current = "M";
       continue;
     }
     const size = PARAMS[type]!;
@@ -86,6 +90,7 @@ export function parseOutline(d: string): Segment[] | null {
         vals = [cx, cy, endX, endY]; x = endX; y = endY; outType = "Q"; break;
       }
     }
+    if (vals.some(n => !Number.isFinite(n))) return null;
     const seg: Segment = { cmd: outType as "M" | "L" | "Q" | "C", values: vals };
     result.push(seg); prev = seg;
   }
@@ -112,7 +117,8 @@ export function outlineNodes(d: string): PathNode[] {
 
 export function editOutlineNode(d: string, nodeId: number, x: number, y: number): string | null {
   const segments = parseOutline(d);
-  if (!segments || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  if (!segments || !Number.isSafeInteger(nodeId) || nodeId < 0 ||
+      !Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 100_000 || Math.abs(y) > 100_000) return null;
   let index = 0, edited = false;
   for (const seg of segments) {
     for (let i = 0; i < seg.values.length; i += 2) {
@@ -124,7 +130,7 @@ export function editOutlineNode(d: string, nodeId: number, x: number, y: number)
     }
   }
   if (!edited) return null;
-  return segments.map((seg) => seg.cmd + (seg.values.length ? seg.values.map(f).join(" ") : "")).join(" ");
+  return serializeOutline(segments);
 }
 
 /** Convert a font-outline point into the studio's SVG world coordinates. */
@@ -192,6 +198,7 @@ function closedContour(segments: NonNullable<ReturnType<typeof parseOutline>>, i
 }
 
 function serializeOutline(segments: NonNullable<ReturnType<typeof parseOutline>>) {
+  if (segments.some(s => s.values.some(n => !Number.isFinite(n) || Math.abs(n) > 100_000))) return null;
   const value = segments.map((s) => s.cmd + (s.values.length ? s.values.map(f).join(" ") : "")).join(" ");
   return value.length <= 500_000 ? value : null;
 }
@@ -242,13 +249,13 @@ export function moveOutlineNodeWithHandles(
       const last = segments[closed.lastIndex]!;
       movePair(last, last.values.length - 2);
       if (last.cmd === "C") movePair(last, 2);
-      if (last.cmd === "Q") movePair(last, 0);
+      if (last.cmd === "Q" && last !== next) movePair(last, 0);
     } else if (index === closed.lastIndex) {
       // Moving the duplicate end also moves M and the first outgoing handle.
       const first = segments[closed.start]!;
       movePair(first, 0);
       const firstCurve = segments[closed.start + 1];
-      if (firstCurve?.cmd === "C" || firstCurve?.cmd === "Q") movePair(firstCurve, 0);
+      if (firstCurve?.cmd === "C" || (firstCurve?.cmd === "Q" && firstCurve !== segment)) movePair(firstCurve, 0);
     }
   }
   return serializeOutline(segments);
@@ -284,6 +291,8 @@ export function smoothOutlineAnchor(d: string, anchorId: number): string | null 
   }
   if (incoming.cmd !== "C" && incoming.cmd !== "Q") return null;
   if (next?.cmd !== "C" && next?.cmd !== "Q") return null;
+  // A single quadratic closing curve has only one shared control, not two tangents.
+  if (next === incoming && incoming.cmd === "Q") return null;
   const handleIndex = incoming.cmd === "C" ? 2 : 0;
   const ix = incoming.values[handleIndex]!, iy = incoming.values[handleIndex + 1]!;
   const ox = next.values[0]!, oy = next.values[1]!;
