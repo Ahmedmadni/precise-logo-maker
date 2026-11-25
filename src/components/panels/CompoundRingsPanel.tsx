@@ -2,13 +2,14 @@ import {useState} from "react";
 import type {PathGeometry} from "../../core/geometry/types";
 import {geometryBounds} from "../../core/geometry/math";
 import {geometryToPathData} from "../../objects/render";
-import {replaceCompoundHole,translateCompoundHole,scaleCompoundHole,type RingEditResult} from "../../editor/compoundRings";
+import {replaceCompoundHole,translateCompoundHole,scaleCompoundHole,insertCompoundHoleNode,deleteCompoundHoleNode,rotateCompoundHole,type RingEditResult} from "../../editor/compoundRings";
 
 export function CompoundRingsPanel({path,disabled,onChange}:{path:PathGeometry;disabled:boolean;onChange:(next:PathGeometry)=>void}){
   const [hole,setHole]=useState(0);
   const [node,setNode]=useState(0);
   const [step,setStep]=useState(5);
   const [factor,setFactor]=useState(110);
+  const [angle,setAngle]=useState(15);
   const [notice,setNotice]=useState("");
   const [proposal,setProposal]=useState<{source:PathGeometry;next:PathGeometry}|null>(null);
   const holes=path.holes??[];
@@ -56,6 +57,13 @@ export function CompoundRingsPanel({path,disabled,onChange}:{path:PathGeometry;d
       {[{label:"يمين",arrow:"→",x:1,y:0},{label:"يسار",arrow:"←",x:-1,y:0},{label:"أعلى",arrow:"↑",x:0,y:-1},{label:"أسفل",arrow:"↓",x:0,y:1}].map(d=><button type="button" key={d.label} aria-label={d.label} className="min-h-11 rounded border border-border" onClick={()=>propose(translateCompoundHole(path,index,d.x*step,d.y*step))}>{d.arrow}</button>)}
     </div>
     <button type="button" className="min-h-11 w-full rounded border border-border text-xs" onClick={()=>propose(scaleCompoundHole(path,index,factor/100))}>اقتراح تغيير حجم الفراغ</button>
+    <div className="grid grid-cols-2 gap-1">
+      <label className="text-xs">زاوية الدوران<select value={angle} onChange={e=>setAngle(Number(e.target.value))} className="min-h-11 w-full rounded border border-border bg-background">{[5,15,30,45,90,180].map(a=><option key={a} value={a}>{a}°</option>)}</select></label>
+      <div className="grid grid-cols-2 gap-1 self-end">
+        <button type="button" aria-label="دوران عكس عقارب الساعة" className="min-h-11 rounded border border-border" onClick={()=>propose(rotateCompoundHole(path,index,-angle))}>↶</button>
+        <button type="button" aria-label="دوران مع عقارب الساعة" className="min-h-11 rounded border border-border" onClick={()=>propose(rotateCompoundHole(path,index,angle))}>↷</button>
+      </div>
+    </div>
     <details className="rounded border border-border p-2">
       <summary className="cursor-pointer text-xs font-semibold">تعديل نقطة من الحلقة</summary>
       <label className="block pt-2 text-xs">النقطة<select className="min-h-10 w-full rounded border border-border bg-background" value={nodeIndex} onChange={e=>{setNode(Number(e.target.value));setProposal(null);}}>
@@ -65,10 +73,15 @@ export function CompoundRingsPanel({path,disabled,onChange}:{path:PathGeometry;d
         <label className="text-xs">إزاحة X<input className="min-h-10 w-full rounded border border-border bg-background px-1" type="number" value={dx} onChange={e=>setDx(e.target.value)}/></label>
         <label className="text-xs">إزاحة Y<input className="min-h-10 w-full rounded border border-border bg-background px-1" type="number" value={dy} onChange={e=>setDy(e.target.value)}/></label>
       </div>
+      <div className="mt-2 grid grid-cols-2 gap-1">
+        <button type="button" className="min-h-11 rounded border border-border text-xs" onClick={()=>propose(insertCompoundHoleNode(path,index,nodeIndex))}>إضافة نقطة بعد المحددة</button>
+        <button type="button" disabled={ring.length<=3} className="min-h-11 rounded border border-border text-xs disabled:opacity-40" onClick={()=>propose(deleteCompoundHoleNode(path,index,nodeIndex))}>حذف النقطة</button>
+      </div>
       <button type="button" className="mt-2 min-h-11 w-full rounded border border-border text-xs" onClick={()=>propose(replaceCompoundHole(path,index,ring.map((p,i)=>i===nodeIndex?{x:p.x+numeric(dx),y:p.y+numeric(dy)}:p)))}>معاينة إزاحة النقطة</button>
     </details>
+    {candidate&&<p className="text-xs">النقاط: {ring.length} ← {shown.length}</p>}
     {candidate&&<div className="grid grid-cols-2 gap-1">
-      <button type="button" className="min-h-11 rounded bg-primary text-xs text-primary-foreground" onClick={()=>{onChange(candidate);setProposal(null);setNotice("تم تعديل الفراغ المحدد.");}}>اعتماد</button>
+      <button type="button" className="min-h-11 rounded bg-primary text-xs text-primary-foreground" onClick={()=>{onChange(candidate);setNode(n=>Math.min(n,shown.length-1));setProposal(null);setNotice("تم تعديل الفراغ المحدد.");}}>اعتماد</button>
       <button type="button" className="min-h-11 rounded border border-border text-xs" onClick={()=>setProposal(null)}>إلغاء</button>
     </div>}
     {notice&&<p role="status" className="text-xs text-muted-foreground">{notice}</p>}
