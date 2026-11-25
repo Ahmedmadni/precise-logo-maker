@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Link2, Move, Waypoints } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import {
-  getJoinAnchor, moveOutlineContour, outlineContours,
+  getJoinAnchor, moveOutlineContour, outlineContours, transformOutlineContour,
   type ContourRole, type JoinSide,
 } from "../../calligraphy/contourComposer";
 import { alignJoinWithClearance, analyzeJoin } from "../../calligraphy/joinAssistant";
@@ -70,6 +70,15 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
     if (contourIndex === null) return;
     const path = moveOutlineContour(selected.pathData!, contourIndex, dx, dy);
     if (path) update(selected.id, { pathData: path });
+  };
+  const transformContour = (sx: number, sy: number, angle = 0) => {
+    const current = useStudio.getState().doc.lettering?.find(item => item.id === selected.id);
+    if (!current?.pathData || contourIndex === null) return;
+    const path = transformOutlineContour(current.pathData, contourIndex, sx, sy, angle);
+    if (path && path !== current.pathData) {
+      update(current.id, { pathData: path });
+      setNotice("تم تعديل الجزء المحدد. راجع موضع نقاط الاتصال اليدوية إذا كانت مرتبطة به.");
+    } else setNotice("تعذر تعديل الجزء المحدد ضمن الحدود المسموح بها.");
   };
   const changeRole = (role: ContourRole) => {
     if (contourIndex === null) return;
@@ -185,6 +194,22 @@ export function GlyphContoursJoinPanel({ selected, siblings, part }: {
                 <button key={label} type="button" className={btn} aria-label={"تحريك الجزء " + label}
                   onClick={() => offsetContour(dx, dy)}><Icon className="h-5 w-5" /></button>)}
             </div>
+            <details className="rounded-lg border border-border p-2">
+              <summary className="cursor-pointer text-xs font-semibold">حجم الجزء ودورانه</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {([
+                  ["تكبير العرض",1.1,1,0],["تصغير العرض",1/1.1,1,0],
+                  ["تكبير الارتفاع",1,1.1,0],["تصغير الارتفاع",1,1/1.1,0],
+                  ["تكبير متناسب",1.1,1.1,0],["تصغير متناسب",1/1.1,1/1.1,0],
+                  ["دوران يمين 5°",1,1,-5],["دوران يسار 5°",1,1,5],
+                ] as const).map(([label,sx,sy,angle]) => (
+                  <button key={label} type="button" className={btn}
+                    onClick={() => transformContour(sx,sy,angle)}>{label}</button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">يتم التعديل حول مركز الجزء فقط، دون تغيير موضع الأجزاء الأخرى.</p>
+            </details>
+            {notice && <p role="status" className="text-xs leading-5 text-primary">{notice}</p>}
             <p className="text-[11px] leading-5 text-muted-foreground">
               تغيير موضع مسار داخلي قد يؤثر في الفراغات والنقاط، لذلك راجع الحرف في المعاينة واستخدم «تراجع» عند الحاجة.
             </p>
