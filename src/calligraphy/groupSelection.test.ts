@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {LetteringItem} from "./model";
-import {glyphLassoHits,groupMoveIds,translateGlyphSelection} from "./groupSelection";
+import {glyphLassoHits,groupMoveIds,translateGlyphSelection,glyphGroupPivot,transformGlyphSelection} from "./groupSelection";
 const glyph=(id:string,x:number):LetteringItem=>({id,kind:"outline",x,y:0,size:100,rotation:0,color:"#000",unitsPerEm:100,pathData:"M 0 0 L 10 0 L 10 10 L 0 10 Z"});
 const a=glyph("a",0),b=glyph("b",40);
 const mark:LetteringItem={id:"mark",kind:"haraka",x:5,y:-20,size:12,rotation:0,color:"#000",mark:"fatha",attachedToGlyphId:"a",anchorMode:"manual"};
@@ -28,5 +28,36 @@ describe("glyph group selection",()=>{
     expect(groupMoveIds([a,mark],["mark"])).toEqual({ok:false,reason:"selection"});
     expect(groupMoveIds([{...a,hidden:true}],["a"])).toEqual({ok:false,reason:"selection"});
     expect(translateGlyphSelection([a],["missing"],1,1)).toBeNull();
+  });
+});
+
+
+describe("group similarity transforms",()=>{
+  it("uses the common outline center and scales attached marks once",()=>{
+    const pivot=glyphGroupPivot([a,b,mark],["a","b"]);
+    expect(pivot).toEqual({x:25,y:-5});
+    const next=transformGlyphSelection([a,b,mark],["a","b"],{scale:2,degrees:0})!;
+    expect(next[0]).toMatchObject({x:-25,y:5,size:200});
+    expect(next[1]).toMatchObject({x:55,y:5,size:200});
+    expect(next[2]).toMatchObject({x:-15,y:-35,size:24,attachedToGlyphId:"a",anchorMode:"manual"});
+    expect(a.x).toBe(0);
+  });
+  it("rotates all anchors about the same pivot",()=>{
+    const next=transformGlyphSelection([a,b],["a","b"],{scale:1,degrees:90})!;
+    expect(next[0]?.x).toBeCloseTo(20);
+    expect(next[0]?.y).toBeCloseTo(-30);
+    expect(next[1]?.x).toBeCloseTo(20);
+    expect(next[1]?.y).toBeCloseTo(10);
+    expect(next[0]?.rotation).toBe(90);
+  });
+  it("scales both widths and rotates the ribbon nib",()=>{
+    const next=transformGlyphSelection([a,b,bridge],["a","b"],{scale:2,degrees:30})!;
+    expect(next[2]?.ribbon).toMatchObject({startWidth:10,endWidth:10,nibAngle:65,sourceGlyphId:"a",targetGlyphId:"b"});
+    expect(transformGlyphSelection([a,b,bridge],["a"],{scale:2,degrees:30})).toBeNull();
+  });
+  it("rejects unsupported sizes and ribbon widths",()=>{
+    expect(transformGlyphSelection([{...a,size:900}],["a"],{scale:2,degrees:0})).toBeNull();
+    const thick={...bridge,ribbon:{...bridge.ribbon!,startWidth:100}};
+    expect(transformGlyphSelection([a,b,thick],["a","b"],{scale:2,degrees:0})).toBeNull();
   });
 });
