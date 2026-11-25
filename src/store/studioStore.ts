@@ -859,7 +859,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       const { tolerance, fitShapes, passes, cornerAngle } = get().trace;
       if (ids.length === 0) return;
       const targets = get().doc.objects.filter(
-        (o) => ids.includes(o.id) && !o.locked && o.geometry.kind === "path",
+        (o) => ids.includes(o.id) && !o.locked && o.geometry.kind === "path" && !o.geometry.holes?.length && !o.geometry.cubicSegments?.some(Boolean),
       );
       if (targets.length === 0) return;
       commit(`Smooth ${targets.length} path${targets.length > 1 ? "s" : ""}`, (doc) => ({
