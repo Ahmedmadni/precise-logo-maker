@@ -1,9 +1,9 @@
 import { angleOf, dist, pointOnCircle, pt } from "../core/geometry/math";
 import type { Geometry, Point } from "../core/geometry/types";
-import { movePathNode } from "./path-nodes";
+import { movePathNode, movePathControl, type PathControlMode } from "./path-nodes";
 import { translateGeometry } from "../objects/transform";
 
-export type HandleRole = "anchor" | "radius" | "center";
+export type HandleRole = "anchor" | "radius" | "center" | "control";
 
 export interface Handle {
   /** Stable id within a single geometry. */
@@ -11,10 +11,11 @@ export interface Handle {
   point: Point;
   role: HandleRole;
   label: string;
+  anchor?: Point;
 }
 
 /** Editable control points of a primitive, in world units. */
-export const handlesOf = (g: Geometry): Handle[] => {
+export const handlesOf = (g: Geometry, cubicEdge?: number): Handle[] => {
   if (g.kind === "line") {
     return [
       { id: "a", point: g.a, role: "anchor", label: "Start" },
@@ -33,12 +34,16 @@ export const handlesOf = (g: Geometry): Handle[] => {
     ];
   }
   if (g.kind === "path") {
-    return g.points.map((p, i) => ({
+    const anchors:Handle[]=g.points.map((p, i) => ({
       id: `p${i}`,
       point: p,
       role: "anchor" as const,
       label: `Point ${i + 1}`,
     }));
+    const edge=cubicEdge??-1;
+    const a=g.points[edge], b=g.points[edge+1]??(g.closed?g.points[0]:undefined), controls=g.cubicSegments?.[edge];
+    if(a&&b&&controls){anchors.push({id:`c${edge}:1`,point:controls.control1,anchor:a,role:"control",label:"Bézier 1"},{id:`c${edge}:2`,point:controls.control2,anchor:b,role:"control",label:"Bézier 2"});}
+    return anchors;
   }
   return [
     { id: "center", point: g.center, role: "center", label: "Center" },
@@ -92,6 +97,8 @@ export const constrainHandle = (
     return p;
   }
   if (g.kind === "path") {
+    const control=/^c(\d+):([12])$/.exec(id);
+    if(control){const edge=Number(control[1]);const anchor=g.points[edge+(control[2]==="2"?1:0)]??(g.closed?g.points[0]:undefined);return anchor?lockFrom(anchor):p;}
     const index = Number(id.slice(1));
     const anchor = g.points[index - 1] ?? g.points[index + 1];
     return anchor ? lockFrom(anchor) : p;
@@ -111,13 +118,15 @@ export const constrainHandle = (
 };
 
 /** Move one handle to `p`, returning the resulting geometry (pure). */
-export const applyHandle = (g: Geometry, id: string, p: Point): Geometry => {
+export const applyHandle = (g: Geometry, id: string, p: Point, mode:PathControlMode="free"): Geometry => {
   if (g.kind === "line") {
     if (id === "a") return { ...g, a: p };
     if (id === "b") return { ...g, b: p };
     return g;
   }
   if (g.kind === "path") {
+    const control=/^c(\d+):([12])$/.exec(id);
+    if(control)return movePathControl(g,Number(control[1]),control[2]==="1"?"control1":"control2",p,mode);
     const index = Number(id.slice(1));
     if (!Number.isInteger(index) || index < 0 || index >= g.points.length) return g;
     return movePathNode(g,index,p);
@@ -140,9 +149,10 @@ export const pickHandle = (
   g: Geometry,
   cursor: Point,
   tolerance: number,
+  cubicEdge?:number,
 ): Handle | null => {
   let best: { h: Handle; d: number } | null = null;
-  for (const h of handlesOf(g)) {
+  for (const h of handlesOf(g,cubicEdge)) {
     const d = dist(h.point, cursor);
     if (d <= tolerance && (!best || d < best.d)) best = { h, d };
   }
