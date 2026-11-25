@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {LetteringItem} from "./model";
-import {glyphLassoHits,groupMoveIds,translateGlyphSelection,glyphGroupPivot,transformGlyphSelection,arrangeGlyphSelection} from "./groupSelection";
+import {glyphLassoHits,groupMoveIds,translateGlyphSelection,glyphGroupPivot,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,glyphOverlapCandidates} from "./groupSelection";
 const glyph=(id:string,x:number):LetteringItem=>({id,kind:"outline",x,y:0,size:100,rotation:0,color:"#000",unitsPerEm:100,pathData:"M 0 0 L 10 0 L 10 10 L 0 10 Z"});
 const a=glyph("a",0),b=glyph("b",40);
 const mark:LetteringItem={id:"mark",kind:"haraka",x:5,y:-20,size:12,rotation:0,color:"#000",mark:"fatha",attachedToGlyphId:"a",anchorMode:"manual"};
@@ -93,5 +93,37 @@ describe("group outline alignment and distribution",()=>{
     expect(arrangeGlyphSelection([a,b,bridge],["a","b"],"x","min")).toEqual({ok:false,reason:"bridge"});
     const result=arrangeGlyphSelection([a,b,bridge],["a","b"],"y","min");
     expect(result.ok&&result.changed).toBe(false);
+  });
+});
+
+
+describe("intentional stacking and overlap diagnostics",()=>{
+  it("distinguishes overlapping bounds from touching bounds",()=>{
+    expect(glyphOverlapCandidates([a,glyph("c",8)],["a","c"])[0]).toMatchObject({a:"a",b:"c",width:2,height:10,ratio:.2});
+    expect(glyphOverlapCandidates([a,glyph("c",10)],["a","c"])).toHaveLength(0);
+  });
+  it("preserves group midpoint and attached mark offset with negative spacing",()=>{
+    const result=spaceGlyphSelection([a,b,mark],["a","b"],"x",-2);
+    expect(result.ok).toBe(true);
+    if(result.ok){
+      expect(result.items[0]?.x).toBeCloseTo(16);
+      expect(result.items[1]?.x).toBeCloseTo(24);
+      expect(result.items[2]?.x).toBeCloseTo(21);
+      expect(glyphOverlapCandidates(result.items,["a","b"])).toHaveLength(1);
+      expect(glyphGroupPivot(result.items,["a","b"])).toEqual(glyphGroupPivot([a,b],["a","b"]));
+    }
+  });
+  it("rejects excessive overlap and live-join distortion",()=>{
+    expect(spaceGlyphSelection([a,b],["a","b"],"x",-10)).toEqual({ok:false,reason:"overlap"});
+    expect(spaceGlyphSelection([a,b,bridge],["a","b"],"x",5)).toEqual({ok:false,reason:"bridge"});
+  });
+  it("allows positive spacing and keeps unrelated glyphs unchanged",()=>{
+    const c=glyph("c",100);
+    const result=spaceGlyphSelection([a,b,c],["a","b"],"x",5);
+    expect(result.ok).toBe(true);
+    if(result.ok){
+      expect(result.items[1]!.x-result.items[0]!.x).toBeCloseTo(15);
+      expect(result.items[2]).toBe(c);
+    }
   });
 });
