@@ -4,7 +4,7 @@ import { worldJoinAnchor } from "./contourComposer";
 import { preciseGlyphBounds } from "./morph";
 
 export type KelkSlantPresetId = "vertical" | "thuluth" | "ruqaa" | "nastaliq";
-export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset";
+export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset" | "vertical" | "circle";
 export type KashidaStyle = "flat" | "arch" | "wave";
 
 export interface KelkSlantPreset {
@@ -95,6 +95,32 @@ export function composeWordLayout(
           rotation: round(dir * -2.5 * k),
         },
       };
+    });
+  }
+
+  if (style === "vertical" || style === "circle") {
+    // Fontkit emits RTL runs in visual LTR order, with increasing glyphIndex.
+    // Stable indexes avoid reshuffling the word on repeated circular layouts.
+    const indexed = glyphs.every(g => Number.isInteger(g.glyphIndex)) &&
+      new Set(glyphs.map(g => g.glyphIndex)).size === glyphs.length;
+    const ordered = indexed ? [...glyphs].sort((a,b) => b.glyphIndex! - a.glyphIndex!) :
+      items.filter(g => glyphs.includes(g));
+    if (ordered.some(g => !Number.isFinite(g.x) || !Number.isFinite(g.y) || !Number.isFinite(g.size))) return [];
+    const cx = ordered.reduce((sum,g)=>sum+g.x,0)/ordered.length;
+    const cy = ordered.reduce((sum,g)=>sum+g.y,0)/ordered.length;
+    const metrics = ordered.map(g => {
+      const b = preciseGlyphBounds({...g,x:0,y:0,rotation:0});
+      return b ? {x:b.x+b.width/2,y:b.y+b.height/2,diameter:Math.hypot(b.width,b.height)} :
+        {x:0,y:-g.size/2,diameter:Math.max(1,g.size)};
+    });
+    const diameter = Math.max(1,...metrics.map(m=>m.diameter));
+    const separation = diameter*(1+0.15*k);
+    const radius = separation/(2*Math.sin(Math.PI/ordered.length));
+    return ordered.map((g,i)=>{
+      const theta = -Math.PI/2-i*2*Math.PI/ordered.length;
+      const px=style==="vertical"?cx:cx+radius*Math.cos(theta);
+      const py=style==="vertical"?cy+(i-(ordered.length-1)/2)*separation:cy+radius*Math.sin(theta);
+      return {id:g.id,patch:{x:round(px-metrics[i]!.x),y:round(py-metrics[i]!.y),rotation:0}};
     });
   }
 
