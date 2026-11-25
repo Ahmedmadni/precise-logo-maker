@@ -29,6 +29,7 @@ const LAYOUT_OPTIONS: { id: KelkLayoutStyle; label: string }[] = [
   { id: "arch", label: "قوس خطّي" },
   { id: "vertical", label: "تركيب رأسي" },
   { id: "circle", label: "تركيب دائري" },
+  { id: "ellipse", label: "تركيب بيضاوي" },
   { id: "reset", label: "تصفير الميل والارتفاع" },
 ];
 
@@ -54,6 +55,11 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const targets = moveScope === "word" && siblings.length > 1 ? siblings : [selected];
   const hasWordGroup = siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length > 1;
   const [layoutIntensity, setLayoutIntensity] = useState(1);
+  const [orbitAspect, setOrbitAspect] = useState(1.5);
+  const [orbitRadius, setOrbitRadius] = useState(1);
+  const [orbitStart, setOrbitStart] = useState(-90);
+  const [orbitClockwise, setOrbitClockwise] = useState(false);
+  const [orbitTangent, setOrbitTangent] = useState(false);
   const [spacingStep, setSpacingStep] = useState(6);
   const kashidaOptions = {
     length: kashidaLength,
@@ -108,7 +114,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
     const ids = new Set((hasWordGroup ? siblings : [selected]).map(item => item.id));
-    const patches = composeWordLayout(latest.filter(item => ids.has(item.id) && !item.hidden), style, layoutIntensity);
+    const patches = composeWordLayout(latest.filter(item => ids.has(item.id) && !item.hidden), style, layoutIntensity, { aspect:orbitAspect, radiusScale:orbitRadius, startAngle:orbitStart, clockwise:orbitClockwise, tangent:orbitTangent });
     if (patches.length) updateMany(patches, label);
   };
 
@@ -182,7 +188,27 @@ export function KelkCompositionPanel({ selected, siblings }: {
           </span>
           <input type="range" min={0.25} max={3} step={0.25} value={layoutIntensity} onChange={e => setLayoutIntensity(Number(e.target.value))} disabled={!hasWordGroup} className="w-full" />
         </label>
-        <p className="text-[11px] text-muted-foreground">التركيب الرأسي والدائري يعيد توزيع الحروف كعناصر زخرفية مستقلة؛ قد يفصل الوصلات الطبيعية للكلمة. لاستعادة المواضع السابقة استخدم التراجع.</p>
+        <p className="text-[11px] text-muted-foreground">التركيب الرأسي والدائري والبيضاوي يعيد توزيع الحروف كعناصر زخرفية مستقلة؛ قد يفصل الوصلات الطبيعية للكلمة. لاستعادة المواضع السابقة استخدم التراجع.</p>
+        <details className="rounded-lg border border-border p-2">
+          <summary className="cursor-pointer py-2 text-xs font-medium">إعدادات المسار الدائري والبيضاوي</summary>
+          <div className="space-y-2 text-xs">
+            <label className="block space-y-1">
+              <span className="flex justify-between"><span>نسبة عرض البيضاوي إلى ارتفاعه</span><span dir="ltr">{orbitAspect.toFixed(1)}×</span></span>
+              <input type="range" min={0.5} max={2.5} step={0.1} value={orbitAspect} onChange={e=>setOrbitAspect(Number(e.target.value))} className="w-full"/>
+            </label>
+            <label className="block space-y-1">
+              <span className="flex justify-between"><span>اتساع نصف القطر</span><span dir="ltr">{orbitRadius.toFixed(1)}×</span></span>
+              <input type="range" min={1} max={3} step={0.1} value={orbitRadius} onChange={e=>setOrbitRadius(Number(e.target.value))} className="w-full"/>
+            </label>
+            <label className="block space-y-1">
+              <span className="flex justify-between"><span>زاوية البداية</span><span dir="ltr">{orbitStart}°</span></span>
+              <input type="range" min={-180} max={180} step={5} value={orbitStart} onChange={e=>setOrbitStart(Number(e.target.value))} className="w-full"/>
+            </label>
+            <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitClockwise} onChange={e=>setOrbitClockwise(e.target.checked)}/> مع عقارب الساعة</label>
+            <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={orbitTangent} onChange={e=>setOrbitTangent(e.target.checked)}/> تدوير الحروف وفق مماس المسار</label>
+            <p className="text-[11px] text-muted-foreground">تطبق الإعدادات عند اختيار التركيب الدائري أو البيضاوي؛ وقد تنقلب بعض الحروف عند اختيار اتجاه المماس.</p>
+          </div>
+        </details>
         <div className="grid grid-cols-2 gap-1">
           {LAYOUT_OPTIONS.map((opt) => (
             <button
