@@ -40,6 +40,15 @@ export const Route = createFileRoute("/")({
 function StudioPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(true);
+  // Close the narrow-screen overlay when moving into the desktop layout,
+  // so rotating back does not unexpectedly reopen a stale sheet.
+  useEffect(() => {
+    const query=window.matchMedia("(min-width: 1024px)");
+    const sync=()=>{if(query.matches)setPanelOpen(false);};
+    sync();
+    query.addEventListener("change",sync);
+    return ()=>query.removeEventListener("change",sync);
+  },[]);
   const openProperties = () => {
     if (window.matchMedia("(min-width: 1024px)").matches) setDesktopPanelOpen(true);
     else setPanelOpen(true);
@@ -54,13 +63,13 @@ function StudioPage() {
   }, [panelOpen]);
 
   return (
-    <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground pt-[env(safe-area-inset-top)] ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)]">
       <ClientOnly fallback={null}>
         <LanguageSync />
       </ClientOnly>
       <StudioHeader />
       <div className="flex min-h-0 flex-1">
-        <div className="hidden shrink-0 lg:flex lg:flex-col lg:border-e lg:border-border">
+        <div className="hidden min-h-0 shrink-0 lg:flex lg:flex-col lg:border-e lg:border-border">
           <button type="button" onClick={() => setDesktopPanelOpen((value) => !value)}
             aria-label={desktopPanelOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}
             aria-expanded={desktopPanelOpen}
@@ -68,11 +77,11 @@ function StudioPage() {
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             {desktopPanelOpen ? "إخفاء الخصائص" : "الخصائص"}
           </button>
-          {desktopPanelOpen && <div className="min-h-0 w-[min(23rem,30vw)] flex-1 overflow-hidden">
+          {desktopPanelOpen && <div className="min-h-0 w-[clamp(17rem,28vw,23rem)] flex-1 overflow-hidden">
             <RightPanel />
           </div>}
         </div>
-        <main className="relative min-w-0 flex-1">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
             <CanvasWithShortcuts />
           </ClientOnly>
@@ -84,20 +93,20 @@ function StudioPage() {
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
           </ClientOnly>
         </main>
-        <div className="hidden sm:flex">
+        <div className="hidden min-h-0 shrink-0 sm:flex">
           <ToolRail onOpenLettering={openProperties} />
         </div>
 
         {/* Small screens keep a slide-over sheet; desktop properties stay beside the canvas. */}
         {panelOpen && (
-          <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
+          <div className="fixed inset-x-0 top-0 bottom-[calc(56px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
             <button
               type="button"
               aria-label="إغلاق لوحة الأدوات"
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
+            <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] max-h-full overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,85vw)] sm:rounded-none">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>
@@ -117,7 +126,7 @@ function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; open
   return (
     <button type="button" onClick={() => { setSection("edit"); openPanel(); }}
       aria-label="تحرير العنصر المحدد"
-      className="absolute bottom-4 end-3 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-primary/60 bg-card/95 px-4 text-xs font-semibold text-primary shadow-xl backdrop-blur-sm sm:hidden">
+      className="absolute bottom-4 end-3 z-20 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/60 bg-card/95 px-4 text-xs font-semibold text-primary shadow-xl backdrop-blur-sm sm:hidden">
       <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
       {glyph ? "تعديل الحرف المحدد" : "تعديل الشكل المحدد"}
     </button>
@@ -131,7 +140,7 @@ function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }
       type="button"
       onClick={onToggle}
       aria-label={t("Panels")}
-      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex lg:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg lg:hidden"
+      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex lg:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg"
     >
       {open ? (
         <X className="h-5 w-5" aria-hidden />
