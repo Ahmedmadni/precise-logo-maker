@@ -67,3 +67,30 @@ export function scaleCompoundHole(path:PathGeometry,index:number,factor:number):
   const center=ring.reduce((s,p)=>({x:s.x+p.x/ring.length,y:s.y+p.y/ring.length}),{x:0,y:0});
   return replaceCompoundHole(path,index,ring.map(p=>({x:center.x+(p.x-center.x)*factor,y:center.y+(p.y-center.y)*factor})));
 }
+
+
+/** Subdivide a ring edge without changing the filled shape. */
+export function insertCompoundHoleNode(path:PathGeometry,index:number,node:number):RingEditResult{
+  const ring=path.holes?.[index];
+  if(!ring||!Number.isInteger(node)||node<0||node>=ring.length)return {ok:false,reason:"invalid"};
+  const a=ring[node]!,b=ring[(node+1)%ring.length]!;
+  const next=[...ring];
+  next.splice(node+1,0,{x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+  return replaceCompoundHole(path,index,next);
+}
+
+/** Remove a node only when the resulting ring remains valid. */
+export function deleteCompoundHoleNode(path:PathGeometry,index:number,node:number):RingEditResult{
+  const ring=path.holes?.[index];
+  if(!ring||ring.length<=3||!Number.isInteger(node)||node<0||node>=ring.length)return {ok:false,reason:"invalid"};
+  return replaceCompoundHole(path,index,ring.filter((_,i)=>i!==node));
+}
+
+/** Rotate one hole around its vertex centroid. */
+export function rotateCompoundHole(path:PathGeometry,index:number,degrees:number):RingEditResult{
+  const ring=path.holes?.[index];
+  if(!ring?.length||!Number.isFinite(degrees))return {ok:false,reason:"invalid"};
+  const center=ring.reduce((s,p)=>({x:s.x+p.x/ring.length,y:s.y+p.y/ring.length}),{x:0,y:0});
+  const angle=(degrees%360)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+  return replaceCompoundHole(path,index,ring.map(p=>({x:center.x+(p.x-center.x)*cos-(p.y-center.y)*sin,y:center.y+(p.x-center.x)*sin+(p.y-center.y)*cos})));
+}
