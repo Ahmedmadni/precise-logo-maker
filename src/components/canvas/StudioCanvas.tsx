@@ -32,6 +32,8 @@ import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../c
 import { geometryToPathData } from "../../objects/render";
 import {lassoHits,combineLassoSelection,lassoNodeIndices,combineNodeSelection,type LassoMode} from "../../editor/lassoSelection";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
+import {glyphLassoHits,groupMoveIds,translateGlyphSelection} from "../../calligraphy/groupSelection";
+import {preciseGlyphBounds} from "../../calligraphy/morph";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
@@ -95,6 +97,10 @@ export function StudioCanvas() {
   const pathControlSelection=useStudio(s=>s.pathControlSelection);
   const lassoActive=useStudio(s=>s.lassoActive);
   const lassoEnabled=lassoActive&&tool==="select";
+  const glyphLasso=useStudio(s=>s.glyphLassoActive);
+  const glyphMultiIds=useStudio(s=>s.glyphMultiIds);
+  const glyphMultiDrag=useRef<{source:LetteringItem[];ids:string[];start:Point}|null>(null);
+  const [glyphMultiPreview,setGlyphMultiPreview]=useState<{source:LetteringItem[];next:LetteringItem[]}|null>(null);
   const nodeLassoId=useStudio(s=>s.nodeLassoTargetId);
   const nodeSelection=useStudio(s=>s.pathNodeSelection);
   const nodeTarget=lassoEnabled&&nodeLassoId&&selection.length===1&&selection[0]===nodeLassoId?doc.objects.find(o=>o.id===nodeLassoId&&!o.locked&&o.visible&&!o.guide&&o.geometry.kind==="path"&&!o.geometry.holes?.length):undefined;
@@ -106,7 +112,7 @@ export function StudioCanvas() {
   const [lassoTrail,setLassoTrail]=useState<Point[]>([]);
   const [lassoNotice,setLassoNotice]=useState("");
   const lassoDrag=useRef<{points:Point[];mode:LassoMode}|null>(null);
-  useEffect(()=>{lassoDrag.current=null;groupDrag.current=null;setGroupPreview(null);setLassoTrail([]);setLassoNotice("");},[lassoEnabled,nodeLassoId]);
+  useEffect(()=>{lassoDrag.current=null;groupDrag.current=null;glyphMultiDrag.current=null;setGlyphMultiPreview(null);setGroupPreview(null);setLassoTrail([]);setLassoNotice("");},[lassoEnabled,nodeLassoId,glyphLasso]);
   const knifeTargetId=useStudio(s=>s.knifeTargetId);
   const knifeTarget=tool==="select"&&selection.length===1&&selection[0]===knifeTargetId&&!doc.objects.find(o=>o.id===knifeTargetId)?.guide
     ?doc.objects.find(o=>o.id===knifeTargetId&&o.visible&&!o.locked&&o.cellKey===undefined&&(o.geometry.kind==="circle"||(o.geometry.kind==="path"&&o.geometry.closed))):undefined;
@@ -442,7 +448,7 @@ export function StudioCanvas() {
     setLetterOffset(null);
     setDragOffset(null);
     setBox(null);
-    lassoDrag.current=null;groupDrag.current=null;setGroupPreview(null);setLassoTrail([]);setLassoNotice("");
+    lassoDrag.current=null;groupDrag.current=null;glyphMultiDrag.current=null;setGlyphMultiPreview(null);setGroupPreview(null);setLassoTrail([]);setLassoNotice("");
     setHandleDrag(null);
     knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");
     penActiveRef.current = false;
@@ -519,6 +525,16 @@ export function StudioCanvas() {
 
     if(lassoEnabled){
       if(guideLayer.edit){setLassoNotice("اخرج من تحرير الأدلة أولًا.");return;}
+      if(glyphLasso&&!e.shiftKey&&!e.altKey&&lassoMode==="replace"){
+        const source=doc.lettering;
+        const id=(e.target as Element).closest("[data-lettering-id]")?.getAttribute("data-lettering-id");
+        if(source&&id&&glyphMultiIds.includes(id)){
+          const check=groupMoveIds(source,glyphMultiIds);
+          if(!check.ok){setLassoNotice(check.reason==="bridge"?"حدد طرفي الوصلة معًا قبل التحريك.":"أعد تحديد الحروف.");return;}
+          glyphMultiDrag.current={source,ids:[...glyphMultiIds],start:world};
+          setGlyphMultiPreview({source,next:source});return;
+        }
+      }
       if(nodeLassoId&&!nodePath){setLassoNotice("حدد مسارًا صالحًا لتحرير النقاط.");return;}
       if(nodeTarget&&nodePath&&!e.shiftKey&&!e.altKey&&selectedAnchors.some(i=>nodePath.points[i]&&dist(nodePath.points[i]!,world)*view.zoom<=10)){
         groupDrag.current={id:nodeTarget.id,source:nodePath,indices:[...selectedAnchors],start:world};
@@ -755,6 +771,14 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if(glyphMultiDrag.current){
+      const drag=glyphMultiDrag.current;
+      if(doc.lettering===drag.source){
+        const next=translateGlyphSelection(drag.source,drag.ids,world.x-drag.start.x,world.y-drag.start.y);
+        setGlyphMultiPreview({source:drag.source,next:next??drag.source});
+      }
+      return;
+    }
     if(groupDrag.current){
       const drag=groupDrag.current;
       if(nodePath===drag.source)setGroupPreview({id:drag.id,source:drag.source,next:nudgePathNodes(drag.source,drag.indices,world.x-drag.start.x,world.y-drag.start.y)});
@@ -935,6 +959,15 @@ export function StudioCanvas() {
     activePointerRef.current = null;
     activePointerTypeRef.current = null;
     panRef.current = null;
+    if(glyphMultiDrag.current){
+      const drag=glyphMultiDrag.current;glyphMultiDrag.current=null;setGlyphMultiPreview(null);
+      if(!e)return;
+      const end=toWorld(e.clientX,e.clientY);
+      if(dist(end,drag.start)*view.zoom<1)return;
+      const ok=useStudio.getState().moveGlyphMulti(drag.source,drag.ids,end.x-drag.start.x,end.y-drag.start.y);
+      setLassoNotice(ok?"تم تحريك الحروف وتشكيلاتها.":"تغير التحديد أو توجد وصلة خارج المجموعة.");
+      return;
+    }
     if(groupDrag.current){
       const drag=groupDrag.current;groupDrag.current=null;setGroupPreview(null);
       if(!e)return;
@@ -953,6 +986,13 @@ export function StudioCanvas() {
       if(points.length<3){setLassoNotice("ارسم مساحة مغلقة حول العناصر.");return;}
       const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
       if((Math.max(...xs)-Math.min(...xs))*view.zoom<6||(Math.max(...ys)-Math.min(...ys))*view.zoom<6){setLassoNotice("مساحة التحديد صغيرة جدًا.");return;}
+      if(state.glyphLassoActive){
+        const items=state.doc.lettering??[];
+        const before=state.glyphMultiIds.filter(id=>items.some(i=>i.id===id&&!i.hidden&&i.kind==="outline"));
+        const ids=combineLassoSelection(before,glyphLassoHits(items,points),drag.mode);
+        state.setGlyphMultiIds(ids);setLassoNotice(`تم تحديد ${ids.length} حرف متجهي. اختر «جديد» للسحب.`);
+        return;
+      }
       if(state.nodeLassoTargetId){
         const target=state.doc.objects.find(o=>o.id===state.nodeLassoTargetId);
         if(!target||target.locked||!target.visible||target.guide||target.geometry.kind!=="path"||target.geometry.holes?.length||state.selection.length!==1||state.selection[0]!==target.id)return;
@@ -1197,7 +1237,7 @@ export function StudioCanvas() {
 
   // Resolve a temporary set of glyphs for live link-following previews during
   // touches, keyboard adjustments, and Bézier editing. This is never saved.
-  const sourceLettering = doc.lettering ?? [];
+  const sourceLettering = glyphMultiPreview?.source===doc.lettering ? glyphMultiPreview.next : doc.lettering ?? [];
   const draggingGlyph = sourceLettering.find((item) => item.id === letterDragRef.current?.id);
   const wordDrag = letterDragRef.current?.scope === "word" && !!draggingGlyph?.groupId;
   const renderedLettering = sourceLettering.map((item) => {
@@ -1355,7 +1395,7 @@ export function StudioCanvas() {
               return <LetteringGlyph key={item.id}
                 item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
                 allItems={renderedLettering}
-                selected={item.id === selectedLetteringId}
+                selected={item.id === selectedLetteringId||(glyphLasso&&glyphMultiIds.includes(item.id))}
                 offset={letterOffset && moved ? letterOffset : null}
                 overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
             })}
@@ -1550,6 +1590,7 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {glyphLasso&&<g pointerEvents="none">{sourceLettering.filter(i=>i.kind==="outline"&&!i.hidden&&glyphMultiIds.includes(i.id)).map(i=>{const b=preciseGlyphBounds(i);return b?<rect key={i.id} x={b.x} y={b.y} width={b.width} height={b.height} fill="none" stroke="var(--color-primary)" strokeDasharray="4 3" strokeWidth="1" vectorEffect="non-scaling-stroke"/>:null;})}</g>}
           {nodeTarget&&nodePath&&<g pointerEvents="none">
             {(groupPreview?.id===nodeTarget.id&&groupPreview.source===nodePath?groupPreview.next:nodePath).points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={(selectedAnchors.includes(i)?5:3)/view.zoom} fill={selectedAnchors.includes(i)?"var(--color-primary)":"var(--color-background)"} stroke="var(--color-primary)" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/>)}
           </g>}
@@ -1603,10 +1644,10 @@ export function StudioCanvas() {
       </svg>
       <CanvasZoomControls />
       {lassoEnabled&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[95%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
-        <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||(nodeLassoId?"حدد النقاط بالرسم حولها، ثم اسحب نقطة محددة.":"التحديد الحر: ارسم حول الأشكال")}</p>
+        <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||(glyphLasso?"حدد مراكز الحروف ثم اسحب حرفًا محددًا.":nodeLassoId?"حدد النقاط بالرسم حولها، ثم اسحب نقطة محددة.":"التحديد الحر: ارسم حول الأشكال")}</p>
         <div className="flex flex-wrap gap-1">
           {([{id:"replace",label:"جديد"},{id:"add",label:"إضافة"},{id:"subtract",label:"استبعاد"}] as const).map(m=><button key={m.id} type="button" aria-pressed={lassoMode===m.id} className={`min-h-10 rounded border px-2 text-xs ${lassoMode===m.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setLassoMode(m.id);setLassoNotice("");}}>{m.label}</button>)}
-          <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>{const s=useStudio.getState();if(nodeLassoId)s.setNodeLassoTarget(null);else s.setLassoActive(false);}}>إنهاء</button>
+          <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>{const s=useStudio.getState();if(glyphLasso)s.setGlyphLassoActive(false);else if(nodeLassoId)s.setNodeLassoTarget(null);else s.setLassoActive(false);}}>إنهاء</button>
         </div>
       </div>}
       {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
