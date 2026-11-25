@@ -76,3 +76,47 @@ export function composeFreePath(items:LetteringItem[],guide:GuideChain,options:F
   }
   return result;
 }
+
+
+export function validGuide(value:unknown):value is GuideChain{
+  return Array.isArray(value)&&value.length>=4&&value.length<=25&&(value.length-1)%3===0&&
+    value.every(p=>p!==null&&typeof p==="object"&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=0&&p.x<=100&&p.y>=0&&p.y<=100);
+}
+
+/** Smooth mode aligns opposite handles, preserving the opposite handle's
+ * length unless the guide editor boundary requires shortening it. */
+export function moveGuidePoint(chain:GuideChain,index:number,point:GuidePoint,smooth:boolean):GuideChain{
+  if(!validGuide(chain)||!Number.isInteger(index)||!chain[index]||![point.x,point.y].every(Number.isFinite))return chain;
+  const clamp=(n:number)=>Math.max(0,Math.min(100,n));
+  const next=chain.map(p=>({...p}));
+  const old=next[index]!,p={x:clamp(point.x),y:clamp(point.y)};
+  next[index]=p;
+  if(!smooth)return next;
+  if(index%3===0){
+    for(const i of [index-1,index+1]){
+      if(!next[i])continue;
+      const q=next[i]!;
+      next[i]={x:clamp(q.x+p.x-old.x),y:clamp(q.y+p.y-old.y)};
+    }
+    return next;
+  }
+  const anchor=index%3===1?index-1:index+1;
+  const opposite=2*anchor-index;
+  if(!next[opposite]||!next[anchor])return next;
+  const a=next[anchor]!,q=next[opposite]!;
+  const dx=a.x-p.x,dy=a.y-p.y,len=Math.hypot(dx,dy);
+  if(len<1e-8)return next;
+  const ux=dx/len,uy=dy/len;
+  let l=Math.hypot(q.x-a.x,q.y-a.y);
+  if(ux>0)l=Math.min(l,(100-a.x)/ux);else if(ux<0)l=Math.min(l,-a.x/ux);
+  if(uy>0)l=Math.min(l,(100-a.y)/uy);else if(uy<0)l=Math.min(l,-a.y/uy);
+  next[opposite]={x:clamp(a.x+ux*l),y:clamp(a.y+uy*l)};
+  return next;
+}
+
+export const GUIDE_PRESETS:{name:string;guide:GuideChain}[]=[
+  {name:"متموج",guide:DEFAULT_GUIDE},
+  {name:"قوس علوي",guide:[{x:90,y:70},{x:75,y:5},{x:25,y:5},{x:10,y:70}]},
+  {name:"قوس سفلي",guide:[{x:90,y:30},{x:75,y:95},{x:25,y:95},{x:10,y:30}]},
+  {name:"قطري",guide:[{x:90,y:15},{x:65,y:35},{x:35,y:65},{x:10,y:85}]},
+];
