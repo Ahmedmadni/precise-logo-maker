@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { PathGeometry, Point } from "../../core/geometry/types";
-import { insertPathNode, deletePathNode, movePathNode, setPathEdgeCurved, movePathControl, type PathControl, type PathControlMode } from "../../editor/path-nodes";
+import { insertPathNode, deletePathNode, movePathNode, arrangePathNodes, nudgePathNodes, setPathEdgeCurved, movePathControl, type PathControl, type PathControlMode } from "../../editor/path-nodes";
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { Button } from "../ui/button";
@@ -9,6 +9,16 @@ import { Button } from "../ui/button";
 export function PathNodesSection({ objectId, path, disabled, onChange }: { objectId:string; path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
   const t = useT();
   const [node, setNode] = useState(0);
+  const [multi,setMulti]=useState<number[]>([]);
+  const [multiAxis,setMultiAxis]=useState<"x"|"y">("x");
+  const [step,setStep]=useState(5);
+  const [multiNotice,setMultiNotice]=useState("");
+  const [nodeFilter,setNodeFilter]=useState("");
+  const selectedNodes=multi.filter(i=>Number.isInteger(i)&&i>=0&&i<path.points.length);
+  const changeMany=(next:PathGeometry)=>{
+    if(next===path){setMultiNotice("لا يوجد تعديل قابل للتطبيق.");return;}
+    onChange(next);setMultiNotice("تم تعديل النقاط المحددة دفعة واحدة.");
+  };
   const [mode,setMode]=useState<PathControlMode>("free");
   const canvasControl=useStudio(s=>s.pathControlSelection);
   const setCanvasControl=useStudio(s=>s.setPathControlSelection);
@@ -45,10 +55,40 @@ export function PathNodesSection({ objectId, path, disabled, onChange }: { objec
         {(["x", "y"] as const).map((axis) => <label key={axis} className="space-y-1 text-xs">{axis.toUpperCase()}<input aria-label={`${t("Node")} ${axis.toUpperCase()}`} type="number" step="0.5" value={Number(point[axis].toFixed(4))} className="w-full rounded-md border border-border bg-background p-1.5" onChange={(e) => update(axis, e.target.value)} /></label>)}
       </div>
       <div className="flex gap-2">
-        <Button variant="outline" size="icon" title={t("Add node")} aria-label={t("Add node")} disabled={disabled || (!path.closed && index === path.points.length - 1)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);onChange(insertPathNode(path, index)); setNode(index + 1); }}><Plus /></Button>
-        <Button variant="outline" size="icon" title={t("Delete node")} aria-label={t("Delete node")} disabled={disabled || path.points.length <= (path.closed ? 3 : 2)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);onChange(deletePathNode(path, index)); setNode(Math.max(0, index - 1)); }}><Trash2 /></Button>
+        <Button variant="outline" size="icon" title={t("Add node")} aria-label={t("Add node")} disabled={disabled || (!path.closed && index === path.points.length - 1)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);setMulti([]);setMultiNotice("");onChange(insertPathNode(path, index)); setNode(index + 1); }}><Plus /></Button>
+        <Button variant="outline" size="icon" title={t("Delete node")} aria-label={t("Delete node")} disabled={disabled || path.points.length <= (path.closed ? 3 : 2)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);setMulti([]);setMultiNotice("");onChange(deletePathNode(path, index)); setNode(Math.max(0, index - 1)); }}><Trash2 /></Button>
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={path.closed} disabled={disabled || path.points.length < 3} onChange={(e) => onChange({ ...path, closed: e.target.checked })} />{t("Closed path")}</label>
       </div>
+      <details className="rounded-lg border border-border p-2">
+        <summary className="cursor-pointer py-2 text-xs font-semibold">تحرير جماعي للنقاط</summary>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs"><span>النقاط المحددة</span><span dir="ltr">{selectedNodes.length} / {path.points.length}</span></div>
+          <div className="grid grid-cols-2 gap-1">
+            <button type="button" className="min-h-11 rounded border border-border text-xs" onClick={()=>{setMulti(path.points.map((_,i)=>i));setMultiNotice("");}}>تحديد الكل</button>
+            <button type="button" className="min-h-11 rounded border border-border text-xs" onClick={()=>{setMulti([]);setMultiNotice("");}}>إلغاء التحديد</button>
+          </div>
+          <input type="search" aria-label="البحث برقم النقطة" placeholder="رقم النقطة" value={nodeFilter} onChange={e=>setNodeFilter(e.target.value)} className="min-h-10 w-full rounded border border-border bg-background px-2 text-xs"/>
+          <div className="grid max-h-36 grid-cols-4 gap-1 overflow-y-auto overscroll-contain">
+            {path.points.map((_,i)=>i).filter(i=>!nodeFilter.trim()||String(i+1).includes(nodeFilter.trim())).map(i=><button key={i} type="button" aria-label={`تحديد نقطة ${i+1}`} aria-pressed={selectedNodes.includes(i)} onClick={()=>{setMulti(old=>old.includes(i)?old.filter(n=>n!==i):[...old,i]);setMultiNotice("");}} className={`min-h-10 rounded border text-xs ${selectedNodes.includes(i)?"border-primary bg-primary/15 font-bold":"border-border"}`}>{i+1}</button>)}
+          </div>
+          <label className="block text-xs">محور المحاذاة والتوزيع
+            <select value={multiAxis} onChange={e=>setMultiAxis(e.target.value as "x"|"y")} className="min-h-11 w-full rounded border border-border bg-background px-2">
+              <option value="x">أفقي X</option><option value="y">رأسي Y</option>
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-1">
+            {([{id:"min",label:"محاذاة للحد الأدنى"},{id:"center",label:"محاذاة للمنتصف"},{id:"max",label:"محاذاة للحد الأعلى"},{id:"distribute",label:"توزيع متساوٍ"}] as const).map(op=><button type="button" key={op.id} disabled={selectedNodes.length<(op.id==="distribute"?3:2)} className="min-h-11 rounded border border-border px-1 text-xs disabled:opacity-40" onClick={()=>changeMany(arrangePathNodes(path,selectedNodes,multiAxis,op.id))}>{op.label}</button>)}
+          </div>
+          <label className="block text-xs">خطوة الإزاحة
+            <select value={step} onChange={e=>setStep(Number(e.target.value))} className="min-h-11 w-full rounded border border-border bg-background px-2">{[1,2,5,10,25,50].map(s=><option key={s} value={s}>{s} px</option>)}</select>
+          </label>
+          <div className="grid grid-cols-4 gap-1">
+            {([{label:"يمين",x:1,y:0,icon:"→"},{label:"يسار",x:-1,y:0,icon:"←"},{label:"أعلى",x:0,y:-1,icon:"↑"},{label:"أسفل",x:0,y:1,icon:"↓"}]).map(d=><button key={d.label} type="button" aria-label={d.label} disabled={!selectedNodes.length} onClick={()=>changeMany(nudgePathNodes(path,selectedNodes,d.x*step,d.y*step))} className="min-h-11 rounded border border-border disabled:opacity-40">{d.icon}</button>)}
+          </div>
+          <p className="text-[11px] text-muted-foreground">تتحرك مقابض المنحنيات مع نقاطها. قد يؤدي تغيير مواضع عدة نقاط إلى تغيير هيئة المسار أو تقاطع حدوده؛ راجع التصميم بعد التطبيق.</p>
+          {multiNotice&&<p role="status" className="text-xs text-muted-foreground">{multiNotice}</p>}
+        </div>
+      </details>
       {end&&<details className="rounded-lg border border-border p-2">
         <summary className="cursor-pointer py-2 text-xs font-semibold">تحرير منحنى المقطع التالي</summary>
         <div className="space-y-2">
