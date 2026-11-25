@@ -67,7 +67,11 @@ export function LetteringPanel({ section, onCreated }: {
   const [showHiddenLayers,setShowHiddenLayers]=useState(false);
   const layerKind=(item:LetteringItem)=>item.kind==="outline"?(item.catalogShapeId?"شكل خطاطي":"حرف متجهي"):item.kind==="haraka"?"حركة تشكيل":item.kind==="ornament"?"زخرفة":item.kind==="bridge"?"وصلة":"نص";
   const normalizeSearch=(value:string)=>removeArabicMarks(value).replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").toLocaleLowerCase().trim();
-  const matchesSearch=(value:string,query:string)=>normalizeSearch(value).includes(normalizeSearch(query));
+  const matchesSearch=(value:string,query:string)=>{
+    if(!query.trim())return true;
+    const normalized=normalizeSearch(query);
+    return normalized?normalizeSearch(value).includes(normalized):value.includes(query.trim());
+  };
   const writeSymbol = (symbol: string) => {
     const result = insertAtSelection(phrase, caret.current.start, caret.current.end, symbol);
     if (result.text.length > 120) return;
@@ -407,7 +411,7 @@ export function LetteringPanel({ section, onCreated }: {
           {visibleGroups.length===0&&<p className="text-xs text-muted-foreground">لا توجد كلمات مطابقة.</p>}
           {visibleGroups.map(([groupId,glyphs],i)=>{
             const shown=glyphs.filter(g=>showHiddenLayers||!g.hidden);
-            const first=shown.find(g=>g.kind==="outline")??shown[0];
+            const first=shown.find(g=>g.kind==="outline"&&!g.hidden)??shown.find(g=>g.kind==="outline")??shown[0];
             if(!first)return null;
             const expanded=expandedGroup===groupId;
             const containsSelection=glyphs.some(g=>g.id===selectedId);
@@ -425,7 +429,7 @@ export function LetteringPanel({ section, onCreated }: {
                     {g.hidden&&<EyeOff className="h-3 w-3 shrink-0"/>}<span className="truncate">{layerKind(g)} {n+1}</span>
                   </button>)}
                 </div>
-                <button className={button+" w-full"} type="button" onClick={()=>{
+                <button className={button+" w-full"} type="button" disabled={first.kind!=="outline"||!first.sourceText} onClick={()=>{
                   setPhrase(first.sourceText??"");setFont(first.font??"Amiri");setFontSize(first.size);setInk(first.color);setEditRun(groupId);setMode("words");
                 }}><RotateCcw className="h-4 w-4"/>إعادة تشكيل الكلمة</button>
                 {containsSelection&&<button type="button" className={button+" w-full"} onClick={()=>setWorkspaceSection("edit")}>تحرير العنصر المحدد</button>}
