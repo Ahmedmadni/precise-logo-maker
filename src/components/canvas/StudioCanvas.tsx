@@ -29,6 +29,7 @@ import { appendBrushSamples, brushPressure, buildBrushStroke, type BrushSample }
 import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import { geometryToPathData } from "../../objects/render";
+import {lassoHits,combineLassoSelection,type LassoMode} from "../../editor/lassoSelection";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
 import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCatalog";
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
@@ -91,6 +92,13 @@ export function StudioCanvas() {
   const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
   const pathControlSelection=useStudio(s=>s.pathControlSelection);
+  const lassoActive=useStudio(s=>s.lassoActive);
+  const lassoEnabled=lassoActive&&tool==="select";
+  const [lassoMode,setLassoMode]=useState<LassoMode>("replace");
+  const [lassoTrail,setLassoTrail]=useState<Point[]>([]);
+  const [lassoNotice,setLassoNotice]=useState("");
+  const lassoDrag=useRef<{points:Point[];mode:LassoMode}|null>(null);
+  useEffect(()=>{lassoDrag.current=null;setLassoTrail([]);setLassoNotice("");},[lassoEnabled]);
   const knifeTargetId=useStudio(s=>s.knifeTargetId);
   const knifeTarget=tool==="select"&&selection.length===1&&selection[0]===knifeTargetId&&!doc.objects.find(o=>o.id===knifeTargetId)?.guide
     ?doc.objects.find(o=>o.id===knifeTargetId&&o.visible&&!o.locked&&o.cellKey===undefined&&(o.geometry.kind==="circle"||(o.geometry.kind==="path"&&o.geometry.closed))):undefined;
@@ -426,6 +434,7 @@ export function StudioCanvas() {
     setLetterOffset(null);
     setDragOffset(null);
     setBox(null);
+    lassoDrag.current=null;setLassoTrail([]);setLassoNotice("");
     setHandleDrag(null);
     knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");
     penActiveRef.current = false;
@@ -500,6 +509,12 @@ export function StudioCanvas() {
 
     const world = toWorld(e.clientX, e.clientY);
 
+    if(lassoEnabled){
+      if(guideLayer.edit){setLassoNotice("اخرج من تحرير الأدلة أولًا.");return;}
+      lassoDrag.current={points:[world],mode:e.shiftKey?"add":e.altKey?"subtract":lassoMode};
+      setLassoTrail([world]);setLassoNotice("");
+      return;
+    }
     if(knifeTarget&&!guideLayer.edit){
       knifeDrag.current={source:knifeTarget,start:world};
       setKnifeLine({source:knifeTarget,start:world,end:world});setKnifeProposal(null);setKnifeNotice("");
@@ -727,6 +742,15 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if(lassoDrag.current){
+      const drag=lassoDrag.current;
+      if(dist(drag.points.at(-1)!,world)*view.zoom>=3){
+        if(drag.points.length>=511)drag.points=drag.points.filter((_,i)=>i%2===0||i===drag.points.length-1);
+        drag.points.push(world);setLassoTrail([...drag.points]);
+      }
+      return;
+    }
+    if(lassoEnabled)return;
     if(knifeDrag.current){
       const drag=knifeDrag.current;
       setKnifeLine({...drag,end:world});
@@ -893,6 +917,20 @@ export function StudioCanvas() {
     activePointerRef.current = null;
     activePointerTypeRef.current = null;
     panRef.current = null;
+    if(lassoDrag.current){
+      const drag=lassoDrag.current;lassoDrag.current=null;setLassoTrail([]);
+      const state=useStudio.getState();
+      if(!e||!state.lassoActive||state.tool!=="select"||state.guideLayer.edit)return;
+      const end=toWorld(e.clientX,e.clientY);
+      const points=dist(drag.points.at(-1)!,end)*view.zoom>=1?[...drag.points,end]:drag.points;
+      if(points.length<3){setLassoNotice("ارسم مساحة مغلقة حول العناصر.");return;}
+      const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
+      if((Math.max(...xs)-Math.min(...xs))*view.zoom<6||(Math.max(...ys)-Math.min(...ys))*view.zoom<6){setLassoNotice("مساحة التحديد صغيرة جدًا.");return;}
+      const hits=lassoHits(state.doc.objects,points);
+      const next=combineLassoSelection(state.selection,hits,drag.mode);
+      setSelection(next);setLassoNotice(`تم تحديد ${next.length} عنصر`);
+      return;
+    }
     if(knifeDrag.current){
       const drag=knifeDrag.current;knifeDrag.current=null;
       if(!e||knifeTarget!==drag.source||guideLayer.edit){setKnifeLine(null);return;}
@@ -1094,7 +1132,7 @@ export function StudioCanvas() {
         ? `${draftReadout(preview, unit)}${shiftDown || precision.angleLock ? ` · locked ${precision.angleStep}°` : ""}`
         : null;
   const editTarget =
-    tool === "select" && !knifeTarget && selection.length === 1
+    tool === "select" && !knifeTarget && !lassoEnabled && selection.length === 1
       ? doc.objects.find(
           (o) =>
             o.id === selection[0] &&
@@ -1141,7 +1179,7 @@ export function StudioCanvas() {
 
   const transform = `translate(${view.pan.x} ${view.pan.y}) rotate(${view.rotation}) scale(${view.zoom})`;
   const cursorStyle =
-    spaceDown || tool === "pan" ? "grab" : knifeTarget ? "crosshair" : tool === "select" ? "default" : "crosshair";
+    spaceDown || tool === "pan" ? "grab" : knifeTarget || lassoEnabled ? "crosshair" : tool === "select" ? "default" : "crosshair";
 
   return (
     <div
@@ -1475,6 +1513,7 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {lassoEnabled&&lassoTrail.length>1&&<polygon points={lassoTrail.map(p=>`${p.x},${p.y}`).join(" ")} fill="var(--color-primary)" fillOpacity=".1" fillRule="evenodd" stroke="var(--color-primary)" strokeDasharray="5 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" pointerEvents="none"/>}
           {/* Box selection */}
           {box && (
             <rect
@@ -1523,6 +1562,13 @@ export function StudioCanvas() {
         </g>
       </svg>
       <CanvasZoomControls />
+      {lassoEnabled&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[95%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
+        <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||"التحديد الحر: ارسم حول الأشكال"}</p>
+        <div className="flex flex-wrap gap-1">
+          {([{id:"replace",label:"جديد"},{id:"add",label:"إضافة"},{id:"subtract",label:"استبعاد"}] as const).map(m=><button key={m.id} type="button" aria-pressed={lassoMode===m.id} className={`min-h-10 rounded border px-2 text-xs ${lassoMode===m.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setLassoMode(m.id);setLassoNotice("");}}>{m.label}</button>)}
+          <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>useStudio.getState().setLassoActive(false)}>إنهاء</button>
+        </div>
+      </div>}
       {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
         <p className="px-2 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":knifeNotice|| (knifeProposal?.source===knifeTarget&&knifeProposal.result.ok?`معاينة: ${knifeProposal.result.parts.length} أجزاء`:"أداة السكين: اسحب خط القص عبر الشكل")}</p>
         <div className="flex gap-1">
