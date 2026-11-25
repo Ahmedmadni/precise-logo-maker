@@ -503,7 +503,7 @@ function ObjectSection() {
       </div>
 
       {g.kind === "path" && selection.length === 1 && (
-        <PathNodesSection key={selected.id} objectId={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
+        g.holes?.length ? <p className="rounded-lg border border-border p-2 text-xs text-muted-foreground">مسار مركب: {g.holes.length} فراغ داخلي. يمكن تحريك الشكل وتغيير حجمه وإعادة استخدامه في Pathfinder؛ تحرير نقاط الحلقات مؤجل.</p> : <PathNodesSection key={selected.id} objectId={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
       )}
 
       {/* Derived dimensions — type a value to reshape the object instantly. */}
@@ -1164,7 +1164,7 @@ function TraceAssistSection() {
   const selection = useStudio((s) => s.selection);
   const objects = useStudio((s) => s.doc.objects);
   const smoothable = objects.filter(
-    (o) => selection.includes(o.id) && o.geometry.kind === "path" && !o.locked,
+    (o) => selection.includes(o.id) && o.geometry.kind === "path" && !o.locked && !o.geometry.holes?.length && !o.geometry.cubicSegments?.some(Boolean),
   ).length;
   const btn =
     "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-40";
