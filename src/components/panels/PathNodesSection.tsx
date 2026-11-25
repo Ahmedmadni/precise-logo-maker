@@ -5,6 +5,7 @@ import { insertPathNode, deletePathNode, movePathNode, arrangePathNodes, nudgePa
 import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { Button } from "../ui/button";
+import { ScissorsPanel } from "./ScissorsPanel";
 
 export function PathNodesSection({ objectId, path, disabled, onChange }: { objectId:string; path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
   const t = useT();
@@ -48,6 +49,7 @@ export function PathNodesSection({ objectId, path, disabled, onChange }: { objec
   return (
     <fieldset disabled={disabled} className="space-y-2 disabled:opacity-50">
       <legend className="mb-2 text-xs font-semibold">{t("Path nodes")}</legend>
+      {!path.closed&&<ScissorsPanel objectId={objectId} path={path} disabled={disabled}/>}
       <label className="flex items-center gap-2 text-xs">
         {t("Node")}
         <select aria-label={t("Node")} className="min-w-0 flex-1 rounded-md border border-border bg-background p-1.5" value={index} onChange={(e) => {setNode(Number(e.target.value));drag.current=null;setPreview(null);if(canvasControl?.objectId===objectId)setCanvasControl(null);}}>
