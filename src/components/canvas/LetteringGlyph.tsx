@@ -18,6 +18,7 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
     : item.kind === "ornament" ? ORNAMENTS.find((m) => m.id === item.ornament) : null;
   const unit = item.unitsPerEm && item.unitsPerEm > 0 ? item.unitsPerEm : 1000;
   const scale = size / unit;
+  const weight=Number.isFinite(item.weight)?Math.max(0,Math.min(20,item.weight??0)):0;
   const outline = item.kind === "outline" ? safePath(overridePath ?? item.pathData) : "";
   if (item.kind === "bridge") {
     const d = safePath(buildRibbonPath(item, allItems ?? []) ?? undefined);
@@ -36,11 +37,11 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
         <>
         <path d={outline} transform={`scale(${scale} ${-scale})`}
           fill={item.color} fillRule={item.fillRule ?? "nonzero"} stroke={item.color}
-          strokeWidth={Math.max(0, item.weight ?? 0) / scale}
+          strokeWidth={weight / scale}
           strokeLinejoin="round"
           style={selected ? { filter: "drop-shadow(0 0 1.8px var(--color-primary))" } : undefined} />
         <path d={outline} transform={`scale(${scale} ${-scale})`} fill="none"
-          stroke="transparent" strokeWidth={Math.max(14, item.weight ?? 0) / scale}
+          stroke="transparent" strokeWidth={Math.max(14, weight) / scale}
           pointerEvents="stroke" aria-hidden="true" />
         </>
       ) : mark ? (
