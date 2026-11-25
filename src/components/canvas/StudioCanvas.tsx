@@ -622,7 +622,7 @@ export function StudioCanvas() {
       const hitRibbonHandle = target.closest("[data-ribbon-handle]");
       const selectedBridge = doc.lettering?.find((item) => item.id === selectedLetteringId && item.kind === "bridge");
       const handleId = hitRibbonHandle?.getAttribute("data-ribbon-handle");
-      if (selectedBridge?.ribbon && (handleId === "start" || handleId === "end" || handleId === "bend")) {
+      if (selectedBridge?.ribbon && (handleId === "start" || handleId === "end" || handleId === "bend" || handleId === "start-width" || handleId === "end-width")) {
         const geometry = ribbonHandleGeometry(selectedBridge, doc.lettering ?? []);
         if (geometry) {
           ribbonDragRef.current = {
