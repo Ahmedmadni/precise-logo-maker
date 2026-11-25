@@ -36,7 +36,10 @@ import type { AlignMode } from "../../objects/align";
 
 import type { Unit } from "../../core/coordinates/units";
 import { fromPx, toPx } from "../../core/coordinates/units";
-import type { Geometry } from "../../core/geometry/types";
+import type { Geometry, PathGeometry } from "../../core/geometry/types";
+import { booleanGeometryChecked, BOOLEAN_TOLERANCE, type BooleanOp } from "../../objects/boolean";
+import { geometryToPathData } from "../../objects/render";
+import { geometryBounds, unionBounds } from "../../core/geometry/math";
 import { angleOf, dist, normalizeAngle, pointOnCircle } from "../../core/geometry/math";
 import { handleCenter } from "../../editor/handles";
 import { scaleGeometry, translateGeometry } from "../../objects/transform";
@@ -172,39 +175,54 @@ const SWATCHES = [
 
 /** Colour and paint controls applied to every selected object. */
 function PathfinderSection() {
-  const t = useT();
-  const selection = useStudio((s) => s.selection);
+  const t=useT();
+  const selection=useStudio(s=>s.selection);
   const objects=useStudio(s=>s.doc.objects);
-  const booleanSelection = useStudio((s) => s.booleanSelection);
+  const booleanSelection=useStudio(s=>s.booleanSelection);
   const [notice,setNotice]=useState("");
+  const [proposal,setProposal]=useState<{objects:typeof objects;ids:string;op:BooleanOp;parts:PathGeometry[]}|null>(null);
   const sources=objects.filter(o=>selection.includes(o.id));
+  const ids=JSON.stringify(sources.map(o=>o.id));
   const protectedSelection=sources.some(o=>o.locked||!o.visible||o.guide||o.cellKey!==undefined);
   const openSelection=sources.some(o=>o.geometry.kind==="line"||(o.geometry.kind==="path"&&!o.geometry.closed));
-  const enabled = sources.length >= 2&&!protectedSelection&&!openSelection;
-  const ops = [
-    { op: "union", label: t("Merge") },
-    { op: "subtract", label: t("Subtract") },
-    { op: "intersect", label: t("Intersect") },
-    { op: "exclude", label: t("Exclude") },
-  ] as const;
-  const apply=(op:typeof ops[number]["op"])=>{
-    const result=booleanSelection(op);
-    if(result.ok){setNotice(`تم إنشاء ${result.count} مسار. يمكنك التراجع عن العملية.`);return;}
-    const messages={selection:"حدد شكلين على الأقل.",invalid:"هناك مسار مفتوح أو هندسة غير صالحة.",holes:"النتيجة تحتوي على فراغ داخلي؛ لم تُعدّل الأشكال لأن المسارات المركبة غير مدعومة بعد.",empty:"لا توجد مساحة ناتجة؛ بقيت الأشكال الأصلية.",complexity:"تعذر حساب النتيجة بأمان؛ بقيت الأشكال الأصلية.",protected:"تتضمن المجموعة عناصر مقفلة أو مخفية أو إرشادية أو خلايا شبكة."};
-    setNotice(messages[result.reason]);
+  const enabled=sources.length>=2&&!protectedSelection&&!openSelection;
+  const current=proposal&&proposal.objects===objects&&proposal.ids===ids&&enabled?proposal:null;
+  const ops=[{op:"union",label:t("Merge")},{op:"subtract",label:t("Subtract")},{op:"intersect",label:t("Intersect")},{op:"exclude",label:t("Exclude")}] as const;
+  const messages={selection:"حدد شكلين على الأقل.",invalid:"هناك مسار مفتوح أو هندسة غير صالحة.",holes:"تعذر تمثيل الحلقات الداخلية.",empty:"لا توجد مساحة ناتجة؛ بقيت الأشكال الأصلية.",complexity:"تعذر حساب النتيجة بأمان؛ بقيت الأشكال الأصلية.",protected:"تتضمن المجموعة عناصر محمية."};
+  const preview=(op:BooleanOp)=>{
+    setProposal(null);
+    const result=booleanGeometryChecked(sources.map(o=>o.geometry),op);
+    if(!result.ok){setNotice(messages[result.reason]);return;}
+    setNotice("");setProposal({objects,ids,op,parts:result.parts});
   };
+  const apply=()=>{
+    if(!current)return;
+    const latest=useStudio.getState();
+    if(latest.doc.objects!==current.objects||JSON.stringify(latest.doc.objects.filter(o=>latest.selection.includes(o.id)).map(o=>o.id))!==current.ids){setProposal(null);setNotice("تغير التحديد؛ أعد المعاينة.");return;}
+    const result=booleanSelection(current.op);
+    setProposal(null);
+    setNotice(result.ok?`تم إنشاء ${result.count} مسار. يمكنك التراجع عن العملية.`:messages[result.reason]);
+  };
+  const bounds=current?unionBounds([...sources.map(o=>geometryBounds(o.geometry)),...current.parts.map(geometryBounds)]):null;
+  const pad=bounds?Math.max(2,(bounds.maxX-bounds.minX)*.05,(bounds.maxY-bounds.minY)*.05):2;
+  const viewBox=bounds?[bounds.minX-pad,bounds.minY-pad,bounds.maxX-bounds.minX+pad*2,bounds.maxY-bounds.minY+pad*2].join(" "):"0 0 100 100";
   return (
     <div className="space-y-2">
       <span className={labelCls}>{t("Pathfinder")}</span>
       <div className="grid grid-cols-2 gap-1.5">
-        {ops.map(({ op, label }) => (
-          <button key={op} type="button" disabled={!enabled} className="min-h-11 rounded-lg border border-border px-1 text-xs hover:bg-accent disabled:opacity-40" onClick={()=>apply(op)}>{label}</button>
-        ))}
+        {ops.map(({op,label})=><button key={op} type="button" disabled={!enabled} aria-pressed={current?.op===op} className={cn("min-h-11 rounded-lg border border-border px-1 text-xs hover:bg-accent disabled:opacity-40",current?.op===op&&"border-primary bg-primary/10 font-semibold")} onClick={()=>preview(op)}>{label}</button>)}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {protectedSelection?"أزل العناصر المحمية من التحديد أولاً.":openSelection?"أغلق المسارات المفتوحة أولاً.":"يتم الطرح من أول شكل محدد حسب ترتيب الطبقات. المنحنيات تُحوّل إلى حدود مضلعة تقريبية."}
-      </p>
+      <p className="text-[11px] text-muted-foreground">{protectedSelection?"أزل العناصر المحمية أولاً.":openSelection?"أغلق المسارات المفتوحة أولاً.":`الطرح من أول شكل حسب ترتيب الطبقات. تقريب المنحنيات بحد ${BOOLEAN_TOLERANCE} px لكل مقطع.`}</p>
       {enabled&&<p className="text-[11px] text-muted-foreground">الشكل الأساسي: {sources[0]?.name}</p>}
+      {current&&<div className="space-y-2 rounded-lg border border-border p-2">
+        <div className="grid grid-cols-2 gap-2">
+          <div><p className="text-xs text-center">قبل</p><svg viewBox={viewBox} className="h-28 w-full rounded bg-muted" aria-label="الأشكال الأصلية">{sources.map(o=><path key={o.id} d={geometryToPathData(o.geometry)} fill="currentColor" fillRule={o.geometry.kind==="path"&&o.geometry.holes?.length?"evenodd":"nonzero"} fillOpacity=".35" stroke="currentColor" vectorEffect="non-scaling-stroke"/>)}</svg></div>
+          <div><p className="text-xs text-center">بعد</p><svg viewBox={viewBox} className="h-28 w-full rounded bg-muted" aria-label="النتيجة المقترحة">{current.parts.map((g,i)=><path key={i} d={geometryToPathData(g)} fill="currentColor" fillRule="evenodd"/>)}</svg></div>
+        </div>
+        <p className="text-xs">{current.parts.length} مسار · {current.parts.reduce((sum,g)=>sum+(g.holes?.length??0),0)} فراغ داخلي</p>
+        <div className="grid grid-cols-2 gap-1"><button type="button" className="min-h-11 rounded bg-primary text-xs text-primary-foreground" onClick={apply}>اعتماد</button><button type="button" className="min-h-11 rounded border border-border text-xs" onClick={()=>setProposal(null)}>إلغاء</button></div>
+      </div>}
+      {proposal&&!current&&<p className="text-xs text-muted-foreground">تغير التصميم أو التحديد؛ أعد المعاينة.</p>}
       {notice&&<p role="status" className="rounded-lg border border-border p-2 text-xs">{notice}</p>}
     </div>
   );
