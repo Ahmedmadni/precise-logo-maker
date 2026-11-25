@@ -2,13 +2,16 @@ import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { PathGeometry, Point } from "../../core/geometry/types";
 import { insertPathNode, deletePathNode, movePathNode, setPathEdgeCurved, movePathControl, type PathControl, type PathControlMode } from "../../editor/path-nodes";
+import { useStudio } from "../../store/studioStore";
 import { useT } from "../../i18n";
 import { Button } from "../ui/button";
 
-export function PathNodesSection({ path, disabled, onChange }: { path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
+export function PathNodesSection({ objectId, path, disabled, onChange }: { objectId:string; path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
   const t = useT();
   const [node, setNode] = useState(0);
   const [mode,setMode]=useState<PathControlMode>("free");
+  const canvasControl=useStudio(s=>s.pathControlSelection);
+  const setCanvasControl=useStudio(s=>s.setPathControlSelection);
   const [preview,setPreview]=useState<{control:PathControl;point:Point}|null>(null);
   const drag=useRef<{control:PathControl;index:number;point:Point;inverse:DOMMatrix}|null>(null);
   const svg=useRef<SVGSVGElement|null>(null);
@@ -17,6 +20,7 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
   if (!point) return null;
   const end=path.points[index+1]??(path.closed?path.points[0]:undefined);
   const curve=path.cubicSegments?.[index];
+  const canvasActive=canvasControl?.objectId===objectId&&canvasControl.edge===index;
   const edited=curve&&preview?{...curve,[preview.control]:preview.point}:curve;
   const bounds=curve&&end?[point,end,curve.control1,curve.control2]:[];
   const left=Math.min(...bounds.map(p=>p.x)),top=Math.min(...bounds.map(p=>p.y));
@@ -33,7 +37,7 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
       <legend className="mb-2 text-xs font-semibold">{t("Path nodes")}</legend>
       <label className="flex items-center gap-2 text-xs">
         {t("Node")}
-        <select aria-label={t("Node")} className="min-w-0 flex-1 rounded-md border border-border bg-background p-1.5" value={index} onChange={(e) => {setNode(Number(e.target.value));drag.current=null;setPreview(null);}}>
+        <select aria-label={t("Node")} className="min-w-0 flex-1 rounded-md border border-border bg-background p-1.5" value={index} onChange={(e) => {setNode(Number(e.target.value));drag.current=null;setPreview(null);if(canvasControl?.objectId===objectId)setCanvasControl(null);}}>
           {path.points.map((_, i) => <option key={i} value={i}>{i + 1}</option>)}
         </select>
       </label>
@@ -41,23 +45,24 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
         {(["x", "y"] as const).map((axis) => <label key={axis} className="space-y-1 text-xs">{axis.toUpperCase()}<input aria-label={`${t("Node")} ${axis.toUpperCase()}`} type="number" step="0.5" value={Number(point[axis].toFixed(4))} className="w-full rounded-md border border-border bg-background p-1.5" onChange={(e) => update(axis, e.target.value)} /></label>)}
       </div>
       <div className="flex gap-2">
-        <Button variant="outline" size="icon" title={t("Add node")} aria-label={t("Add node")} disabled={disabled || (!path.closed && index === path.points.length - 1)} onClick={() => { onChange(insertPathNode(path, index)); setNode(index + 1); }}><Plus /></Button>
-        <Button variant="outline" size="icon" title={t("Delete node")} aria-label={t("Delete node")} disabled={disabled || path.points.length <= (path.closed ? 3 : 2)} onClick={() => { onChange(deletePathNode(path, index)); setNode(Math.max(0, index - 1)); }}><Trash2 /></Button>
+        <Button variant="outline" size="icon" title={t("Add node")} aria-label={t("Add node")} disabled={disabled || (!path.closed && index === path.points.length - 1)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);onChange(insertPathNode(path, index)); setNode(index + 1); }}><Plus /></Button>
+        <Button variant="outline" size="icon" title={t("Delete node")} aria-label={t("Delete node")} disabled={disabled || path.points.length <= (path.closed ? 3 : 2)} onClick={() => { if(canvasControl?.objectId===objectId)setCanvasControl(null);onChange(deletePathNode(path, index)); setNode(Math.max(0, index - 1)); }}><Trash2 /></Button>
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={path.closed} disabled={disabled || path.points.length < 3} onChange={(e) => onChange({ ...path, closed: e.target.checked })} />{t("Closed path")}</label>
       </div>
       {end&&<details className="rounded-lg border border-border p-2">
         <summary className="cursor-pointer py-2 text-xs font-semibold">تحرير منحنى المقطع التالي</summary>
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-1">
-            <button type="button" aria-pressed={!curve} onClick={()=>onChange(setPathEdgeCurved(path,index,false))} className={`min-h-11 rounded-lg border text-xs ${!curve?"border-primary bg-primary/10":"border-border"}`}>مستقيم</button>
+            <button type="button" aria-pressed={!curve} onClick={()=>{if(canvasActive)setCanvasControl(null);onChange(setPathEdgeCurved(path,index,false));}} className={`min-h-11 rounded-lg border text-xs ${!curve?"border-primary bg-primary/10":"border-border"}`}>مستقيم</button>
             <button type="button" aria-pressed={!!curve} onClick={()=>onChange(setPathEdgeCurved(path,index,true))} className={`min-h-11 rounded-lg border text-xs ${curve?"border-primary bg-primary/10":"border-border"}`}>Bézier</button>
           </div>
           {edited&&<>
             <label className="block text-xs">ربط المقابض
-              <select value={mode} onChange={e=>setMode(e.target.value as PathControlMode)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2">
+              <select value={mode} onChange={e=>{const next=e.target.value as PathControlMode;setMode(next);if(canvasActive)setCanvasControl({objectId,edge:index,mode:next});}} className="min-h-11 w-full rounded-lg border border-border bg-background px-2">
                 <option value="free">حر (زاوية مستقلة)</option><option value="aligned">محاذاة (اتجاه مشترك)</option><option value="symmetric">متماثل (اتجاه وطول)</option>
               </select>
             </label>
+            <button type="button" aria-pressed={canvasActive} onClick={()=>setCanvasControl(canvasActive?null:{objectId,edge:index,mode})} className={`min-h-11 w-full rounded-lg border text-xs ${canvasActive?"border-primary bg-primary/10":"border-border"}`}>{canvasActive?"إخفاء مقابض اللوحة":"إظهار مقابض المقطع على اللوحة"}</button>
             <svg ref={svg} viewBox={viewBox} className="block h-40 w-full touch-none rounded-lg border border-border bg-background" role="img" aria-label="تحرير مقابض المقطع المحدد"
               onPointerMove={e=>{const d=drag.current;if(!d||!svg.current)return;const p=svg.current.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(d.inverse);d.point={x:q.x,y:q.y};setPreview({control:d.control,point:d.point});}}
               onPointerUp={()=>{const d=drag.current;drag.current=null;setPreview(null);if(d&&d.index===index&&!disabled)onChange(movePathControl(path,index,d.control,d.point,mode));}}
