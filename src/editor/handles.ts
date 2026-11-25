@@ -42,8 +42,13 @@ export const handlesOf = (g: Geometry, cubicEdge?: number): Handle[] => {
       label: `Point ${i + 1}`,
     }));
     const edge=cubicEdge??-1;
-    const a=g.points[edge], b=g.points[edge+1]??(g.closed?g.points[0]:undefined), controls=g.cubicSegments?.[edge];
-    if(a&&b&&controls){anchors.push({id:`c${edge}:1`,point:controls.control1,anchor:a,role:"control",label:"Bézier 1"},{id:`c${edge}:2`,point:controls.control2,anchor:b,role:"control",label:"Bézier 2"});}
+    const n=g.points.length;
+    const valid=Number.isInteger(edge)&&edge>=0&&n>=2&&edge<(g.closed?n:n-1);
+    const a=valid?g.points[edge]:undefined, b=valid?g.points[(edge+1)%n]:undefined;
+    const controls=valid?g.cubicSegments?.[edge]:undefined;
+    if(a&&b&&controls&&[controls.control1?.x,controls.control1?.y,controls.control2?.x,controls.control2?.y].every(Number.isFinite)){
+      anchors.push({id:`c${edge}:1`,point:controls.control1,anchor:a,role:"control",label:"Bézier 1"},{id:`c${edge}:2`,point:controls.control2,anchor:b,role:"control",label:"Bézier 2"});
+    }
     return anchors;
   }
   return [
@@ -120,6 +125,7 @@ export const constrainHandle = (
 
 /** Move one handle to `p`, returning the resulting geometry (pure). */
 export const applyHandle = (g: Geometry, id: string, p: Point, mode:PathControlMode="free"): Geometry => {
+  if (![p.x,p.y].every(Number.isFinite)) return g;
   if (g.kind === "line") {
     if (id === "a") return { ...g, a: p };
     if (id === "b") return { ...g, b: p };
@@ -127,7 +133,9 @@ export const applyHandle = (g: Geometry, id: string, p: Point, mode:PathControlM
   }
   if (g.kind === "path") {
     const control=/^c(\d+):([12])$/.exec(id);
+    if(g.holes?.length)return g;
     if(control)return movePathControl(g,Number(control[1]),control[2]==="1"?"control1":"control2",p,mode);
+    if (!/^p\d+$/.test(id)) return g;
     const index = Number(id.slice(1));
     if (!Number.isInteger(index) || index < 0 || index >= g.points.length) return g;
     return movePathNode(g,index,p);
