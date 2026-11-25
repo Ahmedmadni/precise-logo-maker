@@ -43,7 +43,7 @@ import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
 import { nudgePathNodes } from "../editor/path-nodes";
-import {translateGlyphSelection} from "../calligraphy/groupSelection";
+import {translateGlyphSelection,transformGlyphSelection,type GlyphGroupTransform} from "../calligraphy/groupSelection";
 import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
 
 export type ToolId =
@@ -177,6 +177,7 @@ export interface StudioState {
   glyphMultiIds:string[];
   setGlyphLassoActive:(active:boolean)=>void;
   setGlyphMultiIds:(ids:string[])=>void;
+  transformGlyphMulti:(source:LetteringItem[],ids:string[],options:GlyphGroupTransform)=>boolean;
   moveGlyphMulti:(source:LetteringItem[],ids:string[],dx:number,dy:number)=>boolean;
   nodeLassoTargetId:string|null;
   pathNodeSelection:{objectId:string;geometry:PathGeometry;indices:number[]}|null;
@@ -401,6 +402,15 @@ export const useStudio = create<StudioState>()((set, get) => {
       set({glyphLassoActive:active,glyphMultiIds:[],lassoActive:active,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null,tool:"select",selection:[],selectedLetteringId:null,selectedGlyphNodeId:null,selectedContourIndex:null,editGlyphNodes:false,editGlyphContours:false,editJoinAnchors:false,joinGuide:null});
     },
     setGlyphMultiIds:(ids)=>set({glyphMultiIds:[...new Set(ids)]}),
+    transformGlyphMulti:(source,ids,options)=>{
+      const s=get();
+      if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
+      if(options.scale===1&&options.degrees===0)return false;
+      const next=transformGlyphSelection(source,ids,options);
+      if(!next)return false;
+      commit("Transform selected Arabic glyphs",d=>({...d,lettering:next}));
+      return true;
+    },
     moveGlyphMulti:(source,ids,dx,dy)=>{
       const s=get();
       if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
