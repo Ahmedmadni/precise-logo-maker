@@ -215,3 +215,37 @@ export function wordEnvelopeOverlaps(items:LetteringItem[]):{first:string;second
   }
   return overlaps;
 }
+
+
+export interface WordPathExpansion {
+  scale:number;
+  before:number;
+  after:number;
+}
+
+/** Search a finite set of larger path scales. The result is advisory only;
+ * nothing is applied until the user accepts the updated preview. */
+export function suggestWordPathExpansion(items:LetteringItem[],groupIds:string[],guide:GuideChain,options:FreePathOptions):WordPathExpansion|null{
+  if(!Number.isFinite(options.scale)||options.scale<.5||options.scale>=3)return null;
+  const ids=new Set(groupIds);
+  const selected=items.filter(g=>g.groupId&&ids.has(g.groupId)&&!g.hidden&&g.kind==="outline");
+  if(!selected.length||selected.length>400)return null;
+  const count=(scale:number)=>{
+    const patches=composeWordGroupsOnPath(items,groupIds,guide,{...options,scale});
+    if(!patches.length)return null;
+    const byId=new Map(patches.map(p=>[p.id,p.patch]));
+    return wordEnvelopeOverlaps(selected.map(g=>({...g,...byId.get(g.id)}))).length;
+  };
+  const before=count(options.scale);
+  if(before===null||before===0)return null;
+  let best:WordPathExpansion|null=null;
+  const start=Math.floor(options.scale*10+1e-7)+1;
+  for(let i=start;i<=30;i++){
+    const scale=i/10,after=count(scale);
+    if(after!==null&&after<before&&(!best||after<best.after)){
+      best={scale,before,after};
+      if(after===0)break;
+    }
+  }
+  return best;
+}
