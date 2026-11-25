@@ -25,11 +25,12 @@ export function morphOutline(
   if (!segments || !nodes.length) return null;
   if (amountInFontUnits === 0) return d;
   const axis = direction === "left" || direction === "right" ? "x" : "y";
-  const values = nodes.map((point) => point[axis]);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  let min = Infinity, max = -Infinity;
+  for (const point of nodes) {
+    min = Math.min(min, point[axis]); max = Math.max(max, point[axis]);
+  }
   const span = max - min;
-  if (span < 0.01) return null;
+  if (!Number.isFinite(span) || span < 0.01) return null;
   const atPositiveEnd = direction === "right" || direction === "up";
   const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
   const exponent = profile === "tip" ? 4 : profile === "balanced" ? 1 : 2;
@@ -54,7 +55,7 @@ export function morphOutline(
     }
     return segment.cmd + v.map(round).join(" ");
   }).join(" ");
-  return hasChange ? warped : null;
+  return hasChange && warped.length <= 500_000 && parseOutline(warped) ? warped : null;
 }
 
 /** Unit conversion lets the designer request an extension in canvas pixels. */
@@ -68,22 +69,21 @@ export function morphGlyphPixels(item: LetteringItem, direction: MorphDirection,
 }
 
 export function letteringGroupBounds(items: LetteringItem[]): { x: number; y: number; width: number; height: number } | null {
-  const points: CoordinatePair[] = [];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const item of items) {
-    if (item.kind !== "outline" || !item.pathData) continue;
-    const nodes = outlineNodes(item.pathData);
-    for (const n of nodes) points.push(glyphPointToWorld(item, n.x, n.y));
+    const b = preciseGlyphBounds(item);
+    if (!b) continue;
+    minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.width); maxY = Math.max(maxY, b.y + b.height);
   }
-  if (!points.length) return null;
-  const minX = Math.min(...points.map((p) => p.x)), maxX = Math.max(...points.map((p) => p.x));
-  const minY = Math.min(...points.map((p) => p.y)), maxY = Math.max(...points.map((p) => p.y));
+  if (![minX,minY,maxX,maxY].every(Number.isFinite)) return null;
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 /** Keep a recomposed variant on exactly the same visual center as its predecessor. */
 export function centerLetteringAt(items: LetteringItem[], target: CoordinatePair): LetteringItem[] {
   const bounds = letteringGroupBounds(items);
-  if (!bounds) return items;
+  if (!bounds || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return items;
   const dx = target.x - (bounds.x + bounds.width / 2);
   const dy = target.y - (bounds.y + bounds.height / 2);
   return items.map((item) => ({ ...item, x: item.x + dx, y: item.y + dy }));
@@ -99,13 +99,16 @@ export function adjustOutlineRegionWidth(d: string, direction: MorphDirection, f
   if (factor === 1) return d;
   const horizontal = direction === "left" || direction === "right";
   const axis = horizontal ? "x" : "y", transverse = horizontal ? "y" : "x";
-  const along = nodes.map(n => n[axis]), across = nodes.map(n => n[transverse]);
-  const min = Math.min(...along), span = Math.max(...along) - min;
-  const center = (Math.min(...across) + Math.max(...across)) / 2;
-  if (span < 0.01) return null;
+  let min = Infinity, max = -Infinity, acrossMin = Infinity, acrossMax = -Infinity;
+  for (const n of nodes) {
+    min = Math.min(min,n[axis]); max = Math.max(max,n[axis]);
+    acrossMin = Math.min(acrossMin,n[transverse]); acrossMax = Math.max(acrossMax,n[transverse]);
+  }
+  const span = max - min, center = acrossMin/2 + acrossMax/2;
+  if (!Number.isFinite(span) || span < 0.01) return null;
   const positive = direction === "right" || direction === "up";
   const cutoff = region === "outer-third" ? 2 / 3 : region === "outer-half" ? 0.5 : 0;
-  return segments.map(segment => {
+  const warped = segments.map(segment => {
     if (segment.cmd === "Z") return "Z";
     const v = [...segment.values];
     for (let i = 0; i < v.length; i += 2) {
@@ -117,6 +120,7 @@ export function adjustOutlineRegionWidth(d: string, direction: MorphDirection, f
     }
     return segment.cmd + v.map(round).join(" ");
   }).join(" ");
+  return warped.length <= 500_000 && parseOutline(warped) ? warped : null;
 }
 
 
