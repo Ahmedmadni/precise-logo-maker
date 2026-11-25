@@ -43,14 +43,14 @@ function StudioPage() {
   // Close the narrow-screen overlay when moving into the desktop layout,
   // so rotating back does not unexpectedly reopen a stale sheet.
   useEffect(() => {
-    const query=window.matchMedia("(min-width: 1024px)");
+    const query=window.matchMedia("(min-width: 900px) and (orientation: landscape), (min-width: 1200px)");
     const sync=()=>{if(query.matches)setPanelOpen(false);};
     sync();
     query.addEventListener("change",sync);
     return ()=>query.removeEventListener("change",sync);
   },[]);
   const openProperties = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) setDesktopPanelOpen(true);
+    if (window.matchMedia("(min-width: 900px) and (orientation: landscape), (min-width: 1200px)").matches) setDesktopPanelOpen(true);
     else setPanelOpen(true);
   };
   useEffect(() => {
@@ -69,7 +69,7 @@ function StudioPage() {
       </ClientOnly>
       <StudioHeader />
       <div className="flex min-h-0 flex-1">
-        <div className="hidden min-h-0 shrink-0 lg:flex lg:flex-col lg:border-e lg:border-border">
+        <div className="hidden min-h-0 shrink-0 [@media(min-width:900px)_and_(orientation:landscape)]:flex min-[1200px]:flex flex-col border-e border-border">
           <button type="button" onClick={() => setDesktopPanelOpen((value) => !value)}
             aria-label={desktopPanelOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}
             aria-expanded={desktopPanelOpen}
@@ -77,7 +77,7 @@ function StudioPage() {
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             {desktopPanelOpen ? "إخفاء الخصائص" : "الخصائص"}
           </button>
-          {desktopPanelOpen && <div className="min-h-0 w-[clamp(17rem,28vw,23rem)] flex-1 overflow-hidden">
+          {desktopPanelOpen && <div className="min-h-0 w-[clamp(15rem,26vw,23rem)] flex-1 overflow-hidden">
             <RightPanel />
           </div>}
         </div>
@@ -99,7 +99,7 @@ function StudioPage() {
 
         {/* Small screens keep a slide-over sheet; desktop properties stay beside the canvas. */}
         {panelOpen && (
-          <div className="fixed inset-x-0 top-0 bottom-[calc(56px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
+          <div className="fixed inset-x-0 top-0 bottom-[calc(56px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden">
             <button
               type="button"
               aria-label="إغلاق لوحة الأدوات"
@@ -140,7 +140,7 @@ function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }
       type="button"
       onClick={onToggle}
       aria-label={t("Panels")}
-      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex lg:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg"
+      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg"
     >
       {open ? (
         <X className="h-5 w-5" aria-hidden />
