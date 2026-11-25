@@ -74,6 +74,36 @@ export function moveOutlineContour(path: string, index: number, dx: number, dy: 
   return d.length <= 500_000 ? d : null;
 }
 
+/** Resize or rotate a single subpath around its local control bounds center.
+ * Keep other contours and their order unchanged. This is a geometric edit,
+ * not a semantic decomposition of connected Arabic strokes. */
+export function transformOutlineContour(path: string, index: number, scaleX: number, scaleY: number, degrees = 0): string | null {
+  if (!Number.isSafeInteger(index) || index < 0 ||
+      ![scaleX,scaleY,degrees].every(Number.isFinite) ||
+      scaleX < 0.25 || scaleX > 4 || scaleY < 0.25 || scaleY > 4 || Math.abs(degrees)>360) return null;
+  const segments = parseOutline(path);
+  if (!segments) return null;
+  let current = -1;
+  const target = segments.filter(s => { if (s.cmd === "M") current++; return current === index; });
+  if (!target.length) return null;
+  if (scaleX === 1 && scaleY === 1 && degrees === 0) return path;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const s of target) for (let i=0;i<s.values.length;i+=2) {
+    minX=Math.min(minX,s.values[i]!); maxX=Math.max(maxX,s.values[i]!);
+    minY=Math.min(minY,s.values[i+1]!); maxY=Math.max(maxY,s.values[i+1]!);
+  }
+  if (![minX,minY,maxX,maxY].every(Number.isFinite)) return null;
+  const cx=minX/2+maxX/2,cy=minY/2+maxY/2;
+  const angle=degrees*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+  for (const s of target) for (let i=0;i<s.values.length;i+=2) {
+    const x=(s.values[i]!-cx)*scaleX,y=(s.values[i+1]!-cy)*scaleY;
+    s.values[i]=cx+x*cos-y*sin; s.values[i+1]=cy+x*sin+y*cos;
+  }
+  if (segments.some(s=>s.values.some(v=>!Number.isFinite(v)||Math.abs(v)>100_000))) return null;
+  const d=toD(segments);
+  return d.length<=500_000?d:null;
+}
+
 /** A geometric fallback, never a font-authored joining point.
  * Prefer user-labeled joining contours or the visually dominant body, and
  * place the marker on a sampled SVG boundary (not an empty bounding-box
