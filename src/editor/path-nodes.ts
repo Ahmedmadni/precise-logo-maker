@@ -134,3 +134,58 @@ export function nudgePathNodes(path:PathGeometry,indices:readonly number[],dx:nu
   if(![dx,dy].every(Number.isFinite)||indices.some(i=>!Number.isInteger(i)||!path.points[i]))return path;
   return movePathNodes(path,new Map(indices.map(i=>[i,{x:path.points[i]!.x+dx,y:path.points[i]!.y+dy}])));
 }
+
+
+/** Geometry of an interior linear node. Preserve open endpoints, sharp turns,
+ * reversals and nodes connected to any existing cubic. */
+function linearNodeInfo(path:PathGeometry,i:number){
+  const n=path.points.length;
+  if(!Number.isInteger(i)||i<0||i>=n||n<3||(!path.closed&&(i===0||i===n-1)))return null;
+  const prev=(i+n-1)%n,next=(i+1)%n;
+  if(path.cubicSegments?.[prev]||path.cubicSegments?.[i])return null;
+  const a=path.points[prev]!,b=path.points[i]!,c=path.points[next]!;
+  if(![a.x,a.y,b.x,b.y,c.x,c.y].every(Number.isFinite))return null;
+  const ux=b.x-a.x,uy=b.y-a.y,vx=c.x-b.x,vy=c.y-b.y;
+  const len=Math.hypot(ux,uy)*Math.hypot(vx,vy);
+  // Only smooth shallow turns (<=45 degrees).
+  if(len<1e-12||(ux*vx+uy*vy)/len<Math.SQRT1_2)return null;
+  const dx=c.x-a.x,dy=c.y-a.y,d2=dx*dx+dy*dy;
+  if(d2<1e-12)return null;
+  const t=((b.x-a.x)*dx+(b.y-a.y)*dy)/d2;
+  if(t<=0||t>=1)return null;
+  const target={x:a.x+t*dx,y:a.y+t*dy};
+  return {prev,next,target,error:Math.hypot(target.x-b.x,target.y-b.y)};
+}
+
+/** One explicit smoothing pass, bounded in artboard units. */
+export function smoothSelectedPathNodes(path:PathGeometry,indices:readonly number[],strength:number,maxMove:number):PathGeometry{
+  if(!Number.isFinite(strength)||strength<=0||strength>1||!Number.isFinite(maxMove)||maxMove<=0)return path;
+  const moves=new Map<number,Point>();
+  for(const i of new Set(indices)){
+    const info=linearNodeInfo(path,i);
+    if(!info||info.error<1e-8)continue;
+    const p=path.points[i]!,w=Math.min(strength,maxMove/info.error);
+    moves.set(i,{x:p.x+(info.target.x-p.x)*w,y:p.y+(info.target.y-p.y)*w});
+  }
+  return movePathNodes(path,moves);
+}
+
+/** Remove only nonadjacent selected linear nodes, each within the stated
+ * distance of its original neighboring chord. No accumulated error in a pass.
+ * Preserve index zero on closed paths and all existing cubic edges. */
+export function simplifySelectedPathNodes(path:PathGeometry,indices:readonly number[],tolerance:number):PathGeometry{
+  if(!Number.isFinite(tolerance)||tolerance<=0)return path;
+  const removed=new Set<number>();
+  const n=path.points.length,min=path.closed?3:2;
+  for(const i of [...new Set(indices)].sort((a,b)=>a-b)){
+    if(i===0||n-removed.size<=min)continue;
+    const info=linearNodeInfo(path,i);
+    if(!info||info.error>tolerance||removed.has(info.prev)||removed.has(info.next))continue;
+    removed.add(i);
+  }
+  if(!removed.size)return path;
+  const points=path.points.filter((_,i)=>!removed.has(i));
+  if(!path.cubicSegments)return {...path,points};
+  const cubicSegments=Array.from({length:n},(_,i)=>removed.has((i+1)%n)?null:path.cubicSegments?.[i]??null).filter((_,i)=>!removed.has(i));
+  return {...path,points,cubicSegments};
+}
