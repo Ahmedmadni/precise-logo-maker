@@ -42,6 +42,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
+import {composeGlyphTiers,type TierOptions} from "../calligraphy/tieredComposition";
 import {suggestDecorationPositions,arrangeDecorations,type DecorationBatchScope} from "../calligraphy/decorationPlacement";
 import { nudgePathNodes } from "../editor/path-nodes";
 import {translateGlyphSelection,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,type GlyphGroupTransform,type GlyphArrangeAxis,type GlyphArrangeMode} from "../calligraphy/groupSelection";
@@ -180,6 +181,7 @@ export interface StudioState {
   setGlyphMultiIds:(ids:string[])=>void;
   arrangeDecorationBatch:(source:DocumentState,id:string,scope:DecorationBatchScope,includeManual:boolean,clearance:number)=>boolean;
   placeDecorationAtSuggestion:(source:DocumentState,id:string,x:number,y:number,clearance:number)=>boolean;
+  composeGlyphMultiTiers:(source:LetteringItem[],ids:string[],options:TierOptions)=>boolean;
   spaceGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,gap:number)=>boolean;
   arrangeGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,mode:GlyphArrangeMode)=>boolean;
   transformGlyphMulti:(source:LetteringItem[],ids:string[],options:GlyphGroupTransform)=>boolean;
@@ -430,6 +432,14 @@ export const useStudio = create<StudioState>()((set, get) => {
       const result=suggestDecorationPositions(items,id,source.artboard,clearance,obstacles);
       if(!result.ok||!result.options.some(p=>p.x===x&&p.y===y))return false;
       commit("Place calligraphy decoration",d=>({...d,lettering:items.map(i=>i.id===id?{...i,x,y,...(i.kind==="haraka"?{anchorMode:"manual" as const}:{})}:i)}));
+      return true;
+    },
+    composeGlyphMultiTiers:(source,ids,options)=>{
+      const s=get();
+      if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
+      const result=composeGlyphTiers(source,ids,options);
+      if(!result.ok||!result.changed)return false;
+      commit("Compose tiered Arabic lettering",d=>({...d,lettering:result.items}));
       return true;
     },
     spaceGlyphMulti:(source,ids,axis,gap)=>{
