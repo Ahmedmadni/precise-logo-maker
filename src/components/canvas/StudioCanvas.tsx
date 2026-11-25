@@ -364,6 +364,7 @@ export function StudioCanvas() {
     const el = containerRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if(e.target instanceof Element&&e.target.closest("[data-canvas-ui]"))return;
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       setView(
@@ -1263,7 +1264,7 @@ export function StudioCanvas() {
     <div
       ref={containerRef}
       dir="ltr"
-      className="relative h-full w-full touch-none overflow-hidden overscroll-none bg-background select-none"
+      className="relative h-full w-full overflow-hidden overscroll-none bg-background select-none"
       style={{ cursor: cursorStyle }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -1307,7 +1308,7 @@ export function StudioCanvas() {
         else setCellChain([]);
       }}
     >
-      <svg className="h-full w-full" role="img" aria-label="Logo construction canvas">
+      <svg className="h-full w-full touch-none" role="img" aria-label="Logo construction canvas">
         <g transform={transform}>
           {/* Artboard */}
           <rect
@@ -1644,7 +1645,7 @@ export function StudioCanvas() {
         </g>
       </svg>
       <CanvasZoomControls />
-      {lassoEnabled&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[95%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
+      {lassoEnabled&&<div data-canvas-ui dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[min(92%,24rem)] max-h-[calc(100%-1.5rem)] -translate-x-1/2 overflow-y-auto overscroll-contain touch-pan-y rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onPointerCancel={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()}>
         <p className="px-1 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":lassoNotice||(glyphLasso?"حدد مراكز الحروف ثم اسحب حرفًا محددًا.":nodeLassoId?"حدد النقاط بالرسم حولها، ثم اسحب نقطة محددة.":"التحديد الحر: ارسم حول الأشكال")}</p>
         <div className="flex flex-wrap gap-1">
           {([{id:"replace",label:"جديد"},{id:"add",label:"إضافة"},{id:"subtract",label:"استبعاد"}] as const).map(m=><button key={m.id} type="button" aria-pressed={lassoMode===m.id} className={`min-h-10 rounded border px-2 text-xs ${lassoMode===m.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setLassoMode(m.id);setLassoNotice("");}}>{m.label}</button>)}
@@ -1652,14 +1653,14 @@ export function StudioCanvas() {
         </div>
         {glyphLasso&&<GlyphGroupTransformControls/>}
       </div>}
-      {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
+      {knifeTarget&&<div data-canvas-ui dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
         <p className="px-2 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":knifeNotice|| (knifeProposal?.source===knifeTarget&&knifeProposal.result.ok?`معاينة: ${knifeProposal.result.parts.length} أجزاء`:"أداة السكين: اسحب خط القص عبر الشكل")}</p>
         <div className="flex gap-1">
           {knifeProposal?.source===knifeTarget&&knifeProposal.result.ok&&!guideLayer.edit&&<button type="button" className="min-h-11 flex-1 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={()=>{const s=useStudio.getState();if(s.knifeTargetId!==knifeTarget.id||s.selection.length!==1||s.selection[0]!==knifeTarget.id||s.doc.objects.find(o=>o.id===knifeTarget.id)!==knifeTarget){setKnifeProposal(null);setKnifeNotice("تغير الشكل؛ أعد القص.");return;}const r=s.splitSelectedShape("angle",knifeProposal.fraction,knifeProposal.degrees);setKnifeProposal(null);if(!r.ok)setKnifeNotice("تعذر اعتماد القص.");}}>اعتماد القص</button>}
           <button type="button" className="min-h-11 flex-1 rounded border border-border px-3 text-xs" onClick={()=>{knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);useStudio.getState().setKnifeTargetId(null);}}>إلغاء</button>
         </div>
       </div>}
-      {tool === "select" && overlapIds.length > 1 && !editGlyphNodes && !editGlyphContours && !editJoinAnchors && (
+      {tool === "select" && !lassoEnabled && !knifeTarget && overlapIds.length > 1 && !editGlyphNodes && !editGlyphContours && !editJoinAnchors && (
         <GlyphOverlapPicker
           items={overlapIds.map((id) => (doc.lettering ?? []).find((item) => item.id === id)).filter(
             (item): item is NonNullable<typeof item> => !!item)}
