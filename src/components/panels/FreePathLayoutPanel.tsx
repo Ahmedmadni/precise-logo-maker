@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
-import { type LetteringItem } from "../../calligraphy/model";
+import { letteringTransform, safeColor, safePath, type LetteringItem } from "../../calligraphy/model";
+import { preciseGlyphBounds } from "../../calligraphy/morph";
 import { composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
 import { useStudio } from "../../store/studioStore";
 
@@ -46,7 +47,23 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
   const count=siblings.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text")).length;
   const options={scale,margin,reverse,tangent,upright};
   const samples=useMemo(()=>open?sampleGuide(guide,count,margin,reverse):[],[open,guide,count,margin,reverse]);
-  const canApply=open&&count>=2&&siblings.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text")).every(g=>g.kind==="outline"&&!!g.pathData)&&samples.length===count;
+  const [showOutlines,setShowOutlines]=useState(true);
+  const composition=useMemo(()=>{
+    if(!open)return null;
+    const patches=composeFreePath(siblings,guide,{scale,margin,reverse,tangent,upright});
+    if(!patches.length)return null;
+    const byId=new Map(patches.map(p=>[p.id,p.patch]));
+    const glyphs=siblings.filter(g=>byId.has(g.id)).map(g=>({...g,...byId.get(g.id)}));
+    const bounds=glyphs.map(preciseGlyphBounds);
+    if(bounds.some(b=>!b))return null;
+    const left=Math.min(...bounds.map(b=>b!.x)),top=Math.min(...bounds.map(b=>b!.y));
+    const right=Math.max(...bounds.map(b=>b!.x+b!.width)),bottom=Math.max(...bounds.map(b=>b!.y+b!.height));
+    const padding=Math.max(4,Math.max(right-left,bottom-top)*.12,...glyphs.map(g=>Math.max(0,Math.min(20,g.weight??0))*Math.max(1,Math.abs(g.scaleX??1),Math.abs(g.scaleY??1))*4));
+    const viewBox=[left-padding,top-padding,right-left+2*padding,bottom-top+2*padding];
+    if(!viewBox.every(Number.isFinite))return null;
+    return {glyphs,viewBox:viewBox.join(" ")};
+  },[open,siblings,guide,scale,margin,reverse,tangent,upright]);
+  const canApply=!!composition;
   const update=(i:number,axis:"x"|"y",value:number)=>{
     setGuide(old=>moveGuidePoint(old,i,{...old[i]!,[axis]:value},smooth));
     setNotice("");
@@ -83,6 +100,22 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
           <circle cx={p.x} cy={p.y} r="3" fill={i%3===0?"currentColor":"none"} stroke="currentColor"/>
         </g>)}
       </svg>
+      <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={showOutlines} onChange={e=>setShowOutlines(e.target.checked)}/> معاينة أشكال الحروف الفعلية</label>
+      {showOutlines&&<div className="rounded-lg border border-border bg-background p-2">
+        <p className="font-medium">التركيب المقترح</p>
+        {composition?<svg viewBox={composition.viewBox} className="block h-40 w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="معاينة توزيع مسارات الحروف الفعلية">
+          {composition.glyphs.map(g=>{
+            const size=Number.isFinite(g.size)?Math.max(1,Math.min(1000,g.size)):48;
+            const units=Number.isFinite(g.unitsPerEm)&&(g.unitsPerEm??0)>0?g.unitsPerEm!:1000;
+            const s=size/units;
+            const weight=Number.isFinite(g.weight)?Math.max(0,Math.min(20,g.weight??0)):0;
+            return <g key={g.id} transform={letteringTransform(g)} fill={safeColor(g.color)}>
+              <path d={safePath(g.pathData)} transform={`scale(${s} ${-s})`} fillRule={g.fillRule==="evenodd"?"evenodd":"nonzero"} stroke={safeColor(g.color)} strokeWidth={weight/s} strokeLinejoin="round"/>
+            </g>;
+          })}
+        </svg>:<p className="py-2 text-muted-foreground">تعذر إنشاء معاينة؛ يلزم حرفان متجهيان صالحان على الأقل.</p>}
+        <p className="text-[11px] text-muted-foreground">معاينة مسارات الحروف فقط؛ الحركات والزخارف والوصلات التابعة تظهر في اللوحة الرئيسية بعد التطبيق.</p>
+      </div>}
       <div className="grid grid-cols-2 gap-1">
         <label className="block">المنحنى المختار<select value={segment} onChange={e=>setSegment(Number(e.target.value))} className="min-h-10 w-full rounded border border-border bg-background">
           {segmentIds.map(i=><option key={i} value={i}>منحنى {i+1}</option>)}
