@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {lassoHits,combineLassoSelection} from "./lassoSelection";
+import {lassoHits,combineLassoSelection,lassoNodeIndices,combineNodeSelection} from "./lassoSelection";
 import {DEFAULT_STYLE,IDENTITY_TRANSFORM,type Geometry,type Point,type VectorObject} from "../core/geometry/types";
 
 const rectangle=(x:number,y:number,w:number,h:number):Point[]=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
@@ -28,5 +28,22 @@ describe("lasso selection",()=>{
     expect(combineLassoSelection(["a","b"],["b","c"],"replace")).toEqual(["b","c"]);
     expect(combineLassoSelection(["a","b"],["b","c"],"add")).toEqual(["a","b","c"]);
     expect(combineLassoSelection(["a","b"],["b","c"],"subtract")).toEqual(["a"]);
+  });
+});
+
+describe("freehand anchor selection",()=>{
+  it("selects only anchors inside the lasso, including its boundary",()=>{
+    const points=[{x:0,y:0},{x:4,y:4},{x:12,y:5},{x:5,y:10}];
+    expect(lassoNodeIndices(points,rectangle(0,0,10,10))).toEqual([0,1,3]);
+  });
+  it("supports concave boundaries and rejects invalid lasso gestures",()=>{
+    const concave=[{x:0,y:0},{x:10,y:0},{x:10,y:2},{x:2,y:2},{x:2,y:10},{x:0,y:10}];
+    expect(lassoNodeIndices([{x:1,y:5},{x:5,y:5}],concave)).toEqual([0]);
+    expect(lassoNodeIndices([{x:1,y:1}],[])).toEqual([]);
+  });
+  it("combines node indices without duplicates",()=>{
+    expect(combineNodeSelection([1,3],[0,3],"add")).toEqual([0,1,3]);
+    expect(combineNodeSelection([1,3],[3],"subtract")).toEqual([1]);
+    expect(combineNodeSelection([1,3],[2,2],"replace")).toEqual([2]);
   });
 });
