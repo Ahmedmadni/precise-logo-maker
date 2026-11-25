@@ -96,3 +96,41 @@ export function movePathControl(path:PathGeometry,index:number,control:PathContr
   }
   return {...path,cubicSegments:segments};
 }
+
+
+/** Apply simultaneous anchor moves in one pass, translating each attached
+ * control by its own anchor's delta (including the closing edge). */
+export function movePathNodes(path:PathGeometry,moves:ReadonlyMap<number,Point>):PathGeometry{
+  const deltas=new Map<number,Point>();
+  for(const [index,point] of moves){
+    const old=path.points[index];
+    if(!Number.isInteger(index)||!old||![point.x,point.y].every(Number.isFinite))return path;
+    if(point.x!==old.x||point.y!==old.y)deltas.set(index,{x:point.x-old.x,y:point.y-old.y});
+  }
+  if(!deltas.size)return path;
+  const points=path.points.map((p,i)=>deltas.has(i)?moves.get(i)!:p);
+  if(!path.cubicSegments)return {...path,points};
+  const shift=(p:Point,i:number)=>{const d=deltas.get(i);return d?{x:p.x+d.x,y:p.y+d.y}:p;};
+  return {...path,points,cubicSegments:path.cubicSegments.map((c,i)=>c&&edgeExists(path,i)?{
+    control1:shift(c.control1,i),control2:shift(c.control2,(i+1)%points.length)
+  }:c)};
+}
+
+export type PathNodeArrangement="min"|"center"|"max"|"distribute";
+export function arrangePathNodes(path:PathGeometry,indices:readonly number[],axis:"x"|"y",mode:PathNodeArrangement):PathGeometry{
+  const ids=[...new Set(indices)];
+  if(ids.length<(mode==="distribute"?3:2)||ids.some(i=>!Number.isInteger(i)||!path.points[i]||!Number.isFinite(path.points[i]![axis])))return path;
+  const ordered=ids.sort((a,b)=>path.points[a]![axis]-path.points[b]![axis]||a-b);
+  const min=path.points[ordered[0]!]![axis],max=path.points[ordered[ordered.length-1]!]![axis];
+  const moves=new Map<number,Point>();
+  ordered.forEach((id,i)=>{
+    const v=mode==="min"?min:mode==="max"?max:mode==="center"?(min+max)/2:min+(max-min)*i/(ordered.length-1);
+    moves.set(id,{...path.points[id]!,[axis]:v});
+  });
+  return movePathNodes(path,moves);
+}
+
+export function nudgePathNodes(path:PathGeometry,indices:readonly number[],dx:number,dy:number):PathGeometry{
+  if(![dx,dy].every(Number.isFinite)||indices.some(i=>!Number.isInteger(i)||!path.points[i]))return path;
+  return movePathNodes(path,new Map(indices.map(i=>[i,{x:path.points[i]!.x+dx,y:path.points[i]!.y+dy}])));
+}
