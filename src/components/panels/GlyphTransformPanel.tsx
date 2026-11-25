@@ -11,6 +11,7 @@ import { GlyphLibraryPanel } from "./GlyphLibraryPanel";
 import { GlyphContoursJoinPanel } from "./GlyphContoursJoinPanel";
 import { GlyphAnchorInspector } from "./GlyphAnchorInspector";
 import { GlyphNodeTopologyActions } from "./GlyphNodeTopologyActions";
+import { KelkCompositionPanel } from "./KelkCompositionPanel";
 
 const button = "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 const input = "min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary";
@@ -371,7 +372,10 @@ export function GlyphTransformPanel({ selected, siblings }: {
         </>
       )}
 
-      {isOutline && activeTab === "joins" && <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="joins" />}
+      {isOutline && activeTab === "joins" && <>
+        {!isCatalogSymbol && <KelkCompositionPanel selected={selected} siblings={siblings} />}
+        <GlyphContoursJoinPanel key={selected.id} selected={selected} siblings={siblings} part="joins" />
+      </>}
       {isOutline && activeTab === "alternates" && <>
         <AlternateBrowser key={selected.groupId ?? selected.id} glyph={selected} siblings={siblings} />
         <details className="rounded-xl border border-border bg-card p-3">
