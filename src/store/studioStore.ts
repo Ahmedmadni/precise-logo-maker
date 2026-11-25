@@ -203,6 +203,7 @@ export interface StudioState {
   duplicateLettering: (id: string) => void;
   reorderLettering: (id: string, direction: -1 | 1) => void;
   updateLettering: (id: string, patch: Partial<LetteringItem>) => void;
+  updateLetteringMany: (entries: { id: string; patch: Partial<LetteringItem> }[], label: string) => void;
   moveLettering: (id: string, dx: number, dy: number) => void;
   deleteLettering: (id: string) => void;
   /** Creates a separate flattened compound outline; the three source layers remain recoverable. */
@@ -574,6 +575,19 @@ export const useStudio = create<StudioState>()((set, get) => {
         lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id ? { ...item, ...patch, id: item.id, kind: item.kind,
           ...(item.kind === "haraka" && (patch.x !== undefined || patch.y !== undefined) && patch.anchorMode === undefined ? { anchorMode: "manual" as const } : {}) } : item)),
       })),
+    updateLetteringMany: (entries, label) => {
+      const patches = new Map(entries.map(({ id, patch }) => [id, patch]));
+      if (!patches.size || !(get().doc.lettering ?? []).some(item => patches.has(item.id))) return;
+      commit(label, (doc) => {
+        const previous = doc.lettering ?? [];
+        return { ...doc, lettering: relayoutHarakat(previous, previous.map(item => {
+          const patch = patches.get(item.id);
+          if (!patch) return item;
+          return { ...item, ...patch, id: item.id, kind: item.kind,
+            ...(item.kind === "haraka" && (patch.x !== undefined || patch.y !== undefined) && patch.anchorMode === undefined ? { anchorMode: "manual" as const } : {}) };
+        })) };
+      });
+    },
     moveLettering: (id, dx, dy) => {
       if (dx === 0 && dy === 0) return;
       commit("Move Arabic lettering", (doc) => ({
