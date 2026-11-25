@@ -1,0 +1,43 @@
+import {useState} from "react";
+import {useStudio,type DocumentState} from "../../store/studioStore";
+import {suggestDecorationPositions,type PlacementResult} from "../../calligraphy/decorationPlacement";
+import type {LetteringItem} from "../../calligraphy/model";
+import {geometryBounds} from "../../core/geometry/math";
+import {LetteringGlyph} from "../canvas/LetteringGlyph";
+
+export function DecorationPlacementPanel({selected}:{selected:LetteringItem}){
+  const doc=useStudio(s=>s.doc);
+  const apply=useStudio(s=>s.placeDecorationAtSuggestion);
+  const pending=useStudio(s=>s.letteringPreview);
+  const [clearance,setClearance]=useState(4);
+  const [proposal,setProposal]=useState<{doc:DocumentState;id:string;clearance:number;result:PlacementResult}|null>(null);
+  const [choice,setChoice]=useState(0);
+  const [notice,setNotice]=useState("");
+  const current=proposal?.doc===doc&&proposal.id===selected.id&&proposal.clearance===clearance?proposal.result:null;
+  const option=current?.ok?current.options[choice]:undefined;
+  const items=doc.lettering??[];
+  const obstacles=doc.objects.filter(o=>o.visible&&!o.guide).map(o=>{
+    const b=geometryBounds(o.geometry),p=Math.max(0,o.style.strokeWidth)/2;
+    return {minX:b.minX-p,minY:b.minY-p,maxX:b.maxX+p,maxY:b.maxY+p};
+  });
+  const preview=option?items.map(i=>i.id===selected.id?{...i,x:option.x,y:option.y}:i):items;
+  return <details className="rounded-lg border border-border p-2">
+    <summary className="cursor-pointer py-2 text-xs font-semibold">اقتراح موضع في الفراغات</summary>
+    <div className="space-y-2">
+      <label className="block text-xs">مسافة الأمان <span dir="ltr">{clearance} px</span><input className="min-h-10 w-full" type="range" min={0} max={30} value={clearance} onChange={e=>{setClearance(Number(e.target.value));setNotice("");}}/></label>
+      <button type="button" disabled={!!pending} className="min-h-11 w-full rounded border border-border text-xs disabled:opacity-40" onClick={()=>{setProposal({doc,id:selected.id,clearance,result:suggestDecorationPositions(items,selected.id,doc.artboard,clearance,obstacles)});setChoice(0);setNotice("");}}>البحث عن مواضع متاحة</button>
+      {current?.ok&&<>
+        <svg viewBox={`0 0 ${doc.artboard.width} ${doc.artboard.height}`} className="h-36 w-full rounded border border-border bg-background" aria-label="معاينة الموضع المقترح">
+          {obstacles.map((b,i)=><rect key={i} x={b.minX} y={b.minY} width={b.maxX-b.minX} height={b.maxY-b.minY} fill="currentColor" opacity=".12"/>)}
+          {preview.filter(i=>!i.hidden).map(i=><LetteringGlyph key={i.id} item={i} selected={i.id===selected.id} allItems={preview}/>)}
+          {current.options.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={Math.max(3,doc.artboard.width*.006)} fill={i===choice?"#0ea5e9":"#94a3b8"}/>)}
+        </svg>
+        <div className="grid grid-cols-3 gap-1">{current.options.map((_,i)=><button type="button" key={i} aria-pressed={choice===i} className={`min-h-10 rounded border text-xs ${choice===i?"border-primary bg-primary/10":"border-border"}`} onClick={()=>setChoice(i)}>موضع {i+1}</button>)}</div>
+        <button type="button" disabled={!option||!!pending} className="min-h-11 w-full rounded bg-primary text-xs text-primary-foreground disabled:opacity-40" onClick={()=>{if(option&&apply(doc,selected.id,option.x,option.y,clearance)){setProposal(null);setNotice("تم اعتماد الموضع.");}else setNotice("تغير التصميم؛ أعد البحث.");}}>اعتماد الموضع</button>
+      </>}
+      {current&&!current.ok&&<p className="text-xs text-muted-foreground">{{selection:"حدد حركة أو زخرفة ظاهرة.",unsupported:"لا يمكن فحص جميع العناصر؛ حوّل النصوص إلى مسارات أو قلل عدد العناصر.",space:"لا توجد مواضع آمنة ضمن نطاق البحث؛ قلل الحجم أو مسافة الأمان."}[current.reason]}</p>}
+      {notice&&<p role="status" className="text-xs">{notice}</p>}
+      <p className="text-[10px] text-muted-foreground">تقدير محافظ يعتمد على حدود العناصر، وليس قواعد التشكيل اللغوية أو اصطدام الحبر الدقيق. الحركة تبقى مرتبطة بحرفها مع تثبيت الموضع يدويًا.</p>
+    </div>
+  </details>;
+}
