@@ -118,3 +118,49 @@ export function arrangeGlyphSelection(items:LetteringItem[],ids:readonly string[
   if(next.some(i=>!Number.isFinite(i.x)||!Number.isFinite(i.y)))return {ok:false,reason:"invalid"};
   return {ok:true,items:next,gap,changed:next.some((i,j)=>i!==items[j])};
 }
+
+
+export type GlyphOverlap={a:string;b:string;x:number;y:number;width:number;height:number;ratio:number};
+/** Broad-phase overlap candidates, not ink collision or a calligraphic error. */
+export function glyphOverlapCandidates(items:LetteringItem[],ids:readonly string[]):GlyphOverlap[]{
+  const selected=new Set(ids);
+  if(selected.size>400)return [];
+  const rows=items.filter(i=>selected.has(i.id)&&i.kind==="outline"&&!i.hidden).flatMap(i=>{const b=preciseGlyphBounds(i);return b?[{id:i.id,...b}]:[];});
+  const overlaps:GlyphOverlap[]=[];
+  for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){
+    const a=rows[i]!,b=rows[j]!,x=Math.max(a.x,b.x),y=Math.max(a.y,b.y);
+    const width=Math.min(a.x+a.width,b.x+b.width)-x,height=Math.min(a.y+a.height,b.y+b.height)-y;
+    if(width<=1e-7||height<=1e-7)continue;
+    overlaps.push({a:a.id,b:b.id,x,y,width,height,ratio:width*height/Math.max(1e-7,Math.min(a.width*a.height,b.width*b.height))});
+  }
+  return overlaps.sort((a,b)=>b.ratio-a.ratio);
+}
+
+/** Explicit signed spacing permits intentional stacking while keeping
+ * outline centers in order and preserving the group's original midpoint. */
+export function spaceGlyphSelection(items:LetteringItem[],ids:readonly string[],axis:GlyphArrangeAxis,gap:number):GlyphArrangeResult{
+  const selected=new Set(ids);
+  if(selected.size<2||selected.size>400)return {ok:false,reason:"selection"};
+  if((axis!=="x"&&axis!=="y")||!Number.isFinite(gap)||Math.abs(gap)>10000)return {ok:false,reason:"invalid"};
+  const rows=items.filter(i=>selected.has(i.id)&&i.kind==="outline"&&!i.hidden).map(i=>{
+    const b=preciseGlyphBounds(i);return b?{id:i.id,min:b[axis],extent:axis==="x"?b.width:b.height}:null;
+  });
+  if(rows.length!==selected.size)return {ok:false,reason:"selection"};
+  if(rows.some(r=>!r||!Number.isFinite(r.min)||!Number.isFinite(r.extent)||r.extent<=0))return {ok:false,reason:"invalid"};
+  const sorted=rows.filter((r):r is NonNullable<typeof r>=>!!r).sort((a,b)=>a.min+a.extent/2-b.min-b.extent/2||a.id.localeCompare(b.id));
+  const low=Math.min(...sorted.map(r=>r.min)),high=Math.max(...sorted.map(r=>r.min+r.extent));
+  // Require advancing starts and ends, so negative spacing cannot swallow
+  // or reverse a neighboring glyph in the chosen order.
+  if(sorted.slice(1).some((r,i)=>gap<=-Math.min(r.extent,sorted[i]!.extent)+1e-7))return {ok:false,reason:"overlap"};
+  const span=sorted.reduce((sum,r)=>sum+r.extent,0)+gap*(sorted.length-1);
+  let cursor=(low+high-span)/2;
+  const offsets=new Map<string,number>();
+  for(const r of sorted){offsets.set(r.id,cursor-r.min);cursor+=r.extent+gap;}
+  for(const i of items)if(i.kind==="bridge"&&!i.hidden&&i.ribbon&&Math.abs((offsets.get(i.ribbon.sourceGlyphId)??0)-(offsets.get(i.ribbon.targetGlyphId)??0))>1e-7)return {ok:false,reason:"bridge"};
+  const next=items.map(i=>{
+    const delta=offsets.get(i.id)??(i.kind==="haraka"&&i.attachedToGlyphId?offsets.get(i.attachedToGlyphId):undefined)??0;
+    return Math.abs(delta)<=1e-7?i:{...i,[axis]:i[axis]+delta};
+  });
+  if(next.some(i=>!Number.isFinite(i.x)||!Number.isFinite(i.y)))return {ok:false,reason:"invalid"};
+  return {ok:true,items:next,gap,changed:next.some((i,j)=>i!==items[j])};
+}
