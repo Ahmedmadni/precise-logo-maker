@@ -10,7 +10,16 @@ import { ScissorsPanel } from "./ScissorsPanel";
 export function PathNodesSection({ objectId, path, disabled, onChange }: { objectId:string; path: PathGeometry; disabled: boolean; onChange: (path: PathGeometry) => void }) {
   const t = useT();
   const [node, setNode] = useState(0);
-  const [multi,setMulti]=useState<number[]>([]);
+  const shared=useStudio(s=>s.pathNodeSelection);
+  const nodeLassoTarget=useStudio(s=>s.nodeLassoTargetId);
+  const setNodeLassoTarget=useStudio(s=>s.setNodeLassoTarget);
+  const multi=shared?.objectId===objectId&&shared.geometry===path?shared.indices:[];
+  const setMulti=(next:number[]|((old:number[])=>number[]))=>{
+    const state=useStudio.getState(),current=state.pathNodeSelection;
+    const old=current?.objectId===objectId&&current.geometry===path?current.indices:[];
+    const indices=typeof next==="function"?next(old):next;
+    state.setPathNodeSelection(indices.length?{objectId,geometry:path,indices}:null);
+  };
   const [multiAxis,setMultiAxis]=useState<"x"|"y">("x");
   const [step,setStep]=useState(5);
   const [multiNotice,setMultiNotice]=useState("");
@@ -21,7 +30,11 @@ export function PathNodesSection({ objectId, path, disabled, onChange }: { objec
   const selectedNodes=multi.filter(i=>Number.isInteger(i)&&i>=0&&i<path.points.length);
   const changeMany=(next:PathGeometry)=>{
     if(next===path){setMultiNotice("لا يوجد تعديل قابل للتطبيق.");return;}
-    onChange(next);setMultiNotice("تم تعديل النقاط المحددة دفعة واحدة.");
+    onChange(next);
+    const state=useStudio.getState();
+    if(state.doc.objects.find(o=>o.id===objectId)?.geometry===next&&next.points.length===path.points.length)state.setPathNodeSelection({objectId,geometry:next,indices:selectedNodes});
+    else state.setPathNodeSelection(null);
+    setMultiNotice("تم تعديل النقاط المحددة دفعة واحدة.");
   };
   const [mode,setMode]=useState<PathControlMode>("free");
   const canvasControl=useStudio(s=>s.pathControlSelection);
@@ -49,6 +62,8 @@ export function PathNodesSection({ objectId, path, disabled, onChange }: { objec
   return (
     <fieldset disabled={disabled} className="space-y-2 disabled:opacity-50">
       <legend className="mb-2 text-xs font-semibold">{t("Path nodes")}</legend>
+      {!path.holes?.length&&<button type="button" aria-pressed={nodeLassoTarget===objectId} className="min-h-11 w-full rounded-lg border border-primary text-xs font-semibold" onClick={()=>setNodeLassoTarget(nodeLassoTarget===objectId?null:objectId)}>{nodeLassoTarget===objectId?"إنهاء تحديد النقاط الحر":"تحديد النقاط على اللوحة (Lasso)"}</button>}
+      {nodeLassoTarget===objectId&&<p className="text-xs text-muted-foreground">ارسم حول النقاط ثم اسحب إحدى النقاط المحددة لتحريك المجموعة. على الهاتف أغلق لوحة الخصائص أولًا.</p>}
       {!path.closed&&<ScissorsPanel objectId={objectId} path={path} disabled={disabled}/>}
       <label className="flex items-center gap-2 text-xs">
         {t("Node")}
