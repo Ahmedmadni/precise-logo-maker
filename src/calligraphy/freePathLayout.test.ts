@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath, composeWordGroupsOnPath } from "./freePathLayout";
+import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath, composeWordGroupsOnPath, wordSpacingFractions, wordEnvelopeOverlaps } from "./freePathLayout";
 import type { LetteringItem } from "./model";
 const glyph=(id:string,x:number,glyphIndex:number):LetteringItem=>({id,kind:"outline",x,y:100,size:100,rotation:0,color:"#111111",unitsPerEm:1000,pathData:"M 0 0 L 300 0 L 300 100 L 0 100 Z",glyphIndex});
 const straight=[{x:90,y:50},{x:65,y:50},{x:35,y:50},{x:10,y:50}];
@@ -81,5 +81,25 @@ describe("rigid tangent word rotation",()=>{
     const second=composeWordGroupsOnPath(moved,["first","second"],vertical,opts);
     expect(second.find(p=>p.id==="a")?.patch.rotation).toBeCloseTo(90);
     expect(second.find(p=>p.id==="b")?.patch.rotation).toBeCloseTo(105);
+  });
+});
+
+
+describe("size-aware word spacing",()=>{
+  it("reserves more path length next to larger words",()=>{
+    const fractions=wordSpacingFractions([20,20,100],0);
+    expect(fractions).toEqual([0,.25,1]);
+    expect(wordSpacingFractions([20,20,100],1)[1]).toBeGreaterThan(.25);
+  });
+  it("preserves weighted spacing when reversing a guide",()=>{
+    const forward=sampleGuide(straight,3,0,false,[0,.25,1]);
+    const reversed=sampleGuide(straight,3,0,true,[0,.25,1]);
+    expect(forward[1]?.point.x).toBeCloseTo(70);
+    expect(reversed[1]?.point.x).toBeCloseTo(30);
+  });
+  it("reports only inter-word envelope intersections",()=>{
+    const items=[{...glyph("a",0,0),groupId:"one"},{...glyph("b",10,1),groupId:"one"},{...glyph("c",35,0),groupId:"two"},{...glyph("d",200,0),groupId:"three"}];
+    expect(wordEnvelopeOverlaps(items)).toEqual([{first:"one",second:"two"}]);
+    expect(wordEnvelopeOverlaps(items.map(g=>g.id==="c"?{...g,hidden:true}:g))).toEqual([]);
   });
 });
