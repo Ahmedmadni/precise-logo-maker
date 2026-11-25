@@ -56,6 +56,7 @@ import { useT } from "../../i18n";
 import { PathNodesSection } from "./PathNodesSection";
 import { CompoundRingsPanel } from "./CompoundRingsPanel";
 import { SplitShapePanel } from "./SplitShapePanel";
+import { JoinPathsPanel } from "./JoinPathsPanel";
 import { LetteringPanel } from "./LetteringPanel";
 import { GlyphTransformPanel } from "./GlyphTransformPanel";
 import { RibbonJoinInspector } from "./RibbonJoinInspector";
@@ -212,6 +213,7 @@ function PathfinderSection() {
     <div className="space-y-2">
       <span className={labelCls}>{t("Pathfinder")}</span>
       {sources.length===1&&sources[0]&&<SplitShapePanel key={sources[0].id} object={sources[0]}/>}
+      {sources.length===2&&sources[0]&&sources[1]&&<JoinPathsPanel key={ids} a={sources[0]} b={sources[1]}/>}
       <div className="grid grid-cols-2 gap-1.5">
         {ops.map(({op,label})=><button key={op} type="button" disabled={!enabled} aria-pressed={current?.op===op} className={cn("min-h-11 rounded-lg border border-border px-1 text-xs hover:bg-accent disabled:opacity-40",current?.op===op&&"border-primary bg-primary/10 font-semibold")} onClick={()=>preview(op)}>{label}</button>)}
       </div>
