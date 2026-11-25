@@ -4,6 +4,7 @@ import {glyphGroupPivot,groupMoveIds,transformGlyphSelection,arrangeGlyphSelecti
 import {preciseGlyphBounds} from "../../calligraphy/morph";
 import {analyzeGlyphInk,INK_CURVE_TOLERANCE,type InkAnalysis} from "../../calligraphy/bakeUnion";
 import type {LetteringItem} from "../../calligraphy/model";
+import {suggestGlyphSpacing,pickSpacingSuggestion,type SpacingSuggestionsResult} from "../../calligraphy/spacingSuggestions";
 import {LetteringGlyph} from "./LetteringGlyph";
 
 export function GlyphGroupTransformControls(){
@@ -21,6 +22,8 @@ export function GlyphGroupTransformControls(){
   const [scale,setScale]=useState(100);
   const [degrees,setDegrees]=useState(0);
   const [notice,setNotice]=useState("");
+  const [suggestions,setSuggestions]=useState<{source:LetteringItem[];key:string;result:SpacingSuggestionsResult}|null>(null);
+  const [budget,setBudget]=useState(5);
   const [ink,setInk]=useState<{source:LetteringItem[];key:string;before:InkAnalysis;after:InkAnalysis|null}|null>(null);
   if(!source||!ids.length)return null;
   const allowed=groupMoveIds(source,ids);
@@ -29,6 +32,9 @@ export function GlyphGroupTransformControls(){
   const spacing=open&&tab==="spacing"?spaceGlyphSelection(source,ids,axis,gap.trim()?Number(gap):NaN):null;
   const beforeOverlaps=open&&tab==="spacing"?glyphOverlapCandidates(source,ids):[];
   const afterOverlaps=spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[];
+  const suggestionKey=JSON.stringify([ids,axis]);
+  const currentSuggestions=suggestions?.source===source&&suggestions.key===suggestionKey?suggestions.result:null;
+  const recommended=currentSuggestions?.ok?pickSpacingSuggestion(currentSuggestions.options,budget/100):null;
   const inkKey=JSON.stringify([ids,axis,gap]);
   const currentInk=ink?.source===source&&ink.key===inkKey?ink:null;
   const shownInk=currentInk?(spacing?.ok?currentInk.after:currentInk.before):null;
@@ -46,6 +52,21 @@ export function GlyphGroupTransformControls(){
         <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>setAxis(v.id)}>{v.label}</button>)}</div>
         <label className="block text-xs">الفاصل بين الحدود (px)<input type="number" value={gap} step={1} min={-10000} max={10000} onChange={e=>{setGap(e.target.value);setNotice("");}} className="min-h-10 w-full rounded border border-border bg-background px-2" dir="ltr"/></label>
         <div className="grid grid-cols-3 gap-1">{[-5,0,5].map(v=><button type="button" key={v} className="min-h-9 rounded border border-border text-xs" onClick={()=>setGap(String(v))}>{v===-5?"تراكب":v===0?"تماس":"فصل"}</button>)}</div>
+        <div className="space-y-1 rounded border border-border p-2">
+          <button type="button" disabled={ids.length<2||ids.length>8} className="min-h-10 w-full rounded border border-border text-xs disabled:opacity-40" onClick={()=>setSuggestions({source,key:suggestionKey,result:suggestGlyphSpacing(source,ids,axis)})}>اقتراح تباعد بناءً على الحبر</button>
+          <p className="text-[10px] text-muted-foreground">يفحص حتى 6 بدائل لمجموعة من 2 إلى 8 حروف.</p>
+          {currentSuggestions?.ok&&<>
+            <label className="block text-xs">أقصى تداخل للحرف الأصغر: {budget}%<select className="min-h-9 w-full rounded border border-border bg-background" value={budget} onChange={e=>setBudget(Number(e.target.value))}>{[0,5,10,20,35].map(v=><option key={v} value={v}>{v}%</option>)}</select></label>
+            <div className="space-y-1">
+              {currentSuggestions.options.map(o=><button type="button" key={o.gap} aria-pressed={Number(gap)===o.gap} className={`flex min-h-10 w-full items-center justify-between gap-1 rounded border px-2 text-xs ${recommended?.gap===o.gap?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setGap(String(o.gap));setNotice("");}}>
+                <span dir="ltr">{o.gap.toFixed(2)} px</span><span>{o.inkPairs} تقاطع · {(o.maxRatio*100).toFixed(1)}%</span>{recommended?.gap===o.gap&&<span>مقترح</span>}
+              </button>)}
+            </div>
+            {!recommended&&<p className="text-xs text-muted-foreground">لا يوجد بديل ضمن حد التداخل المختار.</p>}
+            <p className="text-[10px] text-muted-foreground">المقترح هو الأضيق ضمن الحد المحدد من البدائل المفحوصة. اختره للمعاينة ثم اعتمد يدويًا.</p>
+          </>}
+          {currentSuggestions&&!currentSuggestions.ok&&<p className="text-xs text-muted-foreground">{{selection:"حدد من حرفين إلى ثمانية.",unsupported:"توجد حدود أو سماكات غير مدعومة.", "no-options":"لم يكتمل فحص بديل صالح؛ راجع الوصلات والمسارات."}[currentSuggestions.reason]}</p>}
+        </div>
         {boxes.length>0&&<svg viewBox={viewBox} className="h-28 w-full rounded border border-border bg-background" aria-label="معاينة التداخل">
           {visible.map(i=><LetteringGlyph key={i.id} item={i} selected={false} allItems={next??source}/>)}
           {!shownInk&&(spacing?.ok?afterOverlaps:beforeOverlaps).slice(0,100).map((b,i)=><rect key={i} x={b.x} y={b.y} width={b.width} height={b.height} fill="#f59e0b" fillOpacity=".18" stroke="#f59e0b" strokeDasharray="3 2" vectorEffect="non-scaling-stroke"/>)}
