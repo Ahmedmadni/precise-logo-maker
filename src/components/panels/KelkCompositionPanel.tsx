@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Minimize2, Maximize2, Spline, Sparkles } from "lucide-react";
-import type { LetteringItem } from "../../calligraphy/model";
+import { letteringTransform, safePath, safeColor, type LetteringItem } from "../../calligraphy/model";
+import { letteringGroupBounds } from "../../calligraphy/morph";
+import { outlineNodes } from "../../calligraphy/pathEditor";
+import { buildRibbonPath } from "../../calligraphy/ribbonJoin";
 import {
   KELK_SLANT_PRESETS,
   adjustGroupOverlap,
@@ -61,17 +64,33 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const [autoFitCaps, setAutoFitCaps] = useState(false);
   const [nibAngle, setNibAngle] = useState(35);
   const [nibContrast, setNibContrast] = useState(0);
+  const prepareConnection = (source: LetteringItem, destination: LetteringItem, all: LetteringItem[]) => {
+    const item = createConnectedKashida(source, destination, { ...kashidaOptions, nibAngle, nibContrast: nibContrast / 100 });
+    if (!item) return null;
+    const fit = autoFitCaps ? suggestRibbonCapFit(item, all) : null;
+    return { item: fit ? { ...item, ribbon: fit.ribbon } : item, fitted: !!fit };
+  };
+  const connection = target ? prepareConnection(selected, target, siblings) : null;
+  const previewGlyphs = target ? [selected, target] : [];
+  const previewPath = connection ? buildRibbonPath(connection.item, previewGlyphs) : null;
+  const glyphBounds = letteringGroupBounds(previewGlyphs);
+  const previewNodes = previewPath ? outlineNodes(previewPath) : [];
+  const previewBounds = glyphBounds && previewNodes.length ? (() => {
+    const left = Math.min(glyphBounds.x, ...previewNodes.map(n => n.x));
+    const top = Math.min(glyphBounds.y, ...previewNodes.map(n => n.y));
+    const right = Math.max(glyphBounds.x + glyphBounds.width, ...previewNodes.map(n => n.x));
+    const bottom = Math.max(glyphBounds.y + glyphBounds.height, ...previewNodes.map(n => n.y));
+    const pad = Math.max(4, Math.max(right-left,bottom-top)*0.1);
+    return [left-pad,top-pad,right-left+2*pad,bottom-top+2*pad].join(" ");
+  })() : null;
   const insertConnected = () => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
     const source = latest.find(item => item.id === selected.id);
     const destination = latest.find(item => item.id === targetId);
-    const item = source && destination ? createConnectedKashida(source, destination, { ...kashidaOptions, nibAngle, nibContrast: nibContrast / 100 }) : null;
-    setConnectionError(!item);
-    if (item) {
-      const fit = autoFitCaps ? suggestRibbonCapFit(item, latest) : null;
-      addLettering(fit ? { ...item, ribbon: fit.ribbon } : item);
-    }
+    const prepared = source && destination ? prepareConnection(source, destination, latest) : null;
+    setConnectionError(!prepared);
+    if (prepared) addLettering(prepared.item);
   };
 
   const onSlant = (preset: { skewX: number; rotation: number; label: string }) => {
@@ -246,7 +265,22 @@ export function KelkCompositionPanel({ selected, siblings }: {
             مطابقة سُمك واتجاه الطرفين تلقائيًا
           </label>
           {autoFitCaps && <p className="text-[11px] leading-5 text-muted-foreground">يُستخدم قياس حدود الحرف فقط إذا توفر اقتراح هندسي موثوق ولم يزد مخاطر التقاطع. وإلا تُحفظ الإعدادات اليدوية؛ قد تتغير السماكة والزاوية عند نجاح المطابقة.</p>}
-          <button type="button" className={`${btn} w-full`} disabled={!target} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
+          {target && <div className="rounded-lg border border-border bg-background p-2">
+            <p className="text-[11px] font-medium">معاينة الوصلة بين الحرفين</p>
+            {previewPath && previewBounds && connection ? <>
+              <svg role="img" aria-label="معاينة الحرفين والكشيدة المرتبطة" viewBox={previewBounds} className="block h-32 w-full" preserveAspectRatio="xMidYMid meet">
+                <path d={previewPath} fill={safeColor(connection.item.color)} />
+                {previewGlyphs.map(glyph => {
+                  const scale = glyph.size / (glyph.unitsPerEm || 1000);
+                  return <g key={glyph.id} transform={letteringTransform(glyph)} fill={safeColor(glyph.color)}>
+                    <path d={safePath(glyph.pathData)} transform={`scale(${scale} ${-scale})`} fillRule={glyph.fillRule ?? "nonzero"} stroke={safeColor(glyph.color)} strokeWidth={scale > 0 ? (glyph.weight ?? 0)/scale : 0} strokeLinejoin="round" />
+                  </g>;
+                })}
+              </svg>
+              {autoFitCaps && <p className="text-[11px] text-muted-foreground">{connection.fitted ? "تم اقتراح مطابقة الأطراف." : "لا توجد مطابقة إضافية موثوقة؛ الإعدادات الحالية محفوظة."}</p>}
+            </> : <p className="py-2 text-xs text-muted-foreground">لا تتوفر معاينة صالحة. تحقق من نقاط الاتصال.</p>}
+          </div>}
+          <button type="button" className={`${btn} w-full`} disabled={!connection || !previewPath} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
           {connectionError && <p role="alert" className="text-xs text-destructive">تعذر إنشاء الوصلة. راجع نقطتي الاتصال والمسافة بين الحرفين.</p>}
         </div>}
       </div>
