@@ -26,8 +26,14 @@ export function OfflineStudioPage() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [appearance, setAppearance] = useState<StudioAppearance>(readStudioAppearance);
   useEffect(() => saveStudioAppearance(appearance), [appearance]);
+  useEffect(()=>{
+    const query=window.matchMedia("(min-width: 900px) and (orientation: landscape), (min-width: 1200px)");
+    const sync=()=>{if(query.matches)setPanelOpen(false);};
+    sync();query.addEventListener("change",sync);
+    return ()=>query.removeEventListener("change",sync);
+  },[]);
   const openProperties = () => {
-    if (window.matchMedia("(min-width: 1024px)").matches) setInspectorOpen(true);
+    if (window.matchMedia("(min-width: 900px) and (orientation: landscape), (min-width: 1200px)").matches) setInspectorOpen(true);
     else setPanelOpen(true);
   };
   useEffect(() => {
@@ -40,7 +46,7 @@ export function OfflineStudioPage() {
   }, [panelOpen]);
 
   return (
-    <div className={"studio-workspace flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground " +
+    <div className={"studio-workspace flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground pt-[env(safe-area-inset-top)] ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)] " +
       (appearance === "dark" ? "dark" : "")}>
       <ClientOnly fallback={null}>
         <LanguageSync />
@@ -48,14 +54,14 @@ export function OfflineStudioPage() {
       <StudioHeaderOffline appearance={appearance} onAppearanceChange={setAppearance} />
       {/* At desktop sizes the inspector docks beside—not above—the canvas. */}
       <div className="flex min-h-0 flex-1">
-        <div className="hidden sm:flex">
+        <div className="hidden min-h-0 shrink-0 sm:flex">
           <ToolRail onOpenLettering={openProperties} />
         </div>
-        <main className="relative min-w-0 flex-1">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           <button type="button" onClick={() => setInspectorOpen((shown) => !shown)}
             aria-label={inspectorOpen ? "إخفاء لوحة الخصائص" : "إظهار لوحة الخصائص"}
             aria-pressed={inspectorOpen} title="إظهار أو إخفاء خصائص التصميم"
-            className="absolute end-3 top-3 z-30 hidden h-11 w-11 items-center justify-center rounded-xl border border-border bg-card/95 text-foreground shadow-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary lg:inline-flex">
+            className="absolute end-3 top-3 z-30 hidden h-11 w-11 items-center justify-center rounded-xl border border-border bg-card/95 text-foreground shadow-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary [@media(min-width:900px)_and_(orientation:landscape)]:inline-flex min-[1200px]:inline-flex">
             {inspectorOpen ? <X className="h-5 w-5" aria-hidden /> : <PanelRightOpen className="h-5 w-5" aria-hidden />}
           </button>
           <ClientOnly fallback={<div className="h-full w-full bg-background" />}>
@@ -74,20 +80,20 @@ export function OfflineStudioPage() {
 
         {/* Mobile and tablet use a modal sheet; desktop uses a docked inspector. */}
         {panelOpen && (
-          <div className="fixed inset-x-0 top-0 bottom-[calc(64px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 lg:hidden">
+          <div className="fixed inset-x-0 top-0 bottom-[calc(56px+max(env(safe-area-inset-bottom),4px))] z-40 sm:inset-0 [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden">
             <button
               type="button"
               aria-label="إغلاق لوحة الأدوات"
               className="absolute inset-0 bg-black/50"
               onClick={() => setPanelOpen(false)}
             />
-            <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
+            <div role="dialog" aria-label="أدوات التصميم" className="absolute inset-x-0 bottom-0 h-[min(78dvh,45rem)] max-h-full overflow-hidden rounded-t-2xl border-t border-primary/30 bg-card shadow-2xl sm:inset-y-0 sm:start-auto sm:end-0 sm:h-auto sm:w-[min(23rem,90vw)] sm:rounded-none">
               <RightPanel onClose={() => setPanelOpen(false)} />
             </div>
           </div>
         )}
         {inspectorOpen && (
-          <div className="hidden h-full w-[clamp(17rem,24vw,22rem)] shrink-0 lg:block">
+          <div className="hidden min-h-0 h-full w-[clamp(15rem,26vw,23rem)] shrink-0 overflow-hidden [@media(min-width:900px)_and_(orientation:landscape)]:block min-[1200px]:block">
             <RightPanel />
           </div>
         )}
@@ -134,7 +140,7 @@ function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; open
   const buttonStyle = "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 text-[11px] font-semibold text-foreground active:bg-primary/15";
   return (
     <div dir="rtl" role="group" aria-label="أدوات سريعة للعنصر المحدد"
-      className="absolute bottom-3 end-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-2xl border border-primary/40 bg-card/95 p-1.5 shadow-xl backdrop-blur-lg lg:hidden">
+      className="absolute bottom-3 end-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-2xl border border-primary/40 bg-card/95 p-1.5 shadow-xl backdrop-blur-lg [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden">
       {editJoins && canJoin ? (
         <>
           <span className="max-w-24 truncate px-1 text-[11px] font-semibold text-primary">
@@ -184,7 +190,7 @@ function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }
       type="button"
       onClick={onToggle}
       aria-label={t("Panels")}
-      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex lg:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg lg:hidden"
+      className="absolute top-3 end-3 z-30 hidden h-12 w-12 sm:inline-flex [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden"
     >
       {open ? (
         <X className="h-5 w-5" aria-hidden />
