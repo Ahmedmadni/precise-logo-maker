@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildKashidaOutline, createConnectedKashida } from "./kelkComposition";
+import { buildKashidaOutline, createConnectedKashida, arrangeWordBounds, adjustGroupOverlap } from "./kelkComposition";
 import { buildRibbonPath, sampleRibbon } from "./ribbonJoin";
 import type { LetteringItem } from "./model";
+import { preciseGlyphBounds } from "./morph";
 
 const glyph = (id: string, x: number, size: number): LetteringItem => ({
   id, kind: "outline", x, y: 100, size, rotation: 0, color: "#111111",
@@ -42,5 +43,30 @@ describe("kelk kashida", () => {
   it("rejects hidden or identical glyphs", () => {
     expect(createConnectedKashida(source,{...target,hidden:true},options)).toBeNull();
     expect(createConnectedKashida(source,source,options)).toBeNull();
+  });
+});
+
+
+describe("precise outline bounds and arrangement", () => {
+  it("uses quadratic extrema rather than control-point bounds", () => {
+    const g = {...glyph("q",0,1000), y:0, pathData:"M 0 0 Q 50 100 100 0 Z"};
+    expect(preciseGlyphBounds(g)).toEqual({x:0,y:-50,width:100,height:50});
+  });
+  it("includes cubic extrema after rotation", () => {
+    const g = {...glyph("c",0,1000), y:0, rotation:90, pathData:"M 0 0 C 0 100 100 100 100 0 Z"};
+    const b=preciseGlyphBounds(g);
+    expect(b?.width).toBeCloseTo(75,6);
+    expect(b?.height).toBeCloseTo(100,6);
+  });
+  it("equalizes edge gaps and keeps outer glyphs fixed", () => {
+    const group=[glyph("r",220,100),glyph("m",100,200),glyph("l",0,100)];
+    expect(arrangeWordBounds(group)).toEqual([{id:"m",patch:{x:95}}]);
+  });
+  it("never reverses adjacent anchors during compression", () => {
+    const group=[glyph("r",100,100),glyph("m",95,100),glyph("l",80,100)];
+    const patches=adjustGroupOverlap(group,-100);
+    const xs=group.map(g=>patches.find(p=>p.id===g.id)?.patch.x??g.x);
+    expect(xs[0]!).toBeGreaterThan(xs[1]!);
+    expect(xs[1]!).toBeGreaterThan(xs[2]!);
   });
 });
