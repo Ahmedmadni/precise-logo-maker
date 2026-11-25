@@ -1,0 +1,30 @@
+name: Studio verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: TypeScript
+        run: bunx tsc --noEmit
+      - name: Tests
+        if: always()
+        run: bunx vitest run
+      - name: Web build
+        if: always()
+        run: bun run build
+      - name: Mobile web bundle
+        if: always()
+        run: bun run build:mobile
