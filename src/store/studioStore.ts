@@ -42,6 +42,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
+import {suggestDecorationPositions} from "../calligraphy/decorationPlacement";
 import { nudgePathNodes } from "../editor/path-nodes";
 import {translateGlyphSelection,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,type GlyphGroupTransform,type GlyphArrangeAxis,type GlyphArrangeMode} from "../calligraphy/groupSelection";
 import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
@@ -177,6 +178,7 @@ export interface StudioState {
   glyphMultiIds:string[];
   setGlyphLassoActive:(active:boolean)=>void;
   setGlyphMultiIds:(ids:string[])=>void;
+  placeDecorationAtSuggestion:(source:DocumentState,id:string,x:number,y:number,clearance:number)=>boolean;
   spaceGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,gap:number)=>boolean;
   arrangeGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,mode:GlyphArrangeMode)=>boolean;
   transformGlyphMulti:(source:LetteringItem[],ids:string[],options:GlyphGroupTransform)=>boolean;
@@ -404,6 +406,19 @@ export const useStudio = create<StudioState>()((set, get) => {
       set({glyphLassoActive:active,glyphMultiIds:[],lassoActive:active,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null,tool:"select",selection:[],selectedLetteringId:null,selectedGlyphNodeId:null,selectedContourIndex:null,editGlyphNodes:false,editGlyphContours:false,editJoinAnchors:false,joinGuide:null});
     },
     setGlyphMultiIds:(ids)=>set({glyphMultiIds:[...new Set(ids)]}),
+    placeDecorationAtSuggestion:(source,id,x,y,clearance)=>{
+      const s=get();
+      if(s.doc!==source||s.selectedLetteringId!==id||s.letteringPreview||s.guideLayer.edit)return false;
+      const items=source.lettering??[];
+      const obstacles=source.objects.filter(o=>o.visible&&!o.guide).map(o=>{
+        const b=geometryBounds(o.geometry),p=Math.max(0,o.style.strokeWidth)/2;
+        return {minX:b.minX-p,minY:b.minY-p,maxX:b.maxX+p,maxY:b.maxY+p};
+      });
+      const result=suggestDecorationPositions(items,id,source.artboard,clearance,obstacles);
+      if(!result.ok||!result.options.some(p=>p.x===x&&p.y===y))return false;
+      commit("Place calligraphy decoration",d=>({...d,lettering:items.map(i=>i.id===id?{...i,x,y,...(i.kind==="haraka"?{anchorMode:"manual" as const}:{})}:i)}));
+      return true;
+    },
     spaceGlyphMulti:(source,ids,axis,gap)=>{
       const s=get();
       if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
