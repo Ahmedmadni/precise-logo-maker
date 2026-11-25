@@ -1209,6 +1209,7 @@ export function StudioCanvas() {
                     handleDrag && handleDrag.objectId === o.id ? handleDrag.geometry : o.geometry,
                   )}
 
+                  fillRule={o.geometry.kind==="path"&&o.geometry.holes?.length?"evenodd":"nonzero"}
                   fill={o.guide ? "none" : o.style.fill}
                   fillOpacity={o.style.fillOpacity ?? 1}
                   opacity={o.guide ? 0.6 : (o.style.opacity ?? 1)}
