@@ -31,11 +31,11 @@ export function MobileToolDock({ openPanel, closePanel, panelOpen }: {
       {actions.map(({ id, label, icon: Icon, active, onClick }) => (
         <button key={id} type="button" aria-label={label} aria-pressed={active} onClick={onClick}
           className={cn(
-            "flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-transparent px-0.5 text-[11px] text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+            "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent px-0.5 text-[10px] text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-primary",
             active && "border-primary/20 bg-primary/10 font-semibold text-primary",
           )}>
-          <Icon className="h-[19px] w-[19px]" aria-hidden />
-          <span className="whitespace-nowrap">{label}</span>
+          <Icon className="h-5 w-5" aria-hidden />
+          <span className="w-full truncate text-center">{label}</span>
         </button>
       ))}
     </nav>
