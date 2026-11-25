@@ -1,5 +1,6 @@
 import { angleOf, dist, pointOnCircle, pt } from "../core/geometry/math";
 import type { Geometry, Point } from "../core/geometry/types";
+import { movePathNode } from "./path-nodes";
 import { translateGeometry } from "../objects/transform";
 
 export type HandleRole = "anchor" | "radius" | "center";
@@ -119,7 +120,7 @@ export const applyHandle = (g: Geometry, id: string, p: Point): Geometry => {
   if (g.kind === "path") {
     const index = Number(id.slice(1));
     if (!Number.isInteger(index) || index < 0 || index >= g.points.length) return g;
-    return { ...g, points: g.points.map((q, i) => (i === index ? p : q)) };
+    return movePathNode(g,index,p);
   }
   if (id === "center") {
     return translateGeometry(g, p.x - g.center.x, p.y - g.center.y);
