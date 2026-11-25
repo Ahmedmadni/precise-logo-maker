@@ -14,7 +14,8 @@ import {
   pt,
   unionBounds,
 } from "../../core/geometry/math";
-import type { Geometry, Point } from "../../core/geometry/types";
+import type { Geometry, Point, VectorObject } from "../../core/geometry/types";
+import { knifeLineParameters, splitShapeAtAngle, angledCutGuide, type SplitResult } from "../../objects/splitShape";
 import { resolveSnap, type SnapResult } from "../../core/snapping/snap";
 import { constrainPoint } from "../../core/precision/constraints";
 import { applyHandle, constrainHandle, handlesOf, pickHandle } from "../../editor/handles";
@@ -90,6 +91,14 @@ export function StudioCanvas() {
   const setMeasurement = useStudio((s) => s.setMeasurement);
   const selection = useStudio((s) => s.selection);
   const pathControlSelection=useStudio(s=>s.pathControlSelection);
+  const knifeTargetId=useStudio(s=>s.knifeTargetId);
+  const knifeTarget=tool==="select"&&selection.length===1&&selection[0]===knifeTargetId&&!doc.objects.find(o=>o.id===knifeTargetId)?.guide
+    ?doc.objects.find(o=>o.id===knifeTargetId&&o.visible&&!o.locked&&o.cellKey===undefined&&(o.geometry.kind==="circle"||(o.geometry.kind==="path"&&o.geometry.closed))):undefined;
+  const [knifeLine,setKnifeLine]=useState<{source:VectorObject;start:Point;end:Point}|null>(null);
+  const knifeDrag=useRef<{source:VectorObject;start:Point}|null>(null);
+  const [knifeProposal,setKnifeProposal]=useState<{source:VectorObject;degrees:number;fraction:number;result:SplitResult}|null>(null);
+  const [knifeNotice,setKnifeNotice]=useState("");
+  useEffect(()=>{knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");},[knifeTarget]);
   const paint = useStudio((s) => s.paint);
   const trace = useStudio((s) => s.trace);
   const brush = useStudio((s) => s.brush);
@@ -418,6 +427,7 @@ export function StudioCanvas() {
     setDragOffset(null);
     setBox(null);
     setHandleDrag(null);
+    knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");
     penActiveRef.current = false;
     setPen(null);
     brushTrailRef.current = null;
@@ -489,6 +499,12 @@ export function StudioCanvas() {
     if (e.button !== 0) return;
 
     const world = toWorld(e.clientX, e.clientY);
+
+    if(knifeTarget&&!guideLayer.edit){
+      knifeDrag.current={source:knifeTarget,start:world};
+      setKnifeLine({source:knifeTarget,start:world,end:world});setKnifeProposal(null);setKnifeNotice("");
+      return;
+    }
 
     // A real pressure-sensitive, closed SVG brush stroke (not the grid-cell brush).
     if (tool === "brush") {
@@ -711,6 +727,12 @@ export function StudioCanvas() {
       return;
     }
     const world = toWorld(e.clientX, e.clientY);
+    if(knifeDrag.current){
+      const drag=knifeDrag.current;
+      setKnifeLine({...drag,end:world});
+      return;
+    }
+    if(knifeTarget&&!guideLayer.edit)return;
     if (contourDragRef.current) {
       const dragging = contourDragRef.current;
       const item = (doc.lettering ?? []).find((entry) => entry.id === dragging.id);
@@ -871,6 +893,19 @@ export function StudioCanvas() {
     activePointerRef.current = null;
     activePointerTypeRef.current = null;
     panRef.current = null;
+    if(knifeDrag.current){
+      const drag=knifeDrag.current;knifeDrag.current=null;
+      if(!e||knifeTarget!==drag.source||guideLayer.edit){setKnifeLine(null);return;}
+      const end=toWorld(e.clientX,e.clientY);
+      if(dist(drag.start,end)*view.zoom<8){setKnifeLine(null);setKnifeNotice("اسحب خطًا أطول عبر الشكل.");return;}
+      const params=knifeLineParameters(drag.source.geometry,drag.start,end);
+      if(!params){setKnifeLine(null);setKnifeNotice("خط القص خارج حدود الشكل.");return;}
+      const result=splitShapeAtAngle(drag.source.geometry,params.degrees,params.fraction);
+      setKnifeLine(null);
+      setKnifeProposal({source:drag.source,...params,result});
+      setKnifeNotice(result.ok?"":result.reason==="empty"?"لا توجد مساحة على جانبي القص.":"تعذر تقسيم الشكل بأمان.");
+      return;
+    }
     if (contourDragRef.current) {
       const { id, path: original } = contourDragRef.current;
       contourDragRef.current = null;
@@ -1059,7 +1094,7 @@ export function StudioCanvas() {
         ? `${draftReadout(preview, unit)}${shiftDown || precision.angleLock ? ` · locked ${precision.angleStep}°` : ""}`
         : null;
   const editTarget =
-    tool === "select" && selection.length === 1
+    tool === "select" && !knifeTarget && selection.length === 1
       ? doc.objects.find(
           (o) =>
             o.id === selection[0] &&
@@ -1106,7 +1141,7 @@ export function StudioCanvas() {
 
   const transform = `translate(${view.pan.x} ${view.pan.y}) rotate(${view.rotation}) scale(${view.zoom})`;
   const cursorStyle =
-    spaceDown || tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair";
+    spaceDown || tool === "pan" ? "grab" : knifeTarget ? "crosshair" : tool === "select" ? "default" : "crosshair";
 
   return (
     <div
@@ -1478,11 +1513,23 @@ export function StudioCanvas() {
               ))}
             </g>
           )}
+          {knifeTarget&&knifeProposal?.source===knifeTarget&&knifeProposal.result.ok&&<g pointerEvents="none">
+            {knifeProposal.result.parts.map((g,i)=><path key={i} d={geometryToPathData(g)} fill={i<(knifeProposal.result.ok?knifeProposal.result.firstCount:0)?"#0ea5e9":"#f59e0b"} fillOpacity=".35" fillRule="evenodd" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke"/>)}
+          </g>}
+          {knifeTarget&&knifeLine?.source===knifeTarget&&<line x1={knifeLine.start.x} y1={knifeLine.start.y} x2={knifeLine.end.x} y2={knifeLine.end.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" pointerEvents="none"/>}
+          {knifeTarget&&knifeProposal?.source===knifeTarget&&(()=>{const g=angledCutGuide(knifeTarget.geometry,knifeProposal.degrees,knifeProposal.fraction);return g?<line x1={g.start.x} y1={g.start.y} x2={g.end.x} y2={g.end.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" pointerEvents="none"/>:null;})()}
           {/* Snap indicator */}
           {snap && tool !== "select" && <SnapIndicator snap={snap} zoom={view.zoom} />}
         </g>
       </svg>
       <CanvasZoomControls />
+      {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
+        <p className="px-2 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":knifeNotice|| (knifeProposal?.source===knifeTarget&&knifeProposal.result.ok?`معاينة: ${knifeProposal.result.parts.length} أجزاء`:"أداة السكين: اسحب خط القص عبر الشكل")}</p>
+        <div className="flex gap-1">
+          {knifeProposal?.source===knifeTarget&&knifeProposal.result.ok&&!guideLayer.edit&&<button type="button" className="min-h-11 flex-1 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={()=>{const s=useStudio.getState();if(s.knifeTargetId!==knifeTarget.id||s.selection.length!==1||s.selection[0]!==knifeTarget.id||s.doc.objects.find(o=>o.id===knifeTarget.id)!==knifeTarget){setKnifeProposal(null);setKnifeNotice("تغير الشكل؛ أعد القص.");return;}const r=s.splitSelectedShape("angle",knifeProposal.fraction,knifeProposal.degrees);setKnifeProposal(null);if(!r.ok)setKnifeNotice("تعذر اعتماد القص.");}}>اعتماد القص</button>}
+          <button type="button" className="min-h-11 flex-1 rounded border border-border px-3 text-xs" onClick={()=>{knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);useStudio.getState().setKnifeTargetId(null);}}>إلغاء</button>
+        </div>
+      </div>}
       {tool === "select" && overlapIds.length > 1 && !editGlyphNodes && !editGlyphContours && !editJoinAnchors && (
         <GlyphOverlapPicker
           items={overlapIds.map((id) => (doc.lettering ?? []).find((item) => item.id === id)).filter(
