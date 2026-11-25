@@ -33,6 +33,15 @@ export const parseProject = (raw: string): DocumentState | null => {
     if (!doc || !doc.artboard || !Array.isArray(doc.objects) || !Array.isArray(doc.grids)) {
       return null;
     }
+    // Compound paths have a stricter shape contract: never restore malformed
+    // inner rings into the renderer or pathfinder.
+    for(const object of doc.objects){
+      const geometry=object?.geometry;
+      if(geometry?.kind!=="path"||geometry.holes===undefined)continue;
+      const validRing=(ring:unknown):boolean=>Array.isArray(ring)&&ring.length>=3&&ring.length<=50000&&ring.every(p=>p&&typeof p==="object"&&Number.isFinite(p.x)&&Number.isFinite(p.y));
+      if(!geometry.closed||!validRing(geometry.points)||!Array.isArray(geometry.holes)||geometry.holes.length>1000||!geometry.holes.every(validRing))return null;
+      if(geometry.points.length+geometry.holes.reduce((sum,r)=>sum+r.length,0)>50000)return null;
+    }
     // Treat a .logo file as untrusted too. A malformed bundled library
     // could otherwise enter the editor without the explicit JSON importer.
     if (doc.glyphLibrary !== undefined &&
