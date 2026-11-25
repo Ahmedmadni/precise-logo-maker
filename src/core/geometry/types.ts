@@ -46,6 +46,8 @@ export interface PathGeometry {
   closed: boolean;
   /** Optional cubic controls indexed by outgoing edge; null denotes a straight edge. */
   cubicSegments?: (CubicSegment | null)[];
+  /** Closed linear inner rings of a compound path; rendered with even-odd fill. */
+  holes?: Point[][];
 }
 
 export type Geometry = CircleGeometry | LineGeometry | ArcGeometry | PathGeometry;
