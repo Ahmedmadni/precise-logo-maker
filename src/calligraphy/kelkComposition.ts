@@ -140,6 +140,7 @@ export function buildKashidaOutline(options: {
   thickness: number;
   style: KashidaStyle;
 }): string | null {
+  if (![options.length, options.thickness, options.arch].every(Number.isFinite)) return null;
   const length = Math.max(120, Math.min(2400, options.length));
   const thickness = Math.max(24, Math.min(220, options.thickness));
   const arch = Math.max(-320, Math.min(320, options.arch));
@@ -150,7 +151,7 @@ export function buildKashidaOutline(options: {
   const taper = Math.max(12, t * 0.45);
 
   if (options.style === "flat") {
-    return `M ${round(-half)} ${round(taper)} L ${round(half)} ${round(taper)} L ${round(half)} 0 L ${round(-half)} 0 Z`;
+    return `M ${round(-half)} ${round(t)} L ${round(half)} ${round(t)} L ${round(half)} 0 L ${round(-half)} 0 Z`;
   }
 
   if (options.style === "arch") {
@@ -166,7 +167,7 @@ export function buildKashidaOutline(options: {
 
   // wave (S-curve calligraphic kashida)
   const q = length / 4;
-  const a = arch === 0 ? 90 : arch;
+  const a = arch;
   return [
     `M ${round(-half)} ${round(taper)}`,
     `C ${round(-q)} ${round(a + t)} ${round(q)} ${round(-a + t)} ${round(half)} ${round(taper)}`,
@@ -217,14 +218,16 @@ export function createConnectedKashida(
   if (!start || !end) return null;
   const distance = Math.hypot(end.x-start.x, end.y-start.y);
   if (!Number.isFinite(distance) || distance < 2) return null;
-  const width = Math.max(0.8, Math.min(150, options.thickness * (source.size + target.size) / 2000));
-  const overlap = Math.min(60, distance * 0.1, width * 0.5);
+  const thickness = Math.max(24, Math.min(220, options.thickness));
+  const widthFor = (glyph: LetteringItem) => Math.max(0.8, Math.min(150, thickness * glyph.size / 1000));
+  const startWidth = widthFor(source), endWidth = widthFor(target);
+  const overlapFor = (width: number) => Math.min(60, distance * 0.1, width * 0.5);
   const curvature = options.style === "arch" ? Math.max(-0.5, Math.min(0.5, options.arch / 640)) : 0;
   // Wave is represented by opposite relative displacement of the tangent
   // handles (equal tangent angles at opposite ends of the chord).
   const angle = options.style === "wave" ? Math.max(-45, Math.min(45, options.arch / 5)) : 0;
-  const ribbon = { ...item.ribbon, startWidth: width, endWidth: width,
-    startOverlap: overlap, endOverlap: overlap, curvature,
+  const ribbon = { ...item.ribbon, startWidth, endWidth,
+    startOverlap: overlapFor(startWidth), endOverlap: overlapFor(endWidth), curvature,
     startAngle: angle, endAngle: angle, nibContrast: 0 };
   const result = { ...item, ribbon, sourceText: "ـ" };
   return isValidRibbon(ribbon) && buildRibbonPath(result, [source,target]) ? result : null;
