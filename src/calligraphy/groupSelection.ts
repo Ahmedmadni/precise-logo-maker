@@ -65,7 +65,7 @@ export function transformGlyphSelection(items:LetteringItem[],ids:readonly strin
     const x=(item.x-pivot.x)*scale,y=(item.y-pivot.y)*scale;
     const size=item.size*scale,weight=item.weight===undefined?undefined:item.weight*scale;
     const moved={...item,x:pivot.x+x*cos-y*sin,y:pivot.y+x*sin+y*cos,size,rotation:wrap(item.rotation+degrees),...(weight===undefined?{}:{weight})};
-    if(![moved.x,moved.y,size,moved.rotation,weight??0].every(Number.isFinite)||size<1||size>1000)return null;
+    if(![moved.x,moved.y,size,moved.rotation,weight??0].every(Number.isFinite)||size<1||size>1000||(weight!==undefined&&(weight<0||weight>20)))return null;
     next.push(moved);
   }
   return next;
