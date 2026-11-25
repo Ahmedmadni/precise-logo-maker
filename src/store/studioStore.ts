@@ -168,6 +168,8 @@ export interface StudioState {
   letteringPreview: { id: string; patch: Partial<LetteringItem> } | null;
   setLetteringPreview: (id: string, patch: Partial<LetteringItem>) => void;
   commitLetteringPreview: () => void;
+  knifeTargetId:string|null;
+  setKnifeTargetId:(id:string|null)=>void;
   pathControlSelection: {objectId:string;edge:number;mode:"free"|"aligned"|"symmetric"} | null;
   setPathControlSelection: (value:StudioState["pathControlSelection"])=>void;
   editGlyphNodes: boolean;
@@ -373,6 +375,8 @@ export const useStudio = create<StudioState>()((set, get) => {
     tool: "select",
     selection: [],
     selectedLetteringId: null,
+    knifeTargetId:null,
+    setKnifeTargetId:(knifeTargetId)=>set({knifeTargetId,tool:"select",pathControlSelection:null}),
     pathControlSelection:null,
     setPathControlSelection:(pathControlSelection)=>set({pathControlSelection}),
     letteringMoveScope: "glyph",
@@ -685,7 +689,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     brush: DEFAULT_BRUSH,
     setBrush: (patch) => set((s) => ({ brush: { ...s.brush, ...patch } })),
     setView: (view) => set({ view }),
-    setTool: (tool) => set((s)=>({ tool, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
+    setTool: (tool) => set((s)=>({ tool, knifeTargetId:null, pathControlSelection:tool==="select"?s.pathControlSelection:null })),
     setCursor: (cursor) => set({ cursor }),
     viewport: { width: 1200, height: 800 },
     setViewport: (viewport) => set({ viewport }),
@@ -942,7 +946,7 @@ export const useStudio = create<StudioState>()((set, get) => {
     setSelection: (ids) => {
       get().commitLetteringPreview();
       set({
-        selection: ids, pathControlSelection:null, selectedLetteringId: null, selectedGlyphNodeId: null,
+        selection: ids, knifeTargetId:null,pathControlSelection:null, selectedLetteringId: null, selectedGlyphNodeId: null,
         selectedContourIndex: null, editGlyphNodes: false,
         editGlyphContours: false, editJoinAnchors: false,
       });
@@ -958,7 +962,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           : [...s.selection, id],
       }));
     },
-    clearSelection: () => set({ selection: [],pathControlSelection:null }),
+    clearSelection: () => set({ selection: [],knifeTargetId:null,pathControlSelection:null }),
 
     translateSelection: (dx, dy) => {
       const ids = get().selection;
@@ -1163,7 +1167,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       if(!result.ok)return result;
       const made=result.parts.map((geometry,i):VectorObject=>({...source,id:nextObjectId(),name:`${source.name} · ${i+1}`,type:"path",geometry,cellKey:undefined}));
       commit("Split shape",d=>({...d,objects:d.objects.flatMap(o=>o.id===source.id?made:[o])}));
-      set({selection:made.map(o=>o.id),pathControlSelection:null});
+      set({selection:made.map(o=>o.id),knifeTargetId:null,pathControlSelection:null});
       return {ok:true,count:made.length};
     },
 
