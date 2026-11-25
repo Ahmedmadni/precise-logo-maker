@@ -6,6 +6,7 @@ const mapPoints = (g: Geometry, fn: (p: Point) => Point): Geometry => {
   if (g.kind === "line") return { ...g, a: fn(g.a), b: fn(g.b) };
   if (g.kind === "path") return {
     ...g, points: g.points.map(fn),
+    ...(g.holes ? {holes:g.holes.map(r=>r.map(fn))}:{}),
     ...(g.cubicSegments ? { cubicSegments: g.cubicSegments.map(c => c ? { control1: fn(c.control1), control2: fn(c.control2) } : null) } : {}),
   };
   return { ...g, center: fn(g.center) };
