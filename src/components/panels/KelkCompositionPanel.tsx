@@ -7,6 +7,7 @@ import {
   applyGroupSlant,
   composeWordLayout,
   createKashidaItem,
+  buildKashidaOutline,
   type KashidaStyle,
   type KelkLayoutStyle,
 } from "../../calligraphy/kelkComposition";
@@ -41,34 +42,38 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const [kashidaThickness, setKashidaThickness] = useState(72);
 
   const targets = moveScope === "word" && siblings.length > 1 ? siblings : [selected];
-  const hasWordGroup = siblings.length > 1;
+  const hasWordGroup = siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length > 1;
+  const [layoutIntensity, setLayoutIntensity] = useState(1);
+  const [spacingStep, setSpacingStep] = useState(6);
+  const kashidaOptions = {
+    length: kashidaLength,
+    arch: kashidaStyle === "flat" ? 0 : kashidaArch,
+    thickness: kashidaThickness,
+    style: kashidaStyle,
+  };
+  const kashidaPath = buildKashidaOutline(kashidaOptions);
 
   const onSlant = (preset: { skewX: number; rotation: number; label: string }) => {
     commitPreview();
-    const patches = applyGroupSlant(targets, preset);
+    const patches = applyGroupSlant(targets.filter(item => !item.hidden), preset);
     if (patches.length) updateMany(patches, `ميل ${preset.label}`);
   };
 
   const onLayout = (style: KelkLayoutStyle, label: string) => {
     commitPreview();
-    const patches = composeWordLayout(siblings.length > 1 ? siblings : [selected], style);
+    const patches = composeWordLayout((hasWordGroup ? siblings : [selected]).filter(item => !item.hidden), style, layoutIntensity);
     if (patches.length) updateMany(patches, label);
   };
 
   const onOverlap = (deltaPx: number) => {
     commitPreview();
-    const patches = adjustGroupOverlap(siblings, deltaPx);
+    const patches = adjustGroupOverlap(siblings.filter(item => !item.hidden), deltaPx);
     if (patches.length) updateMany(patches, deltaPx < 0 ? "تقريب الحروف" : "تبعيد الحروف");
   };
 
   const onInsertKashida = () => {
     commitPreview();
-    const item = createKashidaItem(selected, {
-      length: kashidaLength,
-      arch: kashidaStyle === "flat" ? 0 : kashidaArch,
-      thickness: kashidaThickness,
-      style: kashidaStyle,
-    });
+    const item = createKashidaItem(selected, kashidaOptions);
     if (item) addLettering(item);
   };
 
@@ -100,6 +105,12 @@ export function KelkCompositionPanel({ selected, siblings }: {
 
       <div className="space-y-1.5 border-t border-border pt-2">
         <span className="text-[11px] font-medium text-muted-foreground">تراكب وتداخل الكلمة</span>
+        <label className="block space-y-1">
+          <span className="flex justify-between text-[11px] text-muted-foreground">
+            <span>شدة التركيب</span><span dir="ltr">{layoutIntensity.toFixed(2)}×</span>
+          </span>
+          <input type="range" min={0.25} max={3} step={0.25} value={layoutIntensity} onChange={e => setLayoutIntensity(Number(e.target.value))} disabled={!hasWordGroup} className="w-full" />
+        </label>
         <div className="grid grid-cols-2 gap-1">
           {LAYOUT_OPTIONS.map((opt) => (
             <button
@@ -113,11 +124,17 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </button>
           ))}
         </div>
+        <label className="block space-y-1">
+          <span className="flex justify-between text-[11px] text-muted-foreground">
+            <span>خطوة التباعد</span><span dir="ltr">{spacingStep} px</span>
+          </span>
+          <input type="range" min={1} max={24} step={1} value={spacingStep} onChange={e => setSpacingStep(Number(e.target.value))} disabled={!hasWordGroup} className="w-full" />
+        </label>
         <div className="grid grid-cols-2 gap-1">
-          <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onOverlap(-6)}>
+          <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onOverlap(-spacingStep)}>
             <Minimize2 className="h-3.5 w-3.5" /> تقريب التداخل
           </button>
-          <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onOverlap(6)}>
+          <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onOverlap(spacingStep)}>
             <Maximize2 className="h-3.5 w-3.5" /> تبعيد الحروف
           </button>
         </div>
@@ -163,7 +180,14 @@ export function KelkCompositionPanel({ selected, siblings }: {
           </span>
           <input type="range" min={30} max={160} step={4} value={kashidaThickness} onChange={(e) => setKashidaThickness(Number(e.target.value))} className="w-full" />
         </label>
-        <button type="button" className={`${btn} w-full font-semibold`} onClick={onInsertKashida}>
+        <div className="rounded-lg border border-border bg-background px-2 py-1">
+          <p className="text-[11px] text-muted-foreground">معاينة الكشيدة</p>
+          <svg role="img" aria-label="معاينة شكل الكشيدة" viewBox={`${-kashidaLength / 2 - 40} -400 ${kashidaLength + 80} 800`} preserveAspectRatio="xMidYMid meet" className="block h-24 w-full text-foreground">
+            <path d={`M ${-kashidaLength / 2 - 40} 0 H ${kashidaLength / 2 + 40}`} stroke="currentColor" strokeOpacity={0.2} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeDasharray="4 4" />
+            {kashidaPath && <path d={kashidaPath} transform="scale(1 -1)" fill="currentColor" />}
+          </svg>
+        </div>
+        <button type="button" disabled={!kashidaPath} className={`${btn} w-full font-semibold`} onClick={onInsertKashida}>
           إدراج كشيدة
         </button>
       </div>
