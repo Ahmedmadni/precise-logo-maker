@@ -24,7 +24,7 @@ import { buildGridGeometry } from "../../grids";
 import { cellAt, compoundCellAt, paintableGrids, type GridCell } from "../../grids/cells";
 import { edgeFieldFromImage, snapToEdge, type EdgeField } from "../../core/tracing/edges";
 import { cleanStroke } from "../../core/tracing/simplify";
-import { appendBrushSamples, brushPressure, vectorBrushOutline, type BrushSample } from "../../core/tracing/vectorBrush";
+import { appendBrushSamples, brushPressure, buildBrushStroke, type BrushSample } from "../../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import { geometryToPathData } from "../../objects/render";
@@ -940,7 +940,7 @@ export function StudioCanvas() {
       brushPreviewSchedulerRef.current?.clear();
       setBrushTrail([]);
       // Geometry uses the full final trace, not the last preview frame.
-      const shape = vectorBrushOutline(points, brush);
+      const shape = buildBrushStroke(points, brush);
       if (shape) {
         const id = addObject(shape, "Calligraphy brush stroke",
           { fill: brush.color, stroke: "none", strokeWidth: 0 });
