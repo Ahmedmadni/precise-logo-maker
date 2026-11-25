@@ -174,35 +174,38 @@ const SWATCHES = [
 function PathfinderSection() {
   const t = useT();
   const selection = useStudio((s) => s.selection);
+  const objects=useStudio(s=>s.doc.objects);
   const booleanSelection = useStudio((s) => s.booleanSelection);
-  const enabled = selection.length >= 2;
-
+  const [notice,setNotice]=useState("");
+  const sources=objects.filter(o=>selection.includes(o.id));
+  const protectedSelection=sources.some(o=>o.locked||!o.visible||o.guide||o.cellKey!==undefined);
+  const openSelection=sources.some(o=>o.geometry.kind==="line"||(o.geometry.kind==="path"&&!o.geometry.closed));
+  const enabled = sources.length >= 2&&!protectedSelection&&!openSelection;
   const ops = [
     { op: "union", label: t("Merge") },
     { op: "subtract", label: t("Subtract") },
     { op: "intersect", label: t("Intersect") },
     { op: "exclude", label: t("Exclude") },
   ] as const;
-
+  const apply=(op:typeof ops[number]["op"])=>{
+    const result=booleanSelection(op);
+    if(result.ok){setNotice(`تم إنشاء ${result.count} مسار. يمكنك التراجع عن العملية.`);return;}
+    const messages={selection:"حدد شكلين على الأقل.",invalid:"هناك مسار مفتوح أو هندسة غير صالحة.",holes:"النتيجة تحتوي على فراغ داخلي؛ لم تُعدّل الأشكال لأن المسارات المركبة غير مدعومة بعد.",empty:"لا توجد مساحة ناتجة؛ بقيت الأشكال الأصلية.",complexity:"تعذر حساب النتيجة بأمان؛ بقيت الأشكال الأصلية.",protected:"تتضمن المجموعة عناصر مقفلة أو مخفية أو إرشادية أو خلايا شبكة."};
+    setNotice(messages[result.reason]);
+  };
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <span className={labelCls}>{t("Pathfinder")}</span>
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-2 gap-1.5">
         {ops.map(({ op, label }) => (
-          <button
-            key={op}
-            type="button"
-            disabled={!enabled}
-            className="rounded-md border border-border px-1 py-1 text-[10px] text-muted-foreground hover:bg-accent disabled:opacity-40"
-            onClick={() => booleanSelection(op)}
-          >
-            {label}
-          </button>
+          <button key={op} type="button" disabled={!enabled} className="min-h-11 rounded-lg border border-border px-1 text-xs hover:bg-accent disabled:opacity-40" onClick={()=>apply(op)}>{label}</button>
         ))}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {t("Select two or more shapes, then combine them into one outline.")}
+        {protectedSelection?"أزل العناصر المحمية من التحديد أولاً.":openSelection?"أغلق المسارات المفتوحة أولاً.":"يتم الطرح من أول شكل محدد حسب ترتيب الطبقات. المنحنيات تُحوّل إلى حدود مضلعة تقريبية."}
       </p>
+      {enabled&&<p className="text-[11px] text-muted-foreground">الشكل الأساسي: {sources[0]?.name}</p>}
+      {notice&&<p role="status" className="rounded-lg border border-border p-2 text-xs">{notice}</p>}
     </div>
   );
 }
