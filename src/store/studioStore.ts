@@ -40,6 +40,7 @@ import type { GridCell } from "../grids/cells";
 import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, type SplitAxis } from "../objects/splitShape";
+import { cutOpenPath } from "../editor/scissors";
 
 export type ToolId =
   "select" | "line" | "circle" | "arc" | "pen" | "brush" | "cell" | "polygon" | "measure" | "pan" | "lettering";
@@ -291,6 +292,7 @@ export interface StudioState {
   scaleSelection: (factor: number) => void;
   setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
   /** Pathfinder: combine the selected shapes into one outline. */
+  cutSelectedOpenPath:(edge:number,t:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"};
   splitSelectedShape: (axis:SplitAxis|"angle",fraction:number,degrees?:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"|"empty"|"complexity"};
   booleanSelection: (op: BooleanOp) => {ok:true;count:number}|{ok:false;reason:"selection"|"invalid"|"holes"|"empty"|"complexity"|"protected"};
 
@@ -1155,6 +1157,22 @@ export const useStudio = create<StudioState>()((set, get) => {
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
         }),
       }));
+    },
+
+    cutSelectedOpenPath:(edge,t)=>{
+      const {selection,doc}=get();
+      if(selection.length!==1)return {ok:false,reason:"selection"};
+      const source=doc.objects.find(o=>o.id===selection[0]);
+      if(!source)return {ok:false,reason:"selection"};
+      if(source.locked||!source.visible||source.guide||source.cellKey!==undefined)return {ok:false,reason:"protected"};
+      // Splitting an implicitly filled open SVG path changes its filled area.
+      if(source.geometry.kind!=="path"||source.geometry.closed||source.style.fill!=="none")return {ok:false,reason:"invalid"};
+      const parts=cutOpenPath(source.geometry,edge,t);
+      if(!parts)return {ok:false,reason:"invalid"};
+      const made=parts.map((geometry,i):VectorObject=>({...source,id:nextObjectId(),name:`${source.name} · ${i+1}`,geometry,type:"path",cellKey:undefined}));
+      commit("Cut open path",d=>({...d,objects:d.objects.flatMap(o=>o.id===source.id?made:[o])}));
+      set({selection:made.map(o=>o.id),knifeTargetId:null,pathControlSelection:null});
+      return {ok:true,count:made.length};
     },
 
     splitSelectedShape:(axis,fraction,degrees)=>{
