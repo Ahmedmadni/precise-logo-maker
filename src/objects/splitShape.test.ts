@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {PathGeometry,Point} from "../core/geometry/types";
-import {splitShape,splitShapeAtAngle,angledCutGuide,knifeLineParameters} from "./splitShape";
+import {splitShape,splitShapeAtAngle,angledCutGuide,knifeLineParameters,curvedCutGuide,splitShapeCurved} from "./splitShape";
 const box=(x:number,y:number,w:number,h:number):Point[]=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
 const area=(ring:Point[])=>Math.abs(ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length]!;return sum+p.x*q.y-q.x*p.y;},0)/2);
 const filled=(g:PathGeometry)=>area(g.points)-(g.holes??[]).reduce((s,r)=>s+area(r),0);
@@ -69,5 +69,32 @@ describe("knife gesture geometry",()=>{
   it("rejects degenerate and out-of-bounds cuts",()=>{
     expect(knifeLineParameters(path,{x:20,y:20},{x:20,y:20})).toBeNull();
     expect(knifeLineParameters(path,{x:120,y:0},{x:120,y:100})).toBeNull();
+  });
+});
+
+describe("curved shape splitting",()=>{
+  it("uses an identical shared boundary for both cutters",()=>{
+    const guide=curvedCutGuide(path,25,.5,.8)!;
+    expect(guide.curve.length).toBeGreaterThan(2);
+    expect(guide.first.points.slice(1,-1)).toEqual(guide.curve);
+    expect([guide.second.points[0],...guide.second.points.slice(3).reverse()]).toEqual(guide.curve);
+  });
+  it("preserves total polygon area for both signs of bend",()=>{
+    for(const bend of [-.8,.8]){
+      const result=splitShapeCurved(path,30,.5,bend);
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.parts.reduce((s,p)=>s+filled(p),0)).toBeCloseTo(filled(path),6);
+    }
+  });
+  it("reduces a zero bend to the straight cutter",()=>{
+    const straight=angledCutGuide(path,45,.4)!;
+    const curved=curvedCutGuide(path,45,.4,0)!;
+    expect(curved.first).toEqual(straight.first);
+    expect(curved.second).toEqual(straight.second);
+  });
+  it("rejects excessive or nonfinite curvature and open shapes",()=>{
+    expect(splitShapeCurved(path,0,.5,2)).toEqual({ok:false,reason:"invalid"});
+    expect(splitShapeCurved(path,0,.5,NaN)).toEqual({ok:false,reason:"invalid"});
+    expect(splitShapeCurved({...path,closed:false},0,.5,.5)).toEqual({ok:false,reason:"invalid"});
   });
 });
