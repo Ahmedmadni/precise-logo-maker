@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import type {PathGeometry} from "../core/geometry/types";
-import {booleanGeometryChecked} from "./boolean";
+import {booleanGeometryChecked,geometryToRing,BOOLEAN_TOLERANCE} from "./boolean";
 import {geometryToPathData} from "./render";
 import {translateGeometry,mirrorGeometry} from "./transform";
 import {closestPointOnGeometry} from "../core/geometry/math";
@@ -44,5 +44,28 @@ describe("safe pathfinder",()=>{
   });
   it("distinguishes an empty intersection from a failure",()=>{
     expect(booleanGeometryChecked([box(0,0,10,10),box(20,20,10,10)],"intersect")).toEqual({ok:false,reason:"empty"});
+  });
+});
+
+
+describe("adaptive polygon approximation",()=>{
+  it("increases circle resolution with radius and bounds chord sagitta",()=>{
+    const small=geometryToRing({kind:"circle",center:{x:0,y:0},radius:10});
+    const large=geometryToRing({kind:"circle",center:{x:0,y:0},radius:1000});
+    expect(large.length).toBeGreaterThan(small.length);
+    expect(1000*(1-Math.cos(Math.PI/large.length))).toBeLessThanOrEqual(BOOLEAN_TOLERANCE);
+  });
+  it("closes partial arcs by a chord without inserting the center",()=>{
+    const ring=geometryToRing({kind:"arc",center:{x:0,y:0},radius:50,startAngle:0,endAngle:90});
+    expect(ring.every(p=>Math.abs(Math.hypot(p.x,p.y)-50)<1e-8)).toBe(true);
+    expect(ring[0]).toEqual({x:50,y:0});
+    expect(ring.at(-1)?.y).toBeCloseTo(50);
+  });
+  it("subdivides long curved edges more finely than flat ones",()=>{
+    const flat:PathGeometry={kind:"path",closed:true,points:[{x:0,y:0},{x:100,y:0},{x:100,y:100}],cubicSegments:[{control1:{x:20,y:0},control2:{x:80,y:0}},null,null]};
+    const bowed:PathGeometry={...flat,cubicSegments:[{control1:{x:0,y:-200},control2:{x:100,y:-200}},null,null]};
+    expect(geometryToRing(flat)).toHaveLength(3);
+    expect(geometryToRing(bowed).length).toBeGreaterThan(10);
+    expect(geometryToRing(bowed).some(p=>p.y<-100)).toBe(true);
   });
 });
