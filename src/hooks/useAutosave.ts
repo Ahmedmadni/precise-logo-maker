@@ -9,7 +9,7 @@ const DEBOUNCE_MS=800;
 export function useAutosave():void{
   useEffect(()=>{
     let timer:ReturnType<typeof setTimeout>|undefined;
-    let cancelled=false,restoring=true;
+    let cancelled=false,edited=false,restoring=true;
     const local=readLocalSnapshot();
     if(local)useStudio.setState({doc:local.document,historyLog:["Restored autosave"]});
     const initial=useStudio.getState().doc;
@@ -34,13 +34,13 @@ export function useAutosave():void{
     };
     const unsubscribe=useStudio.subscribe((state,prev)=>{
       if(state.doc===prev.doc)return;
-      dirty=true;
+      edited=true;dirty=true;
       if(timer)clearTimeout(timer);
       timer=setTimeout(persist,DEBOUNCE_MS);
     });
     void loadLargeAutosave().then(large=>{
       if(cancelled)return;
-      if(large&&restoring&&!dirty&&useStudio.getState().doc===initial&&preferLargeSnapshot(local,large)){
+      if(large&&restoring&&!edited&&!dirty&&useStudio.getState().doc===initial&&preferLargeSnapshot(local,large)){
         useStudio.setState({doc:large.document,historyLog:["Restored large project"]});
         lastPersisted=large.document;
         dirty=false;
