@@ -41,6 +41,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
+import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
 
 export type ToolId =
   "select" | "line" | "circle" | "arc" | "pen" | "brush" | "cell" | "polygon" | "measure" | "pan" | "lettering";
@@ -292,6 +293,7 @@ export interface StudioState {
   scaleSelection: (factor: number) => void;
   setSelectionStyle: (patch: Partial<Style>, label?: string) => void;
   /** Pathfinder: combine the selected shapes into one outline. */
+  joinSelectedPaths:(aId:string,bId:string,aEnd:PathEnd,bEnd:PathEnd,mode:JoinMode)=>{ok:true}|{ok:false;reason:"selection"|"protected"|"invalid"};
   cutSelectedOpenPath:(edge:number,t:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"};
   splitSelectedShape: (axis:SplitAxis|"angle",fraction:number,degrees?:number)=>{ok:true;count:number}|{ok:false;reason:"selection"|"protected"|"invalid"|"empty"|"complexity"};
   booleanSelection: (op: BooleanOp) => {ok:true;count:number}|{ok:false;reason:"selection"|"invalid"|"holes"|"empty"|"complexity"|"protected"};
@@ -1157,6 +1159,20 @@ export const useStudio = create<StudioState>()((set, get) => {
           return { ...o, geometry: { ...g, radius: g.radius * factor } };
         }),
       }));
+    },
+
+    joinSelectedPaths:(aId,bId,aEnd,bEnd,mode)=>{
+      const {selection,doc}=get();
+      if(aId===bId||selection.length!==2||!selection.includes(aId)||!selection.includes(bId))return {ok:false,reason:"selection"};
+      const a=doc.objects.find(o=>o.id===aId),b=doc.objects.find(o=>o.id===bId);
+      if(!a||!b)return {ok:false,reason:"selection"};
+      if(!eligibleJoinObject(a)||!eligibleJoinObject(b))return {ok:false,reason:"protected"};
+      const geometry=joinOpenPaths(a.geometry,b.geometry,aEnd,bEnd,mode);
+      if(!geometry)return {ok:false,reason:"invalid"};
+      const made:VectorObject={...a,id:nextObjectId(),name:`${a.name} + ${b.name}`,type:"path",geometry,cellKey:undefined};
+      commit("Join open paths",d=>({...d,objects:d.objects.flatMap(o=>o.id===a.id?[made]:o.id===b.id?[]:[o])}));
+      set({selection:[made.id],knifeTargetId:null,pathControlSelection:null});
+      return {ok:true};
     },
 
     cutSelectedOpenPath:(edge,t)=>{
