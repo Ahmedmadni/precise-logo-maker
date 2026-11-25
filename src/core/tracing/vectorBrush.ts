@@ -12,6 +12,8 @@ export interface BrushSettings {
   /** Optional to preserve compatibility with older brush presets. */
   endStyle?: BrushEndStyle;
   pressureCurve?: "soft" | "linear" | "firm";
+  /** Minimum width ratio at zero stylus pressure; legacy presets use 30%. */
+  pressureFloor?: number;
   nibRatio?: number;
 }
 export interface BrushSample extends Point { pressure: number }
@@ -167,7 +169,7 @@ export function appendBrushSamples(
 export function brushPressure(pointerPressure: number, pointerType: string): number {
   // Browsers typically emit 0.5 for a mouse held down. Treat touch/mouse
   // as a medium-pressure stroke, not an absent or zero-pressure stylus.
-  return pointerType === "pen" ? clamp(pointerPressure || 0.15, 0.08, 1) : 0.68;
+  return pointerType === "pen" ? clamp(Number.isFinite(pointerPressure) && pointerPressure > 0 ? pointerPressure : 0.15, 0.08, 1) : 0.68;
 }
 
 export function brushIsValid(config: BrushSettings): boolean {
@@ -177,6 +179,8 @@ export function brushIsValid(config: BrushSettings): boolean {
     Number.isFinite(config.smoothing) && config.smoothing >= 0 && config.smoothing <= 0.9 &&
     (config.endStyle === undefined || ["flat", "soft", "sharp"].includes(config.endStyle)) &&
     (config.pressureCurve === undefined || ["soft", "linear", "firm"].includes(config.pressureCurve)) &&
+    (config.pressureFloor === undefined || (Number.isFinite(config.pressureFloor) && config.pressureFloor >= 0.05 && config.pressureFloor <= 1)) &&
+    typeof config.pressure === "boolean" &&
     (config.nibRatio === undefined || (Number.isFinite(config.nibRatio) && config.nibRatio >= 0.05 && config.nibRatio <= 0.8)) &&
     /^#[0-9a-fA-F]{6}$/.test(config.color);
 }
@@ -223,6 +227,15 @@ export function smoothBrushSamples(samples: BrushSample[], amount: number): Brus
   });
 }
 
+/** Shared pressure-to-width transfer function for saved strokes and previews. */
+export function brushPressureWidth(pressure:number,settings:BrushSettings):number {
+  if(!settings.pressure)return 1;
+  const floor=Number.isFinite(settings.pressureFloor)?clamp(settings.pressureFloor!,0.05,1):0.3;
+  const p=clamp(Number.isFinite(pressure)?pressure:0.15,0.08,1);
+  const exponent=settings.pressureCurve==="soft"?0.5:settings.pressureCurve==="firm"?2:1;
+  return floor+(1-floor)*Math.pow(p,exponent);
+}
+
 /** Build a filled, closed vector silhouette. No raster brushes and no
  * runtime font dependency: every brush mark can be scaled and exported in SVG.
  * The round, reed-pen and tapered profiles all use the same point pipeline. */
@@ -235,8 +248,7 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
   }
   if (!clean.length) return null;
 
-  const pressed = (sample: BrushSample) => settings.pressure
-    ? (0.3 + 0.7 * Math.pow(clamp(sample.pressure, 0.08, 1), settings.pressureCurve === "soft" ? 0.5 : settings.pressureCurve === "firm" ? 2 : 1)) : 1;
+  const pressed = (sample: BrushSample) => brushPressureWidth(sample.pressure, settings);
   const point = clean[0]!;
   if (clean.length === 1) {
     const radius = settings.size * pressed(point) / 2;
@@ -260,7 +272,7 @@ export function vectorBrushOutline(raw: BrushSample[], settings: BrushSettings):
       ] };
     }
     // A chisel makes a short angled nib imprint rather than a round dot.
-    const thin = Math.max(0.2, radius * (settings.nibRatio ?? 0.22));
+    const thin = Math.max(0.2, radius * (settings.nibRatio ?? 0.18));
     const points = [
       [radius, thin * 0.55], [radius * 0.82, thin], [-radius * 0.82, thin], [-radius, thin * 0.55],
       [-radius, -thin * 0.55], [-radius * 0.82, -thin], [radius * 0.82, -thin], [radius, -thin * 0.55],
