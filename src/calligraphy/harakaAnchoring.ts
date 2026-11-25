@@ -75,7 +75,7 @@ function smartMarkPosition(glyph: LetteringItem, mark: LetteringItem, tier: numb
  * outline or position change. Auto placement is intentionally heuristic:
  * calligraphers can switch to manual mode for complex Thuluth compositions.
  */
-export function relayoutHarakat(previous: LetteringItem[], current: LetteringItem[]): LetteringItem[] {
+export function relayoutHarakat(previous: LetteringItem[], current: LetteringItem[], preserveMarkPositions?: ReadonlySet<string>): LetteringItem[] {
   const before = new Map(previous.map((item) => [item.id, item]));
   const glyphs = new Map(current.filter((item) => item.kind === "outline").map((item) => [item.id, item]));
   // Arabic mark ordering must be independent of which toolbar button was
@@ -108,7 +108,7 @@ export function relayoutHarakat(previous: LetteringItem[], current: LetteringIte
     });
   }
   const marks = [...current].map((item) => {
-    if (item.kind !== "haraka" || !item.attachedToGlyphId) return item;
+    if (item.kind !== "haraka" || !item.attachedToGlyphId || preserveMarkPositions?.has(item.id)) return item;
     const glyph = glyphs.get(item.attachedToGlyphId);
     if (!glyph) return { ...item, attachedToGlyphId: undefined, anchorMode: "manual" as const };
     const earlier = before.get(glyph.id);
