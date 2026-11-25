@@ -38,6 +38,7 @@ import { CATALOG_DRAG_MIME, createCatalogShape } from "../../calligraphy/shapeCa
 import { glyphPointToWorld, moveOutlineNodeWithHandles, outlineNodes, worldToGlyphPoint } from "../../calligraphy/pathEditor";
 import { moveLinkedCubicControl } from "../../calligraphy/handleCoupling";
 import { LetteringGlyph } from "./LetteringGlyph";
+import {GlyphGroupTransformControls} from "./GlyphGroupTransformControls";
 import { GlyphContourOverlay } from "./GlyphContourOverlay";
 import { GlyphJoinOverlay } from "./GlyphJoinOverlay";
 import { GlyphJoinDistanceGuide } from "./GlyphJoinDistanceGuide";
@@ -1649,6 +1650,7 @@ export function StudioCanvas() {
           {([{id:"replace",label:"جديد"},{id:"add",label:"إضافة"},{id:"subtract",label:"استبعاد"}] as const).map(m=><button key={m.id} type="button" aria-pressed={lassoMode===m.id} className={`min-h-10 rounded border px-2 text-xs ${lassoMode===m.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setLassoMode(m.id);setLassoNotice("");}}>{m.label}</button>)}
           <button type="button" className="min-h-10 rounded border border-border px-2 text-xs" onClick={()=>{const s=useStudio.getState();if(glyphLasso)s.setGlyphLassoActive(false);else if(nodeLassoId)s.setNodeLassoTarget(null);else s.setLassoActive(false);}}>إنهاء</button>
         </div>
+        {glyphLasso&&<GlyphGroupTransformControls/>}
       </div>}
       {knifeTarget&&<div dir="rtl" className="absolute left-1/2 top-3 z-20 w-max max-w-[90%] -translate-x-1/2 rounded-xl border border-border bg-card p-2 shadow-md" onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()}>
         <p className="px-2 py-1 text-xs">{guideLayer.edit?"اخرج من تحرير الأدلة أولًا.":knifeNotice|| (knifeProposal?.source===knifeTarget&&knifeProposal.result.ok?`معاينة: ${knifeProposal.result.parts.length} أجزاء`:"أداة السكين: اسحب خط القص عبر الشكل")}</p>
