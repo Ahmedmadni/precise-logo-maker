@@ -13,6 +13,7 @@ import {
   type KelkLayoutStyle,
 } from "../../calligraphy/kelkComposition";
 import { useStudio } from "../../store/studioStore";
+import { suggestRibbonCapFit } from "../../calligraphy/ribbonCapFit";
 
 const btn = "inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 
@@ -57,6 +58,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const eligibleTargets = siblings.filter(item => item.id !== selected.id && item.kind === "outline" && !item.hidden && !!item.pathData);
   const target = eligibleTargets.find(item => item.id === targetId);
   const [connectionError, setConnectionError] = useState(false);
+  const [autoFitCaps, setAutoFitCaps] = useState(false);
   const insertConnected = () => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
@@ -64,7 +66,10 @@ export function KelkCompositionPanel({ selected, siblings }: {
     const destination = latest.find(item => item.id === targetId);
     const item = source && destination ? createConnectedKashida(source, destination, kashidaOptions) : null;
     setConnectionError(!item);
-    if (item) addLettering(item);
+    if (item) {
+      const fit = autoFitCaps ? suggestRibbonCapFit(item, latest) : null;
+      addLettering(fit ? { ...item, ribbon: fit.ribbon } : item);
+    }
   };
 
   const onSlant = (preset: { skewX: number; rotation: number; label: string }) => {
@@ -213,6 +218,11 @@ export function KelkCompositionPanel({ selected, siblings }: {
             </select>
           </label>
           <p className="text-[11px] leading-5 text-muted-foreground">الطول حسب المسافة بين نقطتي الخروج والدخول. تبقى الوصلة مرتبطة بالحرفين عند تحريكهما.</p>
+          <label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-2 text-xs">
+            <input type="checkbox" checked={autoFitCaps} onChange={e => setAutoFitCaps(e.target.checked)} />
+            مطابقة سُمك واتجاه الطرفين تلقائيًا
+          </label>
+          {autoFitCaps && <p className="text-[11px] leading-5 text-muted-foreground">يُستخدم قياس حدود الحرف فقط إذا توفر اقتراح هندسي موثوق ولم يزد مخاطر التقاطع. وإلا تُحفظ الإعدادات اليدوية؛ قد تتغير السماكة والزاوية عند نجاح المطابقة.</p>}
           <button type="button" className={`${btn} w-full`} disabled={!target} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
           {connectionError && <p role="alert" className="text-xs text-destructive">تعذر إنشاء الوصلة. راجع نقطتي الاتصال والمسافة بين الحرفين.</p>}
         </div>}
