@@ -1237,7 +1237,7 @@ export function StudioCanvas() {
 
   // Resolve a temporary set of glyphs for live link-following previews during
   // touches, keyboard adjustments, and Bézier editing. This is never saved.
-  const sourceLettering = glyphMultiPreview?.source===doc.lettering ? glyphMultiPreview.next : doc.lettering ?? [];
+  const sourceLettering = glyphMultiPreview&&glyphMultiPreview.source===doc.lettering ? glyphMultiPreview.next : doc.lettering ?? [];
   const draggingGlyph = sourceLettering.find((item) => item.id === letterDragRef.current?.id);
   const wordDrag = letterDragRef.current?.scope === "word" && !!draggingGlyph?.groupId;
   const renderedLettering = sourceLettering.map((item) => {
