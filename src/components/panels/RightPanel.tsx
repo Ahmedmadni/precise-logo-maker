@@ -500,7 +500,7 @@ function ObjectSection() {
       </div>
 
       {g.kind === "path" && selection.length === 1 && (
-        <PathNodesSection key={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
+        <PathNodesSection key={selected.id} objectId={selected.id} path={g} onChange={patchGeometry} disabled={selected.locked || !selected.visible || !!(selected.guide && (guideLayer.locked || guideLayer.hidden || !guideLayer.edit))} />
       )}
 
       {/* Derived dimensions — type a value to reshape the object instantly. */}
