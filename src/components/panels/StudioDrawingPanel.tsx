@@ -4,6 +4,7 @@ import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLi
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 import { BrushPresetPreview } from "./BrushPresetPreview";
+import { BrushInkPalette } from "./BrushInkPalette";
 
 const tools: { id: ToolId; label: string; description: string; icon: typeof PenLine }[] = [
   { id: "select", label: "تحديد وتحريك", description: "حدد الأشكال أو الحروف واسحبها", icon: MousePointer2 },
@@ -156,11 +157,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <input className="w-full accent-[var(--color-primary)]" type="range" min={1} max={100}
               value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} />
           </label>
-          <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 text-xs">
-            لون الحبر
-            <input className="h-10 w-20 rounded-lg border border-border bg-background p-1"
-              type="color" value={brush.color} onChange={(e) => setBrush({ color: e.target.value })} />
-          </label>
+          <BrushInkPalette color={brush.color} onChange={color=>setBrush({color})} />
           {brush.preset === "qalam" && <div className="space-y-2">
             <label className="block space-y-1 text-xs">شكل سن القصبة
               <select className="min-h-11 w-full rounded-lg border border-border bg-background px-2" value={brush.nibShape ?? "chisel"}
