@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { letteringTransform, safeColor, safePath, type LetteringItem } from "../../calligraphy/model";
 import { preciseGlyphBounds } from "../../calligraphy/morph";
-import { wordEnvelopeOverlaps, composeWordGroupsOnPath, composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
+import { suggestWordPathExpansion, wordEnvelopeOverlaps, composeWordGroupsOnPath, composeFreePath, DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, GUIDE_PRESETS, validGuide, type GuideChain } from "../../calligraphy/freePathLayout";
 import { useStudio } from "../../store/studioStore";
 
 const STORAGE_KEY="logo-studio.free-path-presets.v1";
@@ -79,6 +79,12 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
     return {glyphs,viewBox:viewBox.join(" "),overlaps:wordMode?wordEnvelopeOverlaps(glyphs):[]};
   },[open,scope,allItems,activeGroups,wordMode,guide,scale,margin,reverse,tangent,upright,sizeAware,wordGap]);
   const canApply=!!composition;
+  const improveSpacing=()=>{
+    const result=suggestWordPathExpansion(allItems??[],activeGroups,guide,options);
+    if(!result){setNotice("لم نجد اتساعًا أفضل ضمن النطاق الحالي. جرّب تعديل شكل المسار أو الهوامش.");return;}
+    setScale(result.scale);
+    setNotice(`اقتراح اتساع ${result.scale.toFixed(1)}×: التداخلات ${result.before} ← ${result.after}. راجع المعاينة ثم طبّق إن ناسبك.`);
+  };
   const update=(i:number,axis:"x"|"y",value:number)=>{
     setGuide(old=>moveGuidePoint(old,i,{...old[i]!,[axis]:value},smooth));
     setNotice("");
@@ -133,7 +139,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
       {showOutlines&&<div className="rounded-lg border border-border bg-background p-2">
         <p className="font-medium">التركيب المقترح</p>
         {wordMode&&composition&&<div role="status" className="rounded border border-border p-2 text-xs">
-          {composition.overlaps.length>0?<><p className="font-medium">تنبيه: {composition.overlaps.length} زوج من الكلمات ذات حدود متداخلة.</p><p>جرّب زيادة حجم المسار أو تعديل المنحنى. يمكنك اعتماد التداخل إذا كان مقصودًا.</p></>:<p>لا يظهر تداخل بين مستطيلات حدود الكلمات المحددة.</p>}
+          {composition.overlaps.length>0?<><p className="font-medium">تنبيه: {composition.overlaps.length} زوج من الكلمات ذات حدود متداخلة.</p><p>جرّب زيادة حجم المسار أو تعديل المنحنى. يمكنك اعتماد التداخل إذا كان مقصودًا.</p><button type="button" disabled={scale>=3} onClick={improveSpacing} className="mt-2 min-h-10 w-full rounded-lg border border-border disabled:opacity-40">اقتراح تخفيف التداخل</button></>:<p>لا يظهر تداخل بين مستطيلات حدود الكلمات المحددة.</p>}
           <p className="text-muted-foreground">فحص تقريبي للحدود فقط، دون الحركات والزخارف والوصلات أو سماكة الحدود.</p>
         </div>
         {composition?<svg viewBox={composition.viewBox} className="block h-40 w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="معاينة توزيع مسارات الحروف الفعلية">
