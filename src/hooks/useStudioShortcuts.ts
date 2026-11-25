@@ -7,7 +7,8 @@ const TOOL_KEYS: Record<string, ToolId> = {
   c: "circle",
   a: "arc",
   p: "pen",
-  b: "cell",
+  b: "brush",
+  g: "cell",
   n: "polygon",
   m: "measure",
   h: "pan",
@@ -39,7 +40,11 @@ export function useStudioShortcuts(): void {
         return;
       }
       if (e.key === "Escape") {
-        store.clearSelection();
+        if(store.glyphLassoActive)store.setGlyphLassoActive(false);
+        else if(store.nodeLassoTargetId)store.setNodeLassoTarget(null);
+        else if(store.lassoActive)store.setLassoActive(false);
+        else if(store.knifeTargetId)store.setKnifeTargetId(null);
+        else store.clearSelection();
         store.setMeasurement(null);
         return;
       }
@@ -48,7 +53,13 @@ export function useStudioShortcuts(): void {
         store.duplicateSelection();
         return;
       }
-      if (e.key.startsWith("Arrow") && store.selection.length > 0) {
+      if (!mod && e.key.startsWith("Arrow") && store.glyphLassoActive && store.glyphMultiIds.length && store.doc.lettering) {
+        e.preventDefault();
+        const step=e.shiftKey?10:1;
+        store.moveGlyphMulti(store.doc.lettering,store.glyphMultiIds,e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,e.key==="ArrowUp"?-step:e.key==="ArrowDown"?step:0);
+        return;
+      }
+      if (!mod && e.key.startsWith("Arrow") && store.selection.length > 0) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
@@ -57,8 +68,8 @@ export function useStudioShortcuts(): void {
         return;
       }
       if (mod) return;
-      // G hides every grid at once so the bare logo can be judged on its own.
-      if (e.key.toLowerCase() === "g") {
+      // Shift+G hides every grid; G selects the cell brush.
+      if (e.shiftKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
         store.setShowGrids(!store.showGrids);
         return;
