@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { hexToInkHsl, inkHslToHex, inkToneSwatches, type InkHsl } from "../../core/tracing/inkColor";
 
 const KEY = "logo-studio:ink-palette:v1";
 const PALETTES = [
@@ -17,9 +18,15 @@ export function BrushInkPalette({color,onChange}:{color:string;onChange:(value:s
   const [saved,setSaved]=useState<string[]>([]);
   const [draft,setDraft]=useState(color);
   const [message,setMessage]=useState("");
+  const [hsl,setHsl]=useState<InkHsl>(()=>hexToInkHsl(color)??{h:0,s:0,l:0});
   useEffect(()=>{setSaved(loadColors());},[]);
-  useEffect(()=>{setDraft(color);},[color]);
+  useEffect(()=>{setDraft(color);setHsl(old=>{const next=hexToInkHsl(color);if(!next)return old;if(inkHslToHex(old)===color.toLowerCase())return old;return next;});},[color]);
   const select=(value:string)=>{if(HEX.test(value)){onChange(value.toLowerCase());setDraft(value.toLowerCase());}};
+  const updateHsl=(axis:keyof InkHsl,value:number)=>{
+    const next={...hsl,[axis]:value};
+    const hex=inkHslToHex(next);
+    if(hex){setHsl(next);select(hex);}
+  };
   const persist=(next:string[])=>{
     try{localStorage.setItem(KEY,JSON.stringify(next));setSaved(next);setMessage("تم تحديث ألوانك المخصصة");}
     catch{setMessage("تعذر حفظ الألوان على الجهاز");}
@@ -44,6 +51,20 @@ export function BrushInkPalette({color,onChange}:{color:string;onChange:(value:s
         disabled={saved.length>=24||saved.includes(color.toLowerCase())||!HEX.test(color)}
         onClick={()=>persist([...saved,color.toLowerCase()])} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border disabled:opacity-35"><Plus className="h-5 w-5"/></button>
     </div>
+    <details className="rounded-lg border border-border p-2">
+      <summary className="cursor-pointer text-xs font-semibold">درجات اللون وضبط التشبع</summary>
+      <div className="mt-3 space-y-2">
+        <div className="grid grid-cols-7 gap-1" aria-label="درجات اللون من الداكن إلى الفاتح">{inkToneSwatches(color).map(swatch)}</div>
+        {([
+          ["h","درجة اللون",360],["s","التشبع",100],["l","الإضاءة",100],
+        ] as const).map(([axis,label,max])=><label key={axis} className="block space-y-1 text-xs">
+          <span className="flex justify-between"><span>{label}</span><span dir="ltr">{Math.round(hsl[axis])}{axis==="h"?"°":"%"}</span></span>
+          <input type="range" min={0} max={max} step={1} value={Math.round(hsl[axis])} onChange={e=>updateHsl(axis,Number(e.target.value))}
+            className="min-h-9 w-full accent-[var(--color-primary)]"/>
+        </label>)}
+        <p className="text-[11px] text-muted-foreground">يظهر اللون مباشرة في معاينة القلم، ويمكن حفظه ضمن ألواني.</p>
+      </div>
+    </details>
     {PALETTES.map(p=><div key={p.name} className="space-y-1.5"><p className="text-[11px] text-muted-foreground">{p.name}</p><div className="grid grid-cols-4 gap-2">{p.colors.map(swatch)}</div></div>)}
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">ألواني ({saved.length}/24)</p>
