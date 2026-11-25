@@ -8,6 +8,7 @@ import {
   KELK_SLANT_PRESETS,
   adjustGroupOverlap,
   arrangeWordAnchors,
+  arrangeWordBounds,
   applyGroupSlant,
   composeWordLayout,
   createKashidaItem,
@@ -106,12 +107,15 @@ export function KelkCompositionPanel({ selected, siblings }: {
     if (patches.length) updateMany(patches, label);
   };
 
-  const onArrange = (mode: "equal-spacing" | "baseline") => {
+  const [arrangementNotice, setArrangementNotice] = useState("");
+  const onArrange = (mode: "equal-spacing" | "baseline" | "bounds") => {
     commitPreview();
     const latest = useStudio.getState().doc.lettering ?? [];
     const ids = new Set(siblings.map(item => item.id));
-    const patches = arrangeWordAnchors(latest.filter(item => ids.has(item.id)), mode);
-    if (patches.length) updateMany(patches, mode === "baseline" ? "محاذاة السطر" : "توزيع الحروف");
+    const group = latest.filter(item => ids.has(item.id));
+    const patches = mode === "bounds" ? arrangeWordBounds(group) : arrangeWordAnchors(group, mode);
+    setArrangementNotice(patches.length ? "" : "لا يوجد تعديل آمن مطلوب ضمن حدود التركيب الحالي.");
+    if (patches.length) updateMany(patches, mode === "baseline" ? "محاذاة السطر" : mode === "bounds" ? "توزيع حدود الحروف" : "توزيع الحروف");
   };
 
   const onOverlap = (deltaPx: number) => {
@@ -177,7 +181,9 @@ export function KelkCompositionPanel({ selected, siblings }: {
           <button type="button" className={btn} disabled={!hasWordGroup} onClick={() => onArrange("baseline")}>محاذاة السطر</button>
           <button type="button" className={btn} disabled={siblings.filter(item => !item.hidden && (item.kind === "outline" || item.kind === "text")).length < 3} onClick={() => onArrange("equal-spacing")}>توزيع المراسي</button>
         </div>
-        <p className="text-[11px] text-muted-foreground">التوزيع يساوي المسافات بين مراسي الحروف، وليس الفراغ البصري بين حوافها.</p>
+        <button type="button" className={`${btn} w-full`} disabled={siblings.filter(item => !item.hidden && item.kind === "outline" && !!item.pathData).length < 3} onClick={() => onArrange("bounds")}>توزيع المسافات بين حدود الحروف</button>
+        <p className="text-[11px] text-muted-foreground">توزيع الحدود يراعي العرض الهندسي لكل حرف مع تثبيت طرفي التركيب. لا يقيس الفراغ البصري بين المنحنيات مباشرة.</p>
+        {arrangementNotice && <p role="status" className="text-xs text-muted-foreground">{arrangementNotice}</p>}
         <label className="block space-y-1">
           <span className="flex justify-between text-[11px] text-muted-foreground">
             <span>خطوة التباعد</span><span dir="ltr">{spacingStep} px</span>
