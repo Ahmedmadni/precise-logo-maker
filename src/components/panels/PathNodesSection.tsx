@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { PathGeometry } from "../../core/geometry/types";
-import { insertPathNode, deletePathNode } from "../../editor/path-nodes";
+import { insertPathNode, deletePathNode, movePathNode } from "../../editor/path-nodes";
 import { useT } from "../../i18n";
 import { Button } from "../ui/button";
 
@@ -14,7 +14,7 @@ export function PathNodesSection({ path, disabled, onChange }: { path: PathGeome
   const update = (axis: "x" | "y", value: string) => {
     if (!value.trim()) return;
     const number = Number(value);
-    if (Number.isFinite(number)) onChange({ ...path, points: path.points.map((p, i) => i === index ? { ...p, [axis]: number } : p) });
+    if (Number.isFinite(number)) onChange(movePathNode(path,index,{...point,[axis]:number}));
   };
   return (
     <fieldset disabled={disabled} className="space-y-2 disabled:opacity-50">
