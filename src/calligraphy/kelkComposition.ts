@@ -1,4 +1,6 @@
 import type { LetteringItem } from "./model";
+import { createRibbonLink, buildRibbonPath, isValidRibbon } from "./ribbonJoin";
+import { worldJoinAnchor } from "./contourComposer";
 
 export type KelkSlantPresetId = "vertical" | "thuluth" | "ruqaa" | "nastaliq";
 export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset";
@@ -196,4 +198,34 @@ export function createKashidaItem(
     ...(anchor.groupId ? { groupId: anchor.groupId } : {}),
     sourceText: "ـ",
   };
+}
+
+/** Connected alternative to the independent decorative outline.
+ * The user chooses the target explicitly; the ribbon follows both glyphs.
+ * Length follows anchor separation, not the decorative outline length slider.
+ */
+export function createConnectedKashida(
+  source: LetteringItem,
+  target: LetteringItem,
+  options: { arch: number; thickness: number; style: KashidaStyle },
+): LetteringItem | null {
+  if (source.hidden || target.hidden || !Number.isFinite(options.arch) ||
+      !Number.isFinite(options.thickness)) return null;
+  const item = createRibbonLink(source, target);
+  if (!item?.ribbon) return null;
+  const start = worldJoinAnchor(source, "exit"), end = worldJoinAnchor(target, "entry");
+  if (!start || !end) return null;
+  const distance = Math.hypot(end.x-start.x, end.y-start.y);
+  if (!Number.isFinite(distance) || distance < 2) return null;
+  const width = Math.max(0.8, Math.min(150, options.thickness * (source.size + target.size) / 2000));
+  const overlap = Math.min(60, distance * 0.1, width * 0.5);
+  const curvature = options.style === "arch" ? Math.max(-0.5, Math.min(0.5, options.arch / 640)) : 0;
+  // Wave is represented by opposite relative displacement of the tangent
+  // handles (equal tangent angles at opposite ends of the chord).
+  const angle = options.style === "wave" ? Math.max(-45, Math.min(45, options.arch / 5)) : 0;
+  const ribbon = { ...item.ribbon, startWidth: width, endWidth: width,
+    startOverlap: overlap, endOverlap: overlap, curvature,
+    startAngle: angle, endAngle: angle, nibContrast: 0 };
+  const result = { ...item, ribbon, sourceText: "ـ" };
+  return isValidRibbon(ribbon) && buildRibbonPath(result, [source,target]) ? result : null;
 }
