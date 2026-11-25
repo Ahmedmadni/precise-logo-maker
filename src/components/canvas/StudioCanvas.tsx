@@ -383,6 +383,7 @@ export function StudioCanvas() {
   // Space held = temporary pan.
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if(e.target instanceof HTMLElement&&(e.target.isContentEditable||["INPUT","TEXTAREA","SELECT","BUTTON"].includes(e.target.tagName)))return;
       if (e.code === "Space") setSpaceDown(true);
       if (e.key === "Shift") setShiftDown(true);
     };
@@ -390,9 +391,12 @@ export function StudioCanvas() {
       if (e.code === "Space") setSpaceDown(false);
       if (e.key === "Shift") setShiftDown(false);
     };
+    const reset=()=>{setSpaceDown(false);setShiftDown(false);};
+    window.addEventListener("blur",reset);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => {
+      window.removeEventListener("blur",reset);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
@@ -490,6 +494,7 @@ export function StudioCanvas() {
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if(e.button!==0&&e.button!==1)return;
     // Palm touches may arrive *before* the pen on Android tablets.
     // Preserve stylus priority, cancelling an unfinished touch gesture only.
     if (shouldPrioritizeStylus(
@@ -943,6 +948,8 @@ export function StudioCanvas() {
 
   const onPointerUp = (e?: React.PointerEvent<HTMLDivElement>) => {
     if (e) {
+      // Ignored palm contacts and stale pointer releases must not finish a stroke.
+      if(!pointersRef.current.has(e.pointerId))return;
       pointersRef.current.delete(e.pointerId);
       if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
@@ -1270,6 +1277,7 @@ export function StudioCanvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onPointerCancel}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes(CATALOG_DRAG_MIME)) {
           event.preventDefault();
