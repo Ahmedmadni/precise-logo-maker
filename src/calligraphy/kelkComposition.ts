@@ -208,10 +208,11 @@ export function createKashidaItem(
 export function createConnectedKashida(
   source: LetteringItem,
   target: LetteringItem,
-  options: { arch: number; thickness: number; style: KashidaStyle },
+  options: { arch: number; thickness: number; style: KashidaStyle; nibAngle?: number; nibContrast?: number },
 ): LetteringItem | null {
   if (source.hidden || target.hidden || !Number.isFinite(options.arch) ||
-      !Number.isFinite(options.thickness)) return null;
+      !Number.isFinite(options.thickness) || !Number.isFinite(options.nibAngle ?? 35) ||
+      !Number.isFinite(options.nibContrast ?? 0)) return null;
   const item = createRibbonLink(source, target);
   if (!item?.ribbon) return null;
   const start = worldJoinAnchor(source, "exit"), end = worldJoinAnchor(target, "entry");
@@ -228,7 +229,9 @@ export function createConnectedKashida(
   const angle = options.style === "wave" ? Math.max(-45, Math.min(45, options.arch / 5)) : 0;
   const ribbon = { ...item.ribbon, startWidth, endWidth,
     startOverlap: overlapFor(startWidth), endOverlap: overlapFor(endWidth), curvature,
-    startAngle: angle, endAngle: angle, nibContrast: 0 };
+    startAngle: angle, endAngle: angle,
+    nibAngle: Math.max(-180, Math.min(180, options.nibAngle ?? 35)),
+    nibContrast: Math.max(0, Math.min(0.8, options.nibContrast ?? 0)) };
   const result = { ...item, ribbon, sourceText: "ـ" };
   return isValidRibbon(ribbon) && buildRibbonPath(result, [source,target]) ? result : null;
 }
