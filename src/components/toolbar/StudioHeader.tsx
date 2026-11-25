@@ -4,7 +4,7 @@ import {
   ImagePlus, Languages, Maximize2, Redo2, RotateCcw, Save, Settings2,
   Undo2, X,
 } from "lucide-react";
-import { downloadSvg, downloadPng } from "../../objects/export";
+import { downloadSvg, downloadPng, pngDimensions, hasExportLiveText } from "../../objects/export";
 import { downloadProject, readProjectFile } from "../../objects/project";
 import { readReferenceImage } from "../../objects/reference";
 import { fitBounds } from "../../core/coordinates/view";
@@ -37,6 +37,7 @@ export function StudioHeader() {
   const [menu, setMenu] = useState<Menu>(null);
   const [transparent, setTransparent] = useState(true);
   const [pngSize, setPngSize] = useState(2048);
+  const selectedPngDimensions=pngDimensions(doc.artboard,pngSize);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const projectFile = useRef<HTMLInputElement>(null);
@@ -181,10 +182,12 @@ export function StudioHeader() {
               {tr("دقة صورة PNG", "PNG resolution")}
               <select value={pngSize} onChange={(e) => setPngSize(Number(e.target.value))}
                 className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm">
-                {[512, 1024, 2048, 4096].map((size) => <option value={size} key={size}>{size} × {size} px</option>)}
+                {[256,512,1024,2048,4096].map(size=>{const d=pngDimensions(doc.artboard,size);return <option value={size} key={size} disabled={!d}>{d?`${d.width} × ${d.height} px`:`${size} px — ${tr("يتجاوز الحد","Too large")}`}</option>;})}
               </select>
             </label>
-            <button type="button" disabled={count === 0 || busy} onClick={() => void exportImage()}
+            {!selectedPngDimensions&&<p className="text-xs text-destructive">{tr("اختر عرضًا أصغر؛ الحد الأقصى 4096 بكسل لكل ضلع.","Choose a smaller width; maximum 4096 px per edge.")}</p>}
+            {hasExportLiveText(doc)&&<p className="rounded border border-border p-2 text-xs leading-5 text-muted-foreground">{tr("يحتوي التصميم على نصوص حية؛ قد تختلف الخطوط في الملف المصدر. حوّل النصوص إلى مسارات فيكتور قبل التصدير لضمان ثبات شكل الحروف.","Live text may render with different fonts in exported files. Convert text to vector outlines before export for consistent glyph shapes.")}</p>}
+            <button type="button" disabled={count === 0 || busy || !selectedPngDimensions} onClick={() => void exportImage()}
               className="flex min-h-14 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-40">
               {busy ? tr("جار التصدير...", "Exporting...") : "PNG"}
               <Download className="h-5 w-5" />
