@@ -7,6 +7,7 @@ import type {LetteringItem} from "../../calligraphy/model";
 import {suggestGlyphSpacing,pickSpacingSuggestion,type SpacingSuggestionsResult} from "../../calligraphy/spacingSuggestions";
 import {LetteringGlyph} from "./LetteringGlyph";
 import {GlyphBalanceControls} from "./GlyphBalanceControls";
+import {GlyphTierControls} from "./GlyphTierControls";
 
 export function GlyphGroupTransformControls(){
   const source=useStudio(s=>s.doc.lettering);
@@ -48,6 +49,7 @@ export function GlyphGroupTransformControls(){
   return <div className="mt-1 border-t border-border pt-1">
     <button type="button" className="min-h-9 w-full rounded border border-border text-xs" aria-expanded={open} onClick={()=>{setOpen(!open);setNotice("");}}>تنسيق الحروف ({ids.length})</button>
     <GlyphBalanceControls/>
+    <GlyphTierControls/>
     {open&&<div className="max-h-[35dvh] w-full max-w-[300px] space-y-1 overflow-y-auto pt-2">
       <div className="grid grid-cols-3 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة"},{id:"spacing",label:"التداخل"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
       {tab==="spacing"?<>
