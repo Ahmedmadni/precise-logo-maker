@@ -161,7 +161,7 @@ export function FreePathLayoutPanel({siblings}:{siblings:LetteringItem[]}){
         {wordMode&&composition&&<div role="status" className="rounded border border-border p-2 text-xs">
           {composition.overlaps.length>0?<><p className="font-medium">تنبيه: {composition.overlaps.length} زوج من الكلمات ذات حدود متداخلة.</p><p>جرّب زيادة حجم المسار أو تعديل المنحنى. يمكنك اعتماد التداخل إذا كان مقصودًا.</p><button type="button" disabled={scale>=3} onClick={improveSpacing} className="mt-2 min-h-10 w-full rounded-lg border border-border disabled:opacity-40">اقتراح تخفيف التداخل</button></>:<p>لا يظهر تداخل بين مستطيلات حدود الكلمات المحددة.</p>}
           <p className="text-muted-foreground">فحص تقريبي للحدود فقط، دون الحركات والزخارف والوصلات أو سماكة الحدود.</p>
-        </div>
+        </div>}
         {composition?<svg viewBox={composition.viewBox} className="block h-40 w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="معاينة توزيع مسارات الحروف الفعلية">
           {composition.glyphs.map(g=>{
             const size=Number.isFinite(g.size)?Math.max(1,Math.min(1000,g.size)):48;
