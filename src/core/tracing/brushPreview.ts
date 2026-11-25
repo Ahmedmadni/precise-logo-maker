@@ -1,6 +1,6 @@
 import type { PathGeometry } from "../geometry/types";
 import {
-  thinBrushSamples, vectorBrushOutline,
+  thinBrushSamples, buildBrushStroke,
   type BrushSample, type BrushSettings,
 } from "./vectorBrush";
 
@@ -27,7 +27,7 @@ export function brushPreviewSamples(
 }
 
 /** A smaller, editable-looking SVG silhouette for live drawing.
- * The *complete* trace must still go through vectorBrushOutline at pointer-up.
+ * The *complete* trace must still go through buildBrushStroke at pointer-up.
  */
 export function vectorBrushPreviewOutline(
   samples: readonly BrushSample[],
@@ -35,5 +35,5 @@ export function vectorBrushPreviewOutline(
   zoom: number,
 ): PathGeometry | null {
   if (brushPreviewBudget(zoom) === 0) return null;
-  return vectorBrushOutline(brushPreviewSamples(samples, zoom), settings);
+  return buildBrushStroke(brushPreviewSamples(samples, zoom), settings);
 }
