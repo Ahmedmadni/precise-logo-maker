@@ -4,7 +4,7 @@ import { buildBrushStroke, DEFAULT_BRUSH } from "../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../core/tracing/brushPreview";
 import { handlesOf, pickHandle, applyHandle } from "./handles";
 import { geometryToPathData } from "../objects/render";
-import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl,arrangePathNodes,nudgePathNodes,movePathNodes } from "./path-nodes";
+import { movePathNode,insertPathNode,deletePathNode,setPathEdgeCurved,movePathControl,arrangePathNodes,nudgePathNodes,movePathNodes,smoothSelectedPathNodes,simplifySelectedPathNodes } from "./path-nodes";
 
 const path:PathGeometry={kind:"path",closed:true,points:[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],cubicSegments:[{control1:{x:0,y:10},control2:{x:10,y:10}},null,null,{control1:{x:-4,y:10},control2:{x:-4,y:0}}]};
 
@@ -106,5 +106,31 @@ describe("multi-anchor operations",()=>{
     expect(nudgePathNodes(path,[0,99],3,4)).toBe(path);
     expect(movePathNodes(path,new Map([[0,{x:NaN,y:0}]]))).toBe(path);
     expect(nudgePathNodes(path,[0],0,0)).toBe(path);
+  });
+});
+
+
+describe("conservative node refinement",()=>{
+  const line:PathGeometry={kind:"path",closed:false,points:[{x:0,y:0},{x:10,y:1},{x:20,y:0},{x:30,y:1},{x:40,y:0}]};
+  it("limits smoothing displacement and preserves endpoints",()=>{
+    const result=smoothSelectedPathNodes(line,[0,1,4],1,.25);
+    expect(result.points[1]).toEqual({x:10,y:.75});
+    expect(result.points[0]).toEqual(line.points[0]);
+    expect(result.points[4]).toEqual(line.points[4]);
+  });
+  it("removes only nonadjacent eligible nodes",()=>{
+    const result=simplifySelectedPathNodes(line,[1,2,3],1);
+    expect(result.points).toEqual([line.points[0],line.points[2],line.points[4]]);
+    expect(simplifySelectedPathNodes(line,[1,2,3],.1)).toBe(line);
+  });
+  it("preserves sharp turns and nodes attached to cubics",()=>{
+    expect(smoothSelectedPathNodes(path,[0,1,2,3],1,5)).toBe(path);
+    expect(simplifySelectedPathNodes(path,[0,1,2,3],5)).toBe(path);
+  });
+  it("preserves unrelated cubic controls and remaps their indices",()=>{
+    const mixed={...line,cubicSegments:[null,null,null,{control1:{x:32,y:2},control2:{x:38,y:2}},null]};
+    const result=simplifySelectedPathNodes(mixed,[1,3],1);
+    expect(result.points).toHaveLength(4);
+    expect(result.cubicSegments?.[2]).toEqual(mixed.cubicSegments[3]);
   });
 });
