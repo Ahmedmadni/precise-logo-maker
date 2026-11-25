@@ -1,7 +1,7 @@
 import type { LetteringItem } from "./model";
 import { createRibbonLink, buildRibbonPath, isValidRibbon } from "./ribbonJoin";
 import { worldJoinAnchor } from "./contourComposer";
-import { letteringGroupBounds } from "./morph";
+import { preciseGlyphBounds } from "./morph";
 
 export type KelkSlantPresetId = "vertical" | "thuluth" | "ruqaa" | "nastaliq";
 export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset";
@@ -263,7 +263,7 @@ export function arrangeWordAnchors(items: LetteringItem[], mode: "equal-spacing"
 }
 
 
-/** Equal signed gaps between conservative transformed outline bounds.
+/** Equal signed gaps between tight transformed outline bounds.
  * Keep outer glyphs fixed, reject layouts that would reverse anchor order
  * or move the composition's envelope beyond its current extent.
  * Text drafts lack reliable vector bounds and must be outlined first.
@@ -272,7 +272,7 @@ export function arrangeWordBounds(items: LetteringItem[]): LetteringPatchEntry[]
   const visible = items.filter(g => !g.hidden && (g.kind === "outline" || g.kind === "text"));
   if (visible.length < 3 || visible.some(g => g.kind !== "outline" || !g.pathData)) return [];
   const glyphs = sortRtl(visible);
-  const measured = glyphs.map(g => ({ g, b: letteringGroupBounds([g]) }));
+  const measured = glyphs.map(g => ({ g, b: preciseGlyphBounds(g) }));
   if (measured.some(({g,b}) => !b || ![g.x,b.x,b.width].every(Number.isFinite) || b.width <= 0)) return [];
   const boxes = measured.map(({g,b}) => ({g,left:b!.x,right:b!.x+b!.width,width:b!.width}));
   const right = boxes[0]!.right, left = boxes.at(-1)!.left;
