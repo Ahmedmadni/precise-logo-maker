@@ -42,7 +42,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
-import {suggestDecorationPositions} from "../calligraphy/decorationPlacement";
+import {suggestDecorationPositions,arrangeDecorations,type DecorationBatchScope} from "../calligraphy/decorationPlacement";
 import { nudgePathNodes } from "../editor/path-nodes";
 import {translateGlyphSelection,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,type GlyphGroupTransform,type GlyphArrangeAxis,type GlyphArrangeMode} from "../calligraphy/groupSelection";
 import { eligibleJoinObject,joinOpenPaths,type PathEnd,type JoinMode } from "../editor/joinPaths";
@@ -178,6 +178,7 @@ export interface StudioState {
   glyphMultiIds:string[];
   setGlyphLassoActive:(active:boolean)=>void;
   setGlyphMultiIds:(ids:string[])=>void;
+  arrangeDecorationBatch:(source:DocumentState,id:string,scope:DecorationBatchScope,includeManual:boolean,clearance:number)=>boolean;
   placeDecorationAtSuggestion:(source:DocumentState,id:string,x:number,y:number,clearance:number)=>boolean;
   spaceGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,gap:number)=>boolean;
   arrangeGlyphMulti:(source:LetteringItem[],ids:string[],axis:GlyphArrangeAxis,mode:GlyphArrangeMode)=>boolean;
@@ -406,6 +407,18 @@ export const useStudio = create<StudioState>()((set, get) => {
       set({glyphLassoActive:active,glyphMultiIds:[],lassoActive:active,nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null,tool:"select",selection:[],selectedLetteringId:null,selectedGlyphNodeId:null,selectedContourIndex:null,editGlyphNodes:false,editGlyphContours:false,editJoinAnchors:false,joinGuide:null});
     },
     setGlyphMultiIds:(ids)=>set({glyphMultiIds:[...new Set(ids)]}),
+    arrangeDecorationBatch:(source,id,scope,includeManual,clearance)=>{
+      const s=get();
+      if(s.doc!==source||s.selectedLetteringId!==id||s.letteringPreview||s.guideLayer.edit)return false;
+      const obstacles=source.objects.filter(o=>o.visible&&!o.guide).map(o=>{
+        const b=geometryBounds(o.geometry),p=Math.max(0,o.style.strokeWidth)/2;
+        return {minX:b.minX-p,minY:b.minY-p,maxX:b.maxX+p,maxY:b.maxY+p};
+      });
+      const result=arrangeDecorations(source.lettering??[],id,source.artboard,scope,includeManual,clearance,obstacles);
+      if(!result.ok||!result.moved)return false;
+      commit("Arrange calligraphy decorations",d=>({...d,lettering:result.items}));
+      return true;
+    },
     placeDecorationAtSuggestion:(source,id,x,y,clearance)=>{
       const s=get();
       if(s.doc!==source||s.selectedLetteringId!==id||s.letteringPreview||s.guideLayer.edit)return false;
