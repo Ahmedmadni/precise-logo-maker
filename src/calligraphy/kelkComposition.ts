@@ -1,6 +1,7 @@
 import type { LetteringItem } from "./model";
 import { createRibbonLink, buildRibbonPath, isValidRibbon } from "./ribbonJoin";
 import { worldJoinAnchor } from "./contourComposer";
+import { letteringGroupBounds } from "./morph";
 
 export type KelkSlantPresetId = "vertical" | "thuluth" | "ruqaa" | "nastaliq";
 export type KelkLayoutStyle = "cascade" | "interlock" | "arch" | "reset";
@@ -259,4 +260,35 @@ export function arrangeWordAnchors(items: LetteringItem[], mode: "equal-spacing"
   return glyphs.slice(1,-1).map((g,i) => ({
     id:g.id, patch:{x:round(right - (right-left)*(i+1)/(glyphs.length-1))},
   }));
+}
+
+
+/** Equal signed gaps between conservative transformed outline bounds.
+ * Keep outer glyphs fixed, reject layouts that would reverse anchor order
+ * or move the composition's envelope beyond its current extent.
+ * Text drafts lack reliable vector bounds and must be outlined first.
+ */
+export function arrangeWordBounds(items: LetteringItem[]): LetteringPatchEntry[] {
+  const visible = items.filter(g => !g.hidden && (g.kind === "outline" || g.kind === "text"));
+  if (visible.length < 3 || visible.some(g => g.kind !== "outline" || !g.pathData)) return [];
+  const glyphs = sortRtl(visible);
+  const measured = glyphs.map(g => ({ g, b: letteringGroupBounds([g]) }));
+  if (measured.some(({g,b}) => !b || ![g.x,b.x,b.width].every(Number.isFinite) || b.width <= 0)) return [];
+  const boxes = measured.map(({g,b}) => ({g,left:b!.x,right:b!.x+b!.width,width:b!.width}));
+  const right = boxes[0]!.right, left = boxes.at(-1)!.left;
+  if (right <= left || boxes.some(b => b.left < left-0.01 || b.right > right+0.01)) return [];
+  const gap = (right-left-boxes.reduce((sum,b)=>sum+b.width,0))/(boxes.length-1);
+  let cursor = right;
+  const positioned = boxes.map((b,i) => {
+    const x = i===0 || i===boxes.length-1 ? b.g.x : round(b.g.x+cursor-b.right);
+    cursor -= b.width+gap;
+    return {...b,x};
+  });
+  for(let i=0;i<positioned.length;i++){
+    const b=positioned[i]!, dx=b.x-b.g.x;
+    if(b.left+dx<left-0.01 || b.right+dx>right+0.01 ||
+       (i>0 && positioned[i-1]!.x<b.x)) return [];
+  }
+  return positioned.slice(1,-1).filter(b=>Math.abs(b.x-b.g.x)>0.005)
+    .map(b=>({id:b.g.id,patch:{x:b.x}}));
 }
