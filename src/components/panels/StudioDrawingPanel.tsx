@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { brushIsValid, type BrushSettings } from "../../core/tracing/vectorBrush";
-import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline } from "lucide-react";
+import { DEFAULT_BRUSH, brushIsValid, type BrushSettings } from "../../core/tracing/vectorBrush";
+import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline, SlidersHorizontal, Gauge, BookOpen, Check } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
 import { BrushPresetPreview } from "./BrushPresetPreview";
@@ -35,9 +35,10 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
   const [pens, setPens] = useState<SavedPen[]>(readPens);
   const [penName, setPenName] = useState("");
   const [penMessage, setPenMessage] = useState("");
+  const [brushTab,setBrushTab]=useState<"presets"|"shape"|"dynamics">("presets");
   const persistPens = (next: SavedPen[]) => {
-    try { localStorage.setItem(PEN_KEY, JSON.stringify(next)); setPens(next); setPenMessage("تم تحديث مكتبة الأقلام"); }
-    catch { setPenMessage("تعذر حفظ المكتبة على الجهاز"); }
+    try { localStorage.setItem(PEN_KEY, JSON.stringify(next)); setPens(next); setPenMessage("تم تحديث مكتبة الأقلام"); return true; }
+    catch { setPenMessage("تعذر حفظ المكتبة على الجهاز"); return false; }
   };
   const showGrids = useStudio((s) => s.showGrids);
   const setShowGrids = useStudio((s) => s.setShowGrids);
@@ -50,36 +51,24 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
         <h3 className="text-sm font-semibold">أدوات الرسم الفيكتور</h3>
         <p className="mt-1 text-xs text-muted-foreground">اختر أداة ثم ارسم مباشرة على المساحة. للتعديل في الأشكال اختر «تحديد وتحريك».</p>
       </div>
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-foreground">الأدوات الأساسية</p>
-        <div className="grid grid-cols-2 gap-2">
-          {tools.slice(0, 7).map(({ id, label, description, icon: Icon }) => (
-            <button key={id} type="button" aria-pressed={selected === id}
-              className={`min-h-[84px] rounded-xl border p-3 text-right transition-colors ${selected === id ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/40"}`}
-              onClick={() => { setTool(id); onChoose?.(); }}>
-              <Icon className={`mb-1 h-5 w-5 ${selected === id ? "text-primary" : "text-muted-foreground"}`} />
-              <span className="block text-xs font-semibold">{label}</span>
-              <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{description}</span>
-            </button>
-          ))}
+      {([
+        {title:"التحديد والتنقل",ids:["select","pan","measure"]},
+        {title:"الأقلام والفرش",ids:["pen","brush","cell"]},
+        {title:"الأشكال الهندسية",ids:["line","circle","arc","polygon"]},
+      ] as const).map(group=><section key={group.title} className="space-y-1.5">
+        <h4 className="text-xs font-semibold text-muted-foreground">{group.title}</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {group.ids.map(id=>{
+            const item=tools.find(t=>t.id===id)!;
+            const Icon=item.icon;
+            return <button key={id} type="button" aria-pressed={selected===id} title={item.description}
+              className={`flex min-h-12 min-w-0 items-center gap-2 rounded-lg border px-2 text-start text-xs ${selected===id?"border-primary bg-primary/10 font-semibold":"border-border bg-background hover:bg-accent"}`}
+              onClick={()=>{setTool(id);if(id!=="brush")onChoose?.();}}>
+              <Icon className="h-5 w-5 shrink-0" aria-hidden="true"/><span className="min-w-0 flex-1">{item.label}</span>{selected===id&&<Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>}
+            </button>;
+          })}
         </div>
-      </div>
-      <details className="rounded-xl border border-border bg-background p-3">
-        <summary className="cursor-pointer text-xs font-semibold">
-          أدوات رسم إضافية — مضلعات، خلايا وقياس
-        </summary>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {tools.slice(7).map(({ id, label, description, icon: Icon }) => (
-            <button key={id} type="button" aria-pressed={selected === id}
-              className={`min-h-[84px] rounded-xl border p-3 text-right ${selected === id ? "border-primary bg-primary/10" : "border-border bg-card"}`}
-              onClick={() => { setTool(id); onChoose?.(); }}>
-              <Icon className="mb-1 h-5 w-5 text-primary" />
-              <span className="block text-xs font-semibold">{label}</span>
-              <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{description}</span>
-            </button>
-          ))}
-        </div>
-      </details>
+      </section>)}
       {selected === "brush" && (
         <section className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
           <h4 className="flex items-center gap-2 text-sm font-semibold">
@@ -93,6 +82,11 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <BrushPresetPreview preset={brush.preset} settings={brush} live />
             <p className="text-[11px] text-muted-foreground">عينة متجهية بضغط متدرج، تتحدث مع إعدادات القلم.</p>
           </div>
+          {onChoose&&<button type="button" onClick={onChoose} className="min-h-11 w-full rounded-lg bg-primary px-2 text-xs font-semibold text-primary-foreground">ابدأ الرسم بالقلم الحالي</button>}
+          <nav className="grid grid-cols-3 gap-1" aria-label="إعدادات القلم">
+            {([{id:"presets",label:"الأقلام",icon:BookOpen},{id:"shape",label:"السن والحبر",icon:SlidersHorizontal},{id:"dynamics",label:"الضغط",icon:Gauge}] as const).map(({id,label,icon:Icon})=><button key={id} type="button" aria-pressed={brushTab===id} onClick={()=>setBrushTab(id)} className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg border text-[11px] ${brushTab===id?"border-primary bg-primary/10 font-semibold":"border-border bg-background"}`}><Icon className="h-4 w-4" aria-hidden="true"/>{label}</button>)}
+          </nav>
+          <div className={brushTab==="presets"?"space-y-3":"hidden"}>
           <div className="space-y-2">
             <p className="text-xs font-semibold">إعدادات قلم سريعة</p>
             <div className="grid grid-cols-2 gap-2">
@@ -103,7 +97,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
                 { label: "قلم دائري", preset: "round", size: 6, angle: 0, smoothing: 0.3, endStyle: "soft" },
               ] as const).map(({ label, ...settings }) => (
                 <button key={label} type="button" className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs hover:border-primary"
-                  onClick={() => setBrush(settings)}>{label}</button>
+                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
               ))}
             </div>
           </div>
@@ -111,7 +105,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <summary className="cursor-pointer text-xs font-semibold">أقلامي المخصصة ({pens.length})</summary>
             <div className="mt-3 space-y-2">
               <input aria-label="اسم القلم" placeholder="اسم القلم الجديد" maxLength={40} value={penName} onChange={(e) => setPenName(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" />
-              <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]); setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
+              <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { if(pens.some(p=>p.name===penName.trim())){setPenMessage("الاسم مستخدم بالفعل");return;} if(persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]))setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
               {pens.map((pen, i) => <div key={i} className="flex items-center gap-2">
                 <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
                 <button type="button" aria-label={"حذف " + pen.name} className="min-h-11 rounded-lg border border-border px-2 text-xs" onClick={() => persistPens(pens.filter((_, index) => index !== i))}>حذف</button>
@@ -119,6 +113,8 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               <p role="status" className="text-[11px] text-muted-foreground">{penMessage}</p>
             </div>
           </details>
+          </div>
+          <div className={brushTab==="shape"?"space-y-3":"hidden"}>
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="شكل سن القلم">
             {([
               ["round", "دائرية"], ["qalam", "سن قصبة"], ["taper", "مدببة"],
@@ -187,6 +183,8 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               </p>
             </div>
           </div>}
+          </div>
+          <div className={brushTab==="dynamics"?"space-y-3":"hidden"}>
           <label className="block space-y-1 text-xs">
             <span className="flex justify-between"><span>تنعيم حركة اليد</span><span dir="ltr">{Math.round(brush.smoothing * 100)}%</span></span>
             <input className="w-full accent-[var(--color-primary)]" type="range" min={0} max={80}
@@ -207,6 +205,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             الضغط الفعلي يحتاج قلمًا وجهازًا يدعمان Pointer Events. الرسم بالإصبع يستخدم ضغطًا افتراضيًا ثابتًا.
             نقرة القصبة المفردة تترك بصمة سن مائلة بدل دائرة. الأطراف المدببة تعتمد على المسافة لا سرعة العينات. هذه فرش فيكتور وليست ضربات ثلث أصيلة جاهزة.
           </p>
+          </div>
         </section>
       )}
       <details className="rounded-xl border border-border bg-background p-3">
