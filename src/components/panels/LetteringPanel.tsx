@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Buffer } from "buffer";
-import { Layers, LoaderCircle, RotateCcw, Sparkles, Type, WandSparkles } from "lucide-react";
+import { Layers, LoaderCircle, RotateCcw, Sparkles, Type, WandSparkles, Shapes, PenTool, ChevronDown, ChevronLeft, Search, EyeOff } from "lucide-react";
 import {
   FONT_DESCRIPTIONS, HARAKAT, ORNAMENTS, createHaraka, createOrnament,
   type FontPreset, type LetteringItem,
@@ -61,6 +61,13 @@ export function LetteringPanel({ section, onCreated }: {
   const textInput = useRef<HTMLTextAreaElement>(null);
   const caret = useRef({ start: 0, end: 0 });
   const [markSearch, setMarkSearch] = useState("");
+  const [decorationSearch,setDecorationSearch]=useState("");
+  const [layerSearch,setLayerSearch]=useState("");
+  const [expandedGroup,setExpandedGroup]=useState<string|null>(null);
+  const [showHiddenLayers,setShowHiddenLayers]=useState(false);
+  const layerKind=(item:LetteringItem)=>item.kind==="outline"?(item.catalogShapeId?"شكل خطاطي":"حرف متجهي"):item.kind==="haraka"?"حركة تشكيل":item.kind==="ornament"?"زخرفة":item.kind==="bridge"?"وصلة":"نص";
+  const normalizeSearch=(value:string)=>removeArabicMarks(value).replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").toLocaleLowerCase().trim();
+  const matchesSearch=(value:string,query:string)=>normalizeSearch(value).includes(normalizeSearch(query));
   const writeSymbol = (symbol: string) => {
     const result = insertAtSelection(phrase, caret.current.start, caret.current.end, symbol);
     if (result.text.length > 120) return;
@@ -104,7 +111,8 @@ export function LetteringPanel({ section, onCreated }: {
   const items = doc.lettering ?? [];
   const selected = items.find((entry) => entry.id === selectedId);
   const attachedTarget = selected?.kind === "outline" ? selected : selected?.kind === "haraka" && selected.attachedToGlyphId ? items.find((item) => item.id === selected.attachedToGlyphId && item.kind === "outline") : undefined;
-  const filteredHarakat = HARAKAT.filter((mark) => mark.label.includes(markSearch.trim()) || mark.glyph.includes(markSearch.trim()));
+  const filteredHarakat = HARAKAT.filter(mark => matchesSearch(mark.label,markSearch) || (!!markSearch.trim() && mark.glyph.includes(markSearch.trim())));
+  const filteredDecorations=ORNAMENTS.filter(shape=>matchesSearch(shape.label,decorationSearch));
   const grouped = new Map<string, LetteringItem[]>();
   for (const item of items) if (item.groupId) {
     const existing = grouped.get(item.groupId) ?? [];
@@ -112,6 +120,8 @@ export function LetteringPanel({ section, onCreated }: {
     grouped.set(item.groupId, existing);
   }
 
+  const visibleGroups=[...grouped].filter(([,glyphs])=>glyphs.some(g=>(showHiddenLayers||!g.hidden)&&matchesSearch(`${g.sourceText??""} ${layerKind(g)}`,layerSearch)));
+  const independent=items.filter(item=>!item.groupId&&(showHiddenLayers||!item.hidden)&&matchesSearch(`${item.text??""} ${item.sourceText??""} ${layerKind(item)}`,layerSearch));
   useEffect(() => {
     if (selected?.kind === "outline" && selected.groupId && selected.sourceText) {
       setPhrase(selected.sourceText);
@@ -313,14 +323,14 @@ export function LetteringPanel({ section, onCreated }: {
         <section className="space-y-4">
           <nav className="grid grid-cols-3 gap-1.5" aria-label="نوع العنصر المراد إضافته">
             {([
-              ["catalog", "مكتبة الأشكال"],
-              ["harakat", "حركات الخط"],
-              ["decorations", "الزخارف"],
-            ] as const).map(([category, label]) => (
+              ["catalog", "الأشكال", Shapes],
+              ["harakat", "التشكيل", PenTool],
+              ["decorations", "الزخارف", Sparkles],
+            ] as const).map(([category, label, Icon]) => (
               <button type="button" key={category} onClick={() => setMarkCategory(category)}
                 aria-pressed={markCategory === category}
-                className={`min-h-12 rounded-xl border px-2 text-xs font-semibold ${markCategory === category ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
-                {label}
+                className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-1 text-[11px] font-semibold ${markCategory === category ? "border-primary bg-primary/15 text-primary" : "border-border bg-background"}`}>
+                <Icon className="h-4 w-4" aria-hidden="true"/>{label}
               </button>
             ))}
           </nav>
@@ -366,58 +376,71 @@ export function LetteringPanel({ section, onCreated }: {
             {filteredHarakat.length === 0 && <p className="text-xs text-muted-foreground">لا توجد نتائج.</p>}
           </div>}
           {markCategory === "decorations" && <div>
-            <h3 className="mb-2 font-semibold">الزخارف والامتدادات</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {ORNAMENTS.map((shape) => (
-                <button key={shape.id} className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
+            <h3 className="mb-2 text-xs font-semibold">الزخارف والامتدادات ({filteredDecorations.length})</h3>
+            <input className={field+" mb-2"} type="search" aria-label="البحث في الزخارف" placeholder="ابحث عن زخرفة" value={decorationSearch} onChange={e=>setDecorationSearch(e.target.value)}/>
+            <div className="grid grid-cols-3 gap-1.5">
+              {filteredDecorations.map((shape) => (
+                <button key={shape.id} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-background hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-primary"
                   type="button" onClick={() => createDecoration(shape)}>
-                  <svg viewBox="0 0 100 100" className="h-11 w-12" aria-hidden="true">
+                  <svg viewBox="0 0 100 100" className="h-9 w-10" aria-hidden="true">
                     <path d={shape.path} fill="currentColor" stroke="currentColor" strokeWidth="1" fillRule="evenodd" />
                   </svg><span className="text-[11px]">{shape.label}</span>
                 </button>
               ))}
             </div>
           </div>}
+          {markCategory==="decorations"&&filteredDecorations.length===0&&<p className="text-xs text-muted-foreground">لا توجد زخارف مطابقة.</p>}
           <p className="text-xs leading-5 text-muted-foreground">بعد الإضافة حدّد الحركة أو الزخرفة ثم افتح «تعديل» للتحكم في مكانها وحجمها ولونها.</p>
         </section>
       )}
 
       {mode === "layers" && (
         <section className="space-y-3">
-          <h3 className="font-semibold">الكلمات المركبة</h3>
-          {grouped.size === 0 && <p className="text-xs text-muted-foreground">لم تنشئ مسارات حروف بعد. افتح تبويب الكلمات أولا.</p>}
-          {[...grouped].map(([groupId, glyphs], i) => (
-            <div key={groupId} className="rounded-lg border border-border p-2">
-              <div className="flex items-center justify-between gap-2">
-                <button className="text-right text-xs font-semibold" type="button" onClick={() => select(glyphs[0]!.id)}>
-                  {glyphs[0]?.sourceText || `الكلمة ${i + 1}`}
+          <div className="relative">
+            <Search className="absolute start-3 top-3.5 h-4 w-4 text-muted-foreground" aria-hidden="true"/>
+            <input type="search" className={field+" ps-9"} aria-label="البحث في عناصر التصميم" placeholder="ابحث عن كلمة أو نوع عنصر" value={layerSearch} onChange={e=>setLayerSearch(e.target.value)}/>
+          </div>
+          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border px-2 text-xs">
+            <input type="checkbox" checked={showHiddenLayers} onChange={e=>setShowHiddenLayers(e.target.checked)}/> إظهار العناصر المخفية
+          </label>
+          <div className="flex items-center justify-between"><h3 className="text-xs font-semibold">الكلمات المركبة</h3><span className="text-xs text-muted-foreground">{visibleGroups.length} / {grouped.size}</span></div>
+          {visibleGroups.length===0&&<p className="text-xs text-muted-foreground">لا توجد كلمات مطابقة.</p>}
+          {visibleGroups.map(([groupId,glyphs],i)=>{
+            const shown=glyphs.filter(g=>showHiddenLayers||!g.hidden);
+            const first=shown.find(g=>g.kind==="outline")??shown[0];
+            if(!first)return null;
+            const expanded=expandedGroup===groupId;
+            const containsSelection=glyphs.some(g=>g.id===selectedId);
+            return <div key={groupId} className={`rounded-lg border ${containsSelection?"border-primary":"border-border"}`}>
+              <div className="flex items-center gap-1 p-1">
+                <button type="button" aria-expanded={expanded} aria-label={expanded?"طي عناصر الكلمة":"عرض عناصر الكلمة"} onClick={()=>setExpandedGroup(expanded?null:groupId)} className="flex min-h-10 w-9 shrink-0 items-center justify-center rounded-md hover:bg-secondary">
+                  {expanded?<ChevronDown className="h-4 w-4"/>:<ChevronLeft className="h-4 w-4"/>}
                 </button>
-                <span className="text-[10px] text-muted-foreground">{glyphs.length} مسارات</span>
+                <button type="button" onClick={()=>{select(first.id);setExpandedGroup(groupId);}} className="min-h-10 min-w-0 flex-1 truncate text-start text-xs font-semibold">{first.sourceText||`الكلمة ${i+1}`}</button>
+                <span className="pe-2 text-[10px] text-muted-foreground">{shown.length} عنصر</span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {glyphs.map((g, n) => (
-                  <button className={`min-h-10 min-w-9 rounded-md border px-2 text-xs ${selectedId === g.id ? "border-primary bg-primary/10" : "border-border"}`}
-                    key={g.id} onClick={() => select(g.id)} type="button">حرف {n + 1}</button>
-                ))}
-              </div>
-              <button className={button + " mt-2 w-full"} type="button" onClick={() => {
-                const first = glyphs[0]!;
-                setPhrase(first.sourceText ?? "");
-                setFont(first.font ?? "Amiri");
-                setFontSize(first.size);
-                setInk(first.color);
-                setEditRun(groupId);
-                setMode("words");
-              }}><RotateCcw className="h-4 w-4" />إعادة تشكيل الكلمة بهذا الخط أو بخط آخر</button>
-            </div>
-          ))}
-          <h3 className="font-semibold">العناصر المستقلة</h3>
-          <select className={field} value={selectedId ?? ""} onChange={(e) => select(e.target.value || null)}>
-            <option value="">اختر حرفا أو حركة أو زخرفة</option>
-            {items.map((item, i) => <option value={item.id} key={item.id}>
-              {i + 1}. {item.kind === "outline" ? "حرف فيكتور" : item.kind === "haraka" ? "حركة تشكيل" : item.kind === "ornament" ? "زخرفة" : "نص"}
-            </option>)}
-          </select>
+              {expanded&&<div className="space-y-2 border-t border-border p-2">
+                <div className="grid grid-cols-3 gap-1">
+                  {shown.map((g,n)=><button type="button" key={g.id} aria-pressed={selectedId===g.id} title={layerKind(g)} onClick={()=>select(g.id)} className={`flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-md border px-1 text-[11px] ${selectedId===g.id?"border-primary bg-primary/10":"border-border"}`}>
+                    {g.hidden&&<EyeOff className="h-3 w-3 shrink-0"/>}<span className="truncate">{layerKind(g)} {n+1}</span>
+                  </button>)}
+                </div>
+                <button className={button+" w-full"} type="button" onClick={()=>{
+                  setPhrase(first.sourceText??"");setFont(first.font??"Amiri");setFontSize(first.size);setInk(first.color);setEditRun(groupId);setMode("words");
+                }}><RotateCcw className="h-4 w-4"/>إعادة تشكيل الكلمة</button>
+                {containsSelection&&<button type="button" className={button+" w-full"} onClick={()=>setWorkspaceSection("edit")}>تحرير العنصر المحدد</button>}
+              </div>}
+            </div>;
+          })}
+          <div className="flex items-center justify-between"><h3 className="text-xs font-semibold">العناصر المستقلة</h3><span className="text-xs text-muted-foreground">{independent.length}</span></div>
+          {independent.length===0&&<p className="text-xs text-muted-foreground">لا توجد عناصر مستقلة مطابقة.</p>}
+          <div className="space-y-1">
+            {independent.map(item=><button type="button" key={item.id} aria-pressed={selectedId===item.id} onClick={()=>select(item.id)} className={`flex min-h-10 w-full items-center gap-2 rounded-lg border px-2 text-start text-xs ${selectedId===item.id?"border-primary bg-primary/10":"border-border"}`}>
+              {item.hidden?<EyeOff className="h-4 w-4 shrink-0"/>:<Shapes className="h-4 w-4 shrink-0" aria-hidden="true"/>}
+              <span className="min-w-0 flex-1 truncate">{item.text||item.sourceText||layerKind(item)}</span><span className="text-[10px] text-muted-foreground">{layerKind(item)}</span>
+            </button>)}
+          </div>
+          {selected&&!selected.groupId&&<button type="button" className={button+" w-full"} onClick={()=>setWorkspaceSection("edit")}>تحرير العنصر المحدد</button>}
         </section>
       )}
 
