@@ -98,3 +98,53 @@ export function measureOpticalGaps(items:LetteringItem[]):OpticalGap[]{
   }
   return results;
 }
+
+
+export interface OpticalArrangement {
+  patches:{id:string;patch:{x:number}}[];
+  beforeSpread:number;
+  afterSpread:number;
+  appliedStrength:number;
+}
+
+/** Equalize median sampled gaps by horizontal translation only. Preserve
+ * both outer glyphs, RTL anchor order and the existing outline envelope.
+ * Limit movement so sampled negative clearances do not worsen and positive
+ * clearances do not become negative. This is not a collision proof.
+ */
+export function suggestOpticalArrangement(items:LetteringItem[],strength=1):OpticalArrangement|null{
+  const glyphs=items.filter(g=>!g.hidden&&(g.kind==="outline"||g.kind==="text")).sort((a,b)=>b.x-a.x);
+  if(glyphs.length<3||glyphs.length>80||!Number.isFinite(strength)||strength<=0)return null;
+  const gaps=measureOpticalGaps(glyphs);
+  if(gaps.length!==glyphs.length-1)return null;
+  const bounds=glyphs.map(preciseGlyphBounds);
+  if(bounds.some(b=>!b||b.width<=0))return null;
+  const left=Math.min(...bounds.map(b=>b!.x));
+  const right=Math.max(...bounds.map(b=>b!.x+b!.width));
+  const mean=gaps.reduce((sum,g)=>sum+g.median,0)/gaps.length;
+  const spread=(values:number[])=>Math.max(...values)-Math.min(...values);
+  const beforeSpread=spread(gaps.map(g=>g.median));
+  if(beforeSpread<0.01)return null;
+  const offsets=[0];
+  for(const gap of gaps)offsets.push(offsets.at(-1)!+gap.median-mean);
+  offsets[offsets.length-1]=0;
+  let alpha=Math.min(1,strength);
+  for(let i=0;i<glyphs.length;i++){
+    const b=bounds[i]!,d=offsets[i]!;
+    if(d>0)alpha=Math.min(alpha,(right-b.x-b.width)/d);
+    if(d<0)alpha=Math.min(alpha,(b.x-left)/-d);
+    if(i===glyphs.length-1)continue;
+    const change=d-offsets[i+1]!;
+    if(change<0){
+      alpha=Math.min(alpha,Math.max(0,gaps[i]!.minimum)/-change);
+      alpha=Math.min(alpha,Math.max(0,glyphs[i]!.x-glyphs[i+1]!.x)/-change);
+    }
+  }
+  if(!Number.isFinite(alpha)||alpha<=0.0001)return null;
+  const patches=glyphs.slice(1,-1).map((g,i)=>({id:g.id,patch:{x:g.x+alpha*offsets[i+1]!}}))
+    .filter(p=>Math.abs(p.patch.x-glyphs.find(g=>g.id===p.id)!.x)>1e-8);
+  if(!patches.length)return null;
+  const afterSpread=spread(gaps.map((g,i)=>g.median+alpha*(offsets[i]!-offsets[i+1]!)));
+  if(afterSpread>=beforeSpread-1e-6)return null;
+  return {patches,beforeSpread,afterSpread,appliedStrength:alpha};
+}
