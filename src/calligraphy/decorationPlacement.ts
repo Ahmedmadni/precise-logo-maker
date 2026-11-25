@@ -70,3 +70,38 @@ export function suggestDecorationPositions(items:LetteringItem[],id:string,board
   for(const p of options){if(distinct.every(q=>Math.hypot(q.x-p.x,q.y-p.y)>=Math.max(3,target.size*.2)))distinct.push(p);if(distinct.length===6)break;}
   return distinct.length?{ok:true,options:distinct}:{ok:false,reason:"space"};
 }
+
+
+export type DecorationBatchScope="owner"|"all";
+export type DecorationBatchResult={ok:true;items:LetteringItem[];count:number;moved:number}|{ok:false;reason:"selection"|"unsupported"|"space";failedId?:string};
+
+/** Explicit opt-in group layout. Reserve each chosen position before placing
+ * the next mark, and never return a partly moved document on failure.
+ * Shadda precedes other above-base marks; this is a geometric helper,
+ * not a linguistic or calligraphic validation system. */
+export function arrangeDecorations(items:LetteringItem[],selectedId:string,board:{width:number;height:number},scope:DecorationBatchScope,includeManual:boolean,clearance=4,extra:Bounds[]=[]):DecorationBatchResult{
+  const selected=items.find(i=>i.id===selectedId&&!i.hidden);
+  if(!selected||(selected.kind!=="haraka"&&selected.kind!=="ornament")||(scope!=="owner"&&scope!=="all"))return {ok:false,reason:"selection"};
+  if(scope==="owner"&&!selected.attachedToGlyphId)return {ok:false,reason:"selection"};
+  const targets=items.filter(i=>!i.hidden&&(i.kind==="haraka"||i.kind==="ornament")&&(scope==="all"||i.kind==="haraka"&&i.attachedToGlyphId===selected.attachedToGlyphId)&&(includeManual||i.kind!=="haraka"||i.anchorMode!=="manual"));
+  if(targets.length<2)return {ok:false,reason:"selection"};
+  if(targets.length>24||items.length>300||new Set(items.map(i=>i.id)).size!==items.length)return {ok:false,reason:"unsupported"};
+  const ids=new Set(targets.map(i=>i.id));
+  const fixed=items.filter(i=>!ids.has(i.id));
+  const ordered=[...targets].sort((a,b)=>Number(b.kind==="haraka"&&!!b.attachedToGlyphId)-Number(a.kind==="haraka"&&!!a.attachedToGlyphId)
+    ||Number(b.mark==="shadda")-Number(a.mark==="shadda")
+    ||(a.stackOrder??0)-(b.stackOrder??0)||b.size-a.size||a.id.localeCompare(b.id));
+  const placed=new Map<string,LetteringItem>();
+  let moved=0;
+  for(const target of ordered){
+    const working=[...fixed,...placed.values(),target];
+    const result=suggestDecorationPositions(working,target.id,board,clearance,extra);
+    if(!result.ok)return {ok:false,reason:result.reason,failedId:target.id};
+    const best=result.options[0]!;
+    const changed=Math.abs(target.x-best.x)>1e-7||Math.abs(target.y-best.y)>1e-7;
+    if(changed)moved++;
+    placed.set(target.id,{...target,x:best.x,y:best.y,...(target.kind==="haraka"?{anchorMode:"manual" as const}:{})});
+  }
+  const output=items.map(i=>placed.get(i.id)??i);
+  return {ok:true,items:output,count:targets.length,moved};
+}
