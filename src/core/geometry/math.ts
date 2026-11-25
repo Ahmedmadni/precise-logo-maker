@@ -118,7 +118,8 @@ export const closestPointOnGeometry = (g: Geometry, p: Point): Point => {
     case "path": {
       let best: Point = g.points[0] ?? p;
       let bestD = Infinity;
-      for (const [a, b] of sampledPathSegments(g)) {
+      const edges=[...sampledPathSegments(g),...(g.closed?(g.holes??[]).flatMap(r=>pathSegments(r,true)):[])];
+      for (const [a, b] of edges) {
         const q = closestPointOnSegment(a, b, p);
         const d = dist(q, p);
         if (d < bestD) {
@@ -162,6 +163,7 @@ export const geometryBounds = (g: Geometry): Bounds => {
     case "path": {
       // The cubic control hull conservatively encloses every curve.
       let b = g.points.reduce<Bounds>(expandBounds, emptyBounds());
+      for(const ring of g.holes??[])for(const p of ring)b=expandBounds(b,p);
       for (const c of g.cubicSegments ?? []) if (c) {
         b = expandBounds(expandBounds(b, c.control1), c.control2);
       }
