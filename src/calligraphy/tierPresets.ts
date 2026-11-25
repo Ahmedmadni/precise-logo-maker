@@ -12,8 +12,8 @@ function optionsOf(value:unknown):TierOptions|null{
   if(!value||typeof value!=="object")return null;
   const v=value as Record<string,unknown>;
   const finite=(n:unknown,min:number,max:number):n is number=>typeof n==="number"&&Number.isFinite(n)&&n>=min&&n<=max;
-  if(!finite(v.rows,2,6)||!Number.isInteger(v.rows)||!finite(v.horizontalGap,0,100)||!finite(v.verticalGap,-50,100)||!finite(v.stagger,-100,100)||(v.style!=="balanced"&&v.style!=="pyramid"&&v.style!=="cascade"))return null;
-  return {rows:v.rows,style:v.style,horizontalGap:v.horizontalGap,verticalGap:v.verticalGap,stagger:v.stagger};
+  if(!finite(v["rows"],2,6)||!Number.isInteger(v["rows"])||!finite(v["horizontalGap"],0,100)||!finite(v["verticalGap"],-50,100)||!finite(v["stagger"],-100,100)||(v["style"]!=="balanced"&&v["style"]!=="pyramid"&&v["style"]!=="cascade"))return null;
+  return {rows:v["rows"],style:v["style"],horizontalGap:v["horizontalGap"],verticalGap:v["verticalGap"],stagger:v["stagger"]};
 }
 export function decodeTierPresets(raw:string):TierPreset[]{
   if(raw.length>50000)return [];
