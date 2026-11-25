@@ -38,13 +38,16 @@ export const geometryToRing = (g: Geometry): Point[] => {
 const toPolygon = (g: Geometry): Geom | null => {
   // An open path or a line has no unambiguous filled area.
   if(g.kind==="line"||(g.kind==="path"&&!g.closed))return null;
-  const ring = geometryToRing(g);
-  if (ring.length < 3 || ring.length>50000 || ring.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))) return null;
-  const coords = ring.map((p) => [p.x, p.y] as [number, number]);
-  const first = coords[0]!;
-  const last = coords[coords.length - 1]!;
-  if (first[0] !== last[0] || first[1] !== last[1]) coords.push(first);
-  return [[coords]];
+  const rings=[geometryToRing(g),...(g.kind==="path"?g.holes??[]:[])];
+  if(rings.length>1000||rings.reduce((sum,r)=>sum+r.length,0)>50000)return null;
+  if(rings.some(r=>r.length<3||r.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))return null;
+  const coords=rings.map(ring=>{
+    const points=ring.map(p=>[p.x,p.y] as [number,number]);
+    const first=points[0]!,last=points[points.length-1]!;
+    if(first[0]!==last[0]||first[1]!==last[1])points.push(first);
+    return points;
+  });
+  return [coords];
 };
 
 const RUNNERS = { union, subtract: difference, intersect: intersection, exclude: xor } as const;
@@ -53,8 +56,7 @@ export type BooleanResult =
   | {ok:true;parts:PathGeometry[]}
   | {ok:false;reason:"selection"|"invalid"|"holes"|"empty"|"complexity"};
 
-/** Never return a partially computed result. Compound holes cannot yet be
- * represented by independent PathGeometry objects without filling the holes. */
+/** Each resulting polygon keeps its inner rings in one compound path. */
 export function booleanGeometryChecked(shapes:Geometry[],op:BooleanOp):BooleanResult{
   if(shapes.length<2)return {ok:false,reason:"selection"};
   if(shapes.length>100)return {ok:false,reason:"complexity"};
@@ -65,12 +67,12 @@ export function booleanGeometryChecked(shapes:Geometry[],op:BooleanOp):BooleanRe
   try{
     const result=RUNNERS[op](head,...rest);
     if(!result.length)return {ok:false,reason:"empty"};
-    if(result.some(poly=>poly.length>1))return {ok:false,reason:"holes"};
     const out:PathGeometry[]=[];
     for(const poly of result){
-      const points=poly[0]?.slice(0,-1).map(([x,y])=>({x,y}))??[];
-      if(points.length<3||points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return {ok:false,reason:"invalid"};
-      out.push({kind:"path",points,closed:true});
+      const rings=poly.map(r=>r.slice(0,-1).map(([x,y])=>({x,y})));
+      const [points,...holes]=rings;
+      if(!points||rings.some(r=>r.length<3||r.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))))return {ok:false,reason:"invalid"};
+      out.push({kind:"path",points,closed:true,...(holes.length?{holes}:{})});
     }
     return {ok:true,parts:out};
   }catch{return {ok:false,reason:"complexity"};}
