@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath } from "./freePathLayout";
+import { DEFAULT_GUIDE, sampleGuide, splitGuideSegment, moveGuidePoint, validGuide, composeFreePath, composeWordGroupsOnPath } from "./freePathLayout";
 import type { LetteringItem } from "./model";
 const glyph=(id:string,x:number,glyphIndex:number):LetteringItem=>({id,kind:"outline",x,y:100,size:100,rotation:0,color:"#111111",unitsPerEm:1000,pathData:"M 0 0 L 300 0 L 300 100 L 0 100 Z",glyphIndex});
 const straight=[{x:90,y:50},{x:65,y:50},{x:35,y:50},{x:10,y:50}];
@@ -38,5 +38,23 @@ describe("free path guides",()=>{
     expect(patches[0]!.patch.x!).toBeGreaterThan(patches[1]!.patch.x!);
     expect(patches[0]!.patch.rotation).toBeCloseTo(0);
     expect(items[0]!.x).toBe(0);
+  });
+});
+
+
+describe("intact word composition",()=>{
+  it("moves each word rigidly in explicit selection order",()=>{
+    const items=[{...glyph("a",100,0),groupId:"first"},{...glyph("b",130,1),groupId:"first",rotation:15},{...glyph("c",0,0),groupId:"second"}];
+    const patches=composeWordGroupsOnPath(items,["first","second"],straight,{scale:1,margin:0,reverse:false,tangent:true,upright:true});
+    expect(patches).toHaveLength(3);
+    const a=patches.find(p=>p.id==="a")!.patch,b=patches.find(p=>p.id==="b")!.patch;
+    expect(b.x!-a.x!).toBeCloseTo(30);
+    expect(b.y!-a.y!).toBeCloseTo(0);
+    expect(b.rotation).toBeUndefined();
+    expect(a.x!).toBeGreaterThan(patches.find(p=>p.id==="c")!.patch.x!);
+  });
+  it("requires two distinct valid groups",()=>{
+    const items=[{...glyph("a",100,0),groupId:"first"}];
+    expect(composeWordGroupsOnPath(items,["first","first"],straight,{scale:1,margin:0,reverse:false,tangent:false,upright:true})).toEqual([]);
   });
 });
