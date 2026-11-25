@@ -203,7 +203,7 @@ export interface StudioState {
   duplicateLettering: (id: string) => void;
   reorderLettering: (id: string, direction: -1 | 1) => void;
   updateLettering: (id: string, patch: Partial<LetteringItem>) => void;
-  updateLetteringMany: (entries: { id: string; patch: Partial<LetteringItem> }[], label: string) => void;
+  updateLetteringMany: (entries: { id: string; patch: Partial<LetteringItem> }[], label: string, preserveMarkPositions?: boolean) => void;
   moveLettering: (id: string, dx: number, dy: number) => void;
   deleteLettering: (id: string) => void;
   /** Creates a separate flattened compound outline; the three source layers remain recoverable. */
@@ -575,7 +575,7 @@ export const useStudio = create<StudioState>()((set, get) => {
         lettering: relayoutHarakat(doc.lettering ?? [], (doc.lettering ?? []).map((item) => item.id === id ? { ...item, ...patch, id: item.id, kind: item.kind,
           ...(item.kind === "haraka" && (patch.x !== undefined || patch.y !== undefined) && patch.anchorMode === undefined ? { anchorMode: "manual" as const } : {}) } : item)),
       })),
-    updateLetteringMany: (entries, label) => {
+    updateLetteringMany: (entries, label, preserveMarkPositions) => {
       const patches = new Map(entries.map(({ id, patch }) => [id, patch]));
       if (!patches.size || !(get().doc.lettering ?? []).some(item => patches.has(item.id))) return;
       commit(label, (doc) => {
@@ -585,7 +585,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           if (!patch) return item;
           return { ...item, ...patch, id: item.id, kind: item.kind,
             ...(item.kind === "haraka" && (patch.x !== undefined || patch.y !== undefined) && patch.anchorMode === undefined ? { anchorMode: "manual" as const } : {}) };
-        })) };
+        }), preserveMarkPositions ? new Set(entries.filter(({patch}) => patch.anchorMode !== undefined && patch.x !== undefined && patch.y !== undefined).map(({id}) => id)) : undefined) };
       });
     },
     moveLettering: (id, dx, dy) => {
