@@ -13,6 +13,8 @@ export function SplitShapePanel({object}:{object:VectorObject}){
   const [preview,setPreview]=useState<{source:VectorObject;axis:SplitAxis|"angle";percent:number;degrees:number;result:SplitResult}|null>(null);
   const [notice,setNotice]=useState("");
   const apply=useStudio(s=>s.splitSelectedShape);
+  const knife=useStudio(s=>s.knifeTargetId);
+  const setKnife=useStudio(s=>s.setKnifeTargetId);
   const eligible=(object.geometry.kind==="circle"||(object.geometry.kind==="path"&&object.geometry.closed))&&!object.locked&&object.visible&&!object.guide&&object.cellKey===undefined;
   const current=preview?.source===object&&preview.axis===axis&&preview.percent===percent&&preview.degrees===degrees?preview.result:null;
   const b=geometryBounds(object.geometry),pad=Math.max(2,(b.maxX-b.minX)*.08,(b.maxY-b.minY)*.08);
@@ -23,6 +25,8 @@ export function SplitShapePanel({object}:{object:VectorObject}){
   return <details className="rounded-lg border border-border p-2">
     <summary className="cursor-pointer py-2 text-xs font-semibold">تقسيم الشكل</summary>
     <div className="space-y-2">
+      <button type="button" aria-pressed={knife===object.id} onClick={()=>{setPreview(null);setKnife(knife===object.id?null:object.id);}} className="min-h-11 w-full rounded-lg border border-primary text-xs font-semibold">{knife===object.id?"إلغاء أداة السكين":"أداة السكين — ارسم خط القص على اللوحة"}</button>
+      {knife===object.id&&<p className="text-xs text-muted-foreground">أغلق لوحة الخصائص على الهاتف، ثم اسحب خطًا عبر الشكل المحدد.</p>}
       <div className="grid grid-cols-3 gap-1">{([{id:"x",label:"رأسي"},{id:"y",label:"أفقي"},{id:"angle",label:"مائل"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-11 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setAxis(v.id);setPreview(null);setNotice("");}}>{v.label}</button>)}</div>
       {axis==="angle"&&<label className="block text-xs">زاوية القص من الرأسي <span dir="ltr">{angle}°</span><input type="range" min={-90} max={90} step={1} value={angle} className="min-h-11 w-full" onChange={e=>{setAngle(Number(e.target.value));setPreview(null);setNotice("");}}/></label>}
       <label className="block text-xs">موضع القص من الحد الأدنى <span dir="ltr">{percent}%</span><input className="min-h-11 w-full" type="range" min={5} max={95} step={1} value={percent} onChange={e=>{setPercent(Number(e.target.value));setPreview(null);setNotice("");}}/></label>
