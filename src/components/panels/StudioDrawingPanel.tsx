@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_BRUSH, brushIsValid, type BrushSettings } from "../../core/tracing/vectorBrush";
+import { DEFAULT_BRUSH, brushIsValid, brushPressureWidth, type BrushSettings } from "../../core/tracing/vectorBrush";
 import { Circle, Compass, Grid3X3, Hand, Minus, MousePointer2, Paintbrush, PenLine, Ruler, Shapes, Spline, SlidersHorizontal, Gauge, BookOpen, Check } from "lucide-react";
 import type { ToolId } from "../../store/studioStore";
 import { useStudio } from "../../store/studioStore";
@@ -97,7 +97,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
                 { label: "قلم دائري", preset: "round", size: 6, angle: 0, smoothing: 0.3, endStyle: "soft" },
               ] as const).map(({ label, ...settings }) => (
                 <button key={label} type="button" className="min-h-11 rounded-lg border border-border bg-background px-2 text-xs hover:border-primary"
-                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
+                  onClick={() => setBrush({ ...DEFAULT_BRUSH, pressureCurve:"linear", pressureFloor:.3, nibRatio:.18, ...settings, color:brush.color })}>{label}</button>
               ))}
             </div>
           </div>
@@ -107,7 +107,7 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
               <input aria-label="اسم القلم" placeholder="اسم القلم الجديد" maxLength={40} value={penName} onChange={(e) => setPenName(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-xs" />
               <button type="button" disabled={!penName.trim() || pens.length >= 30} className="min-h-11 w-full rounded-lg border border-border text-xs disabled:opacity-40" onClick={() => { if(pens.some(p=>p.name===penName.trim())){setPenMessage("الاسم مستخدم بالفعل");return;} if(persistPens([...pens, { name: penName.trim(), settings: { ...brush } }]))setPenName(""); }}>حفظ إعدادات القلم الحالي</button>
               {pens.map((pen, i) => <div key={i} className="flex items-center gap-2">
-                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
+                <button type="button" className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-border px-2 text-xs" onClick={() => setBrush({ ...pen.settings, pressureCurve: pen.settings.pressureCurve ?? "linear", pressureFloor:pen.settings.pressureFloor??.3, nibRatio: pen.settings.nibRatio ?? 0.18, endStyle: pen.settings.endStyle ?? "flat" })}>{pen.name}</button>
                 <button type="button" aria-label={"حذف " + pen.name} className="min-h-11 rounded-lg border border-border px-2 text-xs" onClick={() => persistPens(pens.filter((_, index) => index !== i))}>حذف</button>
               </div>)}
               <p role="status" className="text-[11px] text-muted-foreground">{penMessage}</p>
@@ -196,6 +196,16 @@ export function StudioDrawingPanel({ onChoose }: { onChoose?: (() => void) | und
             <input type="checkbox" checked={brush.pressure}
               onChange={(e) => setBrush({ pressure: e.target.checked })} className="h-5 w-5" />
           </label>
+          {brush.pressure&&<div className="space-y-2 rounded-lg border border-border bg-background p-2">
+            <label className="block space-y-1 text-xs"><span className="flex justify-between"><span>الحد الأدنى النسبي للسماكة</span><span dir="ltr">{Math.round((brush.pressureFloor??.3)*100)}%</span></span>
+              <input className="min-h-10 w-full accent-[var(--color-primary)]" type="range" min={5} max={100} step={5} value={Math.round((brush.pressureFloor??.3)*100)} onChange={e=>setBrush({pressureFloor:Number(e.target.value)/100})}/>
+            </label>
+            <svg viewBox="0 0 160 90" role="img" aria-label="منحنى الضغط وعرض الضربة" className="block h-24 w-full text-foreground">
+              <path d="M12 6 V78 H150" fill="none" stroke="currentColor" strokeOpacity=".3"/>
+              <path d={Array.from({length:21},(_,i)=>`${i===0?"M":"L"} ${12+i*6.9} ${78-brushPressureWidth(i/20,brush)*72}`).join(" ")} stroke="currentColor" strokeWidth="2" fill="none"/>
+            </svg>
+            <p className="text-[11px] text-muted-foreground">المحور الأفقي ضغط القلم، والرأسي نسبة عرض الضربة قبل تأثير سن القصبة والأطراف. القيمة 100% تعني عرضًا ثابتًا.</p>
+          </div>}
           {brush.pressure && <label className="block space-y-1 text-xs">استجابة الضغط
             <select className="min-h-11 w-full rounded-lg border border-border bg-background px-2" value={brush.pressureCurve ?? "linear"} onChange={(e) => setBrush({ pressureCurve: e.target.value as "soft" | "linear" | "firm" })}>
               <option value="soft">ناعمة</option><option value="linear">متوازنة</option><option value="firm">قوية</option>
