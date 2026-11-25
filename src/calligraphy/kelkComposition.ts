@@ -11,6 +11,8 @@ export interface OrbitLayoutOptions {
   startAngle?: number;
   clockwise?: boolean;
   tangent?: boolean;
+  equalArc?: boolean;
+  keepUpright?: boolean;
 }
 export type KashidaStyle = "flat" | "arch" | "wave";
 
@@ -130,11 +132,19 @@ export function composeWordLayout(
     const rx=radius*Math.max(1,ratio), ry=radius*Math.max(1,1/ratio);
     const direction=orbit.clockwise?1:-1;
     const start=bounded(orbit.startAngle,-90,-180,180)*Math.PI/180;
+    const angles = style==="ellipse" && orbit.equalArc!==false
+      ? equalArcAngles(rx,ry,ordered.length,start,direction)
+      : ordered.map((_,i)=>start+direction*i*2*Math.PI/ordered.length);
+    if(angles.length!==ordered.length)return [];
     return ordered.map((g,i)=>{
-      const theta = start+direction*i*2*Math.PI/ordered.length;
+      const theta = angles[i]!;
       const px=style==="vertical"?cx:cx+rx*Math.cos(theta);
       const py=style==="vertical"?cy+(i-(ordered.length-1)/2)*separation:cy+ry*Math.sin(theta);
-      const rotation=style!=="vertical"&&orbit.tangent ? round(Math.atan2(ry*Math.cos(theta),-rx*Math.sin(theta))*180/Math.PI) : 0;
+      let rotation=style!=="vertical"&&orbit.tangent ? round(Math.atan2(ry*Math.cos(theta),-rx*Math.sin(theta))*180/Math.PI) : 0;
+      if(orbit.keepUpright && orbit.tangent){
+        if(rotation>90)rotation-=180;
+        else if(rotation< -90)rotation+=180;
+      }
       const b=preciseGlyphBounds({...g,x:0,y:0,rotation});
       const local=b?{x:b.x+b.width/2,y:b.y+b.height/2}:metrics[i]!;
       return {id:g.id,patch:{x:round(px-local.x),y:round(py-local.y),rotation}};
@@ -334,4 +344,31 @@ export function arrangeWordBounds(items: LetteringItem[]): LetteringPatchEntry[]
   }
   return positioned.slice(1,-1).filter(b=>Math.abs(b.x-b.g.x)>0.005)
     .map(b=>({id:b.g.id,patch:{x:b.x}}));
+}
+
+
+/** Approximate equal arclength positions with a bounded chord-length table.
+ * The first angle is exact; the endpoint is excluded on closed paths.
+ */
+export function equalArcAngles(rx:number,ry:number,count:number,start:number,direction:1|-1):number[]{
+  if(![rx,ry,start].every(Number.isFinite)||rx<=0||ry<=0||
+    !Number.isInteger(count)||count<1||count>1000)return [];
+  const steps=2048, step=direction*2*Math.PI/steps;
+  const cumulative=[0];
+  let x=rx*Math.cos(start),y=ry*Math.sin(start);
+  for(let i=1;i<=steps;i++){
+    const a=start+i*step,nx=rx*Math.cos(a),ny=ry*Math.sin(a);
+    cumulative.push(cumulative[i-1]!+Math.hypot(nx-x,ny-y));
+    x=nx;y=ny;
+  }
+  const total=cumulative[steps]!;
+  if(!Number.isFinite(total)||total<=0)return [];
+  let j=1;
+  return Array.from({length:count},(_,i)=>{
+    const distance=total*i/count;
+    while(j<steps&&cumulative[j]!<distance)j++;
+    const span=cumulative[j]!-cumulative[j-1]!;
+    const fraction=span>0?(distance-cumulative[j-1]!)/span:0;
+    return start+(j-1+fraction)*step;
+  });
 }
