@@ -146,7 +146,7 @@ export interface HistoryEntry {
 }
 
 /** Ephemeral editor workspace; deliberately excluded from .logo serialization. */
-export type GlyphInspectorTab = "basic" | "paths" | "joins" | "alternates";
+export type GlyphInspectorTab = "basic" | "paths" | "joins" | "composition" | "alternates";
 
 export interface StudioState {
   doc: DocumentState;
