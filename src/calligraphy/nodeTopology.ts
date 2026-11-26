@@ -97,23 +97,43 @@ export function insertOutlineAnchor(d: string, selectedNodeId: number, t = 0.5):
 
 /** Numerically verify a prospective Q/Q or C/C merge at matching parameters.
  * The original pair is evaluated over [0,split] and [split,1]. Endpoint
- * tangents give candidate handles, then sampled maximum displacement guards
- * against distorted Arabic calligraphy; untouched contours remain byte-stable.
+ * tangents give candidate handles, then a conservative Bézier control-hull bound guards
+ * against distorted Arabic calligraphy; other contours are not intentionally moved.
  */
 const separation = (a: {x:number;y:number}, b: {x:number;y:number}) =>
   Math.hypot(a.x-b.x, a.y-b.y);
-function curvePosition(start: {x:number;y:number}, seg: OutlineSegments[number], t: number) {
-  if (seg.cmd === "L") return lerp(start, point(seg.values), t);
-  if (seg.cmd !== "Q" && seg.cmd !== "C") return start;
-  const end = endPoint(seg), u = 1-t;
-  if (seg.cmd === "Q") {
-    const p = point(seg.values);
-    return {x: u*u*start.x+2*u*t*p.x+t*t*end.x,
-      y: u*u*start.y+2*u*t*p.y+t*t*end.y};
+type CurvePoint={x:number;y:number};
+function controlPoints(start:CurvePoint,seg:OutlineSegments[number]):CurvePoint[]{
+  const points=[start];
+  for(let i=0;i<seg.values.length;i+=2)points.push(point(seg.values,i));
+  return points;
+}
+function splitControls(points:CurvePoint[],t:number):[CurvePoint[],CurvePoint[]]{
+  let level=points;
+  const left=[level[0]!],right=[level.at(-1)!];
+  while(level.length>1){
+    level=level.slice(0,-1).map((p,i)=>lerp(p,level[i+1]!,t));
+    left.push(level[0]!);right.push(level.at(-1)!);
   }
-  const p = point(seg.values), q = point(seg.values,2);
-  return {x:u*u*u*start.x+3*u*u*t*p.x+3*u*t*t*q.x+t*t*t*end.x,
-    y:u*u*u*start.y+3*u*u*t*p.y+3*u*t*t*q.y+t*t*t*end.y};
+  return [left,right.reverse()];
+}
+/** The difference of equal-degree Béziers is itself a Bézier. Its control
+ * hull gives a conservative upper bound on displacement at every parameter.
+ * Subdivide only when necessary; uncertain candidates are rejected. */
+export function curveDeviationBound(differences:CurvePoint[],limit:number,depth=0):number{
+  if(!differences.length||!Number.isFinite(limit)||limit<0)return Infinity;
+  const upper=Math.max(...differences.map(p=>Math.hypot(p.x,p.y)));
+  if(!Number.isFinite(upper))return Infinity;
+  if(upper<=limit||depth>=8)return upper;
+  const [left,right]=splitControls(differences,.5);
+  if(Math.max(Math.hypot(left[0]!.x,left[0]!.y),Math.hypot(left.at(-1)!.x,left.at(-1)!.y),Math.hypot(right.at(-1)!.x,right.at(-1)!.y))>limit)return upper;
+  return Math.max(curveDeviationBound(left,limit,depth+1),curveDeviationBound(right,limit,depth+1));
+}
+function mergeDeviation(start:CurvePoint,first:OutlineSegments[number],second:OutlineSegments[number],merged:OutlineSegments[number],split:number,tolerance:number):number{
+  const original=[controlPoints(start,first),controlPoints(endPoint(first),second)];
+  const rounded={...merged,values:merged.values.map(n=>Number(f(n)))};
+  const parts=splitControls(controlPoints(start,rounded),split);
+  return Math.max(...parts.map((part,i)=>curveDeviationBound(part.map((p,j)=>({x:p.x-original[i]![j]!.x,y:p.y-original[i]![j]!.y})),tolerance)));
 }
 function mergeCurves(
   start: {x:number;y:number}, first: OutlineSegments[number],
@@ -132,8 +152,9 @@ function mergeCurves(
   let best: { segment: OutlineSegments[number]; error: number } | null=null;
   // Common de Casteljau subdivisions are recovered exactly at t=.5.
   // Other smooth joins can be approximated if residuals are sufficiently low.
-  for (let i=2;i<=38;i++) {
-    const split=i/40; // 0.05 ... 0.95
+  // Tangent-length ratio recovers arbitrary exact subdivisions, not only grid steps.
+  const splits=[a/(a+b),...Array.from({length:37},(_,i)=>(i+2)/40)].filter(t=>t>=.05&&t<=.95);
+  for (const split of splits) {
     const ctrlStart=point(first.values);
     const ctrlEnd=first.cmd==="C"?point(second.values,2):point(second.values);
     const p1={x:start.x+(ctrlStart.x-start.x)/split,
@@ -145,23 +166,14 @@ function mergeCurves(
       : {cmd:"Q",values:flatten(
         {x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2},end)};
     if (merged.values.some(v=>!finite(v))) continue;
-    let error=0;
-    for (let j=0;j<=16;j++) {
-      const u=j/16;
-      const originalLeft=curvePosition(start,first,u);
-      const newLeft=curvePosition(start,merged,u*split);
-      const originalRight=curvePosition(middle,second,u);
-      const newRight=curvePosition(start,merged,split+(1-split)*u);
-      error=Math.max(error,separation(originalLeft,newLeft),separation(originalRight,newRight));
-      if (error>tolerance && best && error>best.error) break;
-    }
+    const error=mergeDeviation(start,first,second,merged,split,tolerance);
     if (!best || error<best.error) best={segment:merged,error};
   }
   return best && best.error<=tolerance ? best : null;
 }
 
 /** Remove a redundant intermediate anchor only if the resulting outline's
- * maximum measured displacement is within tolerance, in native glyph units.
+ * conservative displacement bound is within tolerance, in native glyph units.
  * Never remove closed seams, line/curve junctions, sharp cusps or contours
  * too small to keep their valid outline topology.
  */
@@ -243,6 +255,8 @@ export function changeOutlineAnchor(d: string, selectedNodeId: number, mode: Nod
   }
   const incomingControlIndex = incoming.cmd === "C" ? 2 : incoming.cmd === "Q" ? 0 : -1;
   if (incomingControlIndex < 0 || (next?.cmd !== "C" && next?.cmd !== "Q")) return null;
+  // A one-segment quadratic closed contour has only one shared handle.
+  if(next===incoming&&incoming.cmd==="Q")return null;
   if (mode === "corner") {
     incoming.values.splice(incomingControlIndex, 2, anchor.x, anchor.y);
     next.values.splice(0, 2, anchor.x, anchor.y);
