@@ -134,37 +134,39 @@ export function editOutlineNode(d: string, nodeId: number, x: number, y: number)
 }
 
 /** Convert a font-outline point into the studio's SVG world coordinates. */
-export function glyphPointToWorld(item: LetteringItem, x: number, y: number): { x: number; y: number } {
-  const units = item.unitsPerEm || 1000, s = item.size / units;
-  const sx = x * s * (item.scaleX ?? 1);
-  const sy = -y * s * (item.scaleY ?? 1);
-  const skewY = Math.tan(Math.max(-60, Math.min(60, item.skewY ?? 0)) * Math.PI / 180);
-  const skewX = Math.tan(Math.max(-60, Math.min(60, item.skewX ?? 0)) * Math.PI / 180);
-  const py = sy + skewY * sx;
-  const px = sx + skewX * py;
-  const angle = item.rotation * Math.PI / 180;
+/** Same finite-value fallbacks and limits as letteringTransform/letteringSvg.
+ * Imported legacy values must not make edit handles disagree with the SVG. */
+function outlineTransformValues(item:LetteringItem){
+  const bounded=(v:number|undefined,fallback:number,min:number,max:number)=>Number.isFinite(v)?Math.max(min,Math.min(max,v!)):fallback;
+  const units=Number.isFinite(item.unitsPerEm)&&(item.unitsPerEm??0)>0?item.unitsPerEm!:1000;
+  const s=bounded(item.size,48,1,1000)/units;
   return {
-    x: item.x + px * Math.cos(angle) - py * Math.sin(angle),
-    y: item.y + px * Math.sin(angle) + py * Math.cos(angle),
+    x:Number.isFinite(item.x)?item.x:0,y:Number.isFinite(item.y)?item.y:0,
+    angle:(Number.isFinite(item.rotation)?item.rotation:0)*Math.PI/180,
+    sx:s*bounded(item.scaleX,1,-20,20),sy:s*bounded(item.scaleY,1,-20,20),
+    skewX:Math.tan(bounded(item.skewX,0,-60,60)*Math.PI/180),
+    skewY:Math.tan(bounded(item.skewY,0,-60,60)*Math.PI/180),
   };
+}
+export function glyphPointToWorld(item: LetteringItem, x: number, y: number): { x: number; y: number } {
+  const t=outlineTransformValues(item);
+  const sx=x*t.sx,sy=-y*t.sy;
+  const py=sy+t.skewY*sx,px=sx+t.skewX*py;
+  return {x:t.x+px*Math.cos(t.angle)-py*Math.sin(t.angle),y:t.y+px*Math.sin(t.angle)+py*Math.cos(t.angle)};
 }
 
 /** Inverse mapping used to drag an anchor/control point accurately. */
 export function worldToGlyphPoint(item: LetteringItem, wx: number, wy: number): { x: number; y: number } | null {
-  const units = item.unitsPerEm || 1000, s = item.size / units;
-  const sx = (item.scaleX ?? 1) * s, sy = (item.scaleY ?? 1) * s;
-  if (!sx || !sy) return null;
-  const angle = -item.rotation * Math.PI / 180;
-  const dx = wx - item.x, dy = wy - item.y;
-  const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
-  const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
-  const skewX = Math.tan(Math.max(-60, Math.min(60, item.skewX ?? 0)) * Math.PI / 180);
-  const skewY = Math.tan(Math.max(-60, Math.min(60, item.skewY ?? 0)) * Math.PI / 180);
-  const originalX = rotatedX - skewX * rotatedY;
-  const originalY = rotatedY - skewY * originalX;
-  return { x: originalX / sx, y: -originalY / sy };
+  const t=outlineTransformValues(item);
+  if(![wx,wy,t.sx,t.sy].every(Number.isFinite)||!t.sx||!t.sy)return null;
+  const dx=wx-t.x,dy=wy-t.y;
+  const rotatedX=dx*Math.cos(t.angle)+dy*Math.sin(t.angle);
+  const rotatedY=-dx*Math.sin(t.angle)+dy*Math.cos(t.angle);
+  const originalX=rotatedX-t.skewX*rotatedY;
+  const originalY=rotatedY-t.skewY*originalX;
+  const result={x:originalX/t.sx,y:-originalY/t.sy};
+  return Number.isFinite(result.x)&&Number.isFinite(result.y)?result:null;
 }
-
 
 /** A contour is one M...Z sequence; other marks and dots are separate. */
 function nodeLocation(segments: NonNullable<ReturnType<typeof parseOutline>>, nodeId: number) {
