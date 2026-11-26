@@ -30,7 +30,7 @@ public class NativeDocumentsPlugin extends Plugin {
         if (filename == null || !filename.matches("[a-zA-Z0-9._-]{1,100}")
                 || mimeType == null || !(mimeType.equals("image/png")
                     || mimeType.equals("image/svg+xml") || mimeType.equals("application/json"))
-                || base64 == null || base64.length() > ((MAX_SAVE_BYTES * 4L / 3L) + 16L)) {
+                || base64 == null || base64.length() > (((("application/json".equals(mimeType) ? MAX_OPEN_BYTES : MAX_SAVE_BYTES) * 4L) / 3L) + 16L)) {
             call.reject("Invalid filename, MIME type or file size");
             return;
         }
@@ -53,6 +53,10 @@ public class NativeDocumentsPlugin extends Plugin {
         }
         try {
             byte[] bytes = Base64.decode(call.getString("base64"), Base64.DEFAULT);
+            if ("application/json".equals(call.getString("mimeType")) && bytes.length > MAX_OPEN_BYTES) {
+                call.reject("Project exceeds 24 MiB reopen limit");
+                return;
+            }
             if (bytes.length > MAX_SAVE_BYTES) {
                 call.reject("File exceeds 32 MiB limit");
                 return;
