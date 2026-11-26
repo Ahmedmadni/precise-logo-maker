@@ -160,6 +160,8 @@ export type GlyphInspectorTab = "basic" | "paths" | "joins" | "composition" | "a
 
 export interface StudioState {
   doc: DocumentState;
+  autosaveStatus: "checking" | "idle" | "pending" | "saved" | "partial" | "failed";
+  restoreAutosave: (doc: DocumentState, label: string) => void;
   past: HistoryEntry[];
   future: HistoryEntry[];
   historyLog: string[];
@@ -399,6 +401,8 @@ export const useStudio = create<StudioState>()((set, get) => {
 
   return {
     doc: initialDoc(),
+    autosaveStatus: "checking",
+    restoreAutosave: (doc,label)=>set({...resetHistoryInteraction(),doc,past:[],future:[],historyLog:[label],tool:"select"}),
     past: [],
     future: [],
     historyLog: ["New document"],
