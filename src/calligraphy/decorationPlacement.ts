@@ -24,7 +24,10 @@ export function decorationBounds(item:LetteringItem,all:LetteringItem[]):Bounds|
   if(item.kind==="outline"){
     if(!item.pathData)return null;
     const b=boundsOf(outlineNodes(item.pathData).map(p=>glyphPointToWorld(item,p.x,p.y)));
-    return b?inflate(b,Math.max(0,item.weight??0)*Math.max(1,Math.abs(item.scaleX??1),Math.abs(item.scaleY??1))*(1+Math.abs(Math.tan((item.skewX??0)*Math.PI/180)))*(1+Math.abs(Math.tan((item.skewY??0)*Math.PI/180)))):null;
+    const bounded=(v:number|undefined,fallback:number,min:number,max:number)=>Number.isFinite(v)?Math.max(min,Math.min(max,v!)):fallback;
+    const scale=Math.max(1,Math.abs(bounded(item.scaleX,1,-20,20)),Math.abs(bounded(item.scaleY,1,-20,20)));
+    const shear=(v:number|undefined)=>1+Math.abs(Math.tan(bounded(v,0,-60,60)*Math.PI/180));
+    return b?inflate(b,bounded(item.weight,0,0,20)*scale*shear(item.skewX)*shear(item.skewY)):null;
   }
   const d=item.kind==="haraka"?(item.markPathData||HARAKAT.find(m=>m.id===item.mark)?.path):ORNAMENTS.find(m=>m.id===item.ornament)?.path;
   if(!d)return null;
