@@ -36,10 +36,10 @@ export function GlyphGroupTransformControls(){
   const beforeOverlaps=useMemo(()=>open&&tab==="spacing"?glyphOverlapCandidates(items,ids):[],[source,ids,open,tab]);
   const afterOverlaps=useMemo(()=>spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[],[spacing,ids]);
   const suggestionKey=JSON.stringify([ids,axis]);
-  const currentSuggestions=suggestions?.source===source&&suggestions.key===suggestionKey?suggestions.result:null;
+  const currentSuggestions=suggestions&&suggestions.source===source&&suggestions.key===suggestionKey?suggestions.result:null;
   const recommended=currentSuggestions?.ok?pickSpacingSuggestion(currentSuggestions.options,budget/100):null;
   const inkKey=JSON.stringify([ids,axis,gap]);
-  const currentInk=ink?.source===source&&ink.key===inkKey?ink:null;
+  const currentInk=ink&&ink.source===source&&ink.key===inkKey?ink:null;
   const shownInk=currentInk?(spacing?.ok?currentInk.after:currentInk.before):null;
   const next=useMemo(()=>groupTab?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(items,ids,{scale:scale/100,degrees}):null):null,[groupTab,tab,spacing,arrangement,allowed,source,ids,scale,degrees]);
   const selected=useMemo(()=>new Set(ids),[ids]);
