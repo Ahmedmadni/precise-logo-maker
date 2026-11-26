@@ -11,12 +11,12 @@ export const LetteringGlyph = memo(function LetteringGlyph({ item, selected, off
   allItems?: LetteringItem[];
 }) {
   if (item.hidden) return null;
-  const size = Math.max(1, Math.min(1000, item.size));
+  const size = Number.isFinite(item.size)?Math.max(1, Math.min(1000, item.size)):48;
   const itemToDraw = offset ? { ...item, x: item.x + offset.x, y: item.y + offset.y } : item;
   const transform = letteringTransform(itemToDraw);
   const mark = item.kind === "haraka" ? HARAKAT.find((m) => m.id === item.mark)
     : item.kind === "ornament" ? ORNAMENTS.find((m) => m.id === item.ornament) : null;
-  const unit = item.unitsPerEm && item.unitsPerEm > 0 ? item.unitsPerEm : 1000;
+  const unit = Number.isFinite(item.unitsPerEm)&&(item.unitsPerEm??0)>0?item.unitsPerEm!:1000;
   const scale = size / unit;
   const weight=Number.isFinite(item.weight)?Math.max(0,Math.min(20,item.weight??0)):0;
   const outline = item.kind === "outline" ? safePath(overridePath ?? item.pathData) : "";
