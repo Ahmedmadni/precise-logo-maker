@@ -2,6 +2,7 @@ import type { FontPreset, LetteringItem } from "./model";
 import type { Font } from "fontkit";
 import { centerLetteringAt, letteringGroupBounds } from "./morph";
 import { Buffer } from "buffer";
+import {createFontCache} from "./fontCache";
 
 /** Bundled OFL fonts — no remote CDN and no request to the Lovable backend. */
 const FONT_URLS: Partial<Record<FontPreset, () => Promise<string>>> = {
@@ -11,23 +12,33 @@ const FONT_URLS: Partial<Record<FontPreset, () => Promise<string>>> = {
   Gulzar: () => import("@fontsource/gulzar/files/gulzar-arabic-400-normal.woff?url").then((m) => m.default),
 };
 
-const rawFont = new Map<string, Promise<Uint8Array>>();
-export async function loadFontBytes(font: FontPreset, custom?: string): Promise<Uint8Array> {
-  const loader = FONT_URLS[font];
-  const source = font === "Custom Thuluth" ? custom : loader ? await loader() : undefined;
-  if (!source) throw new Error("اختر أحد الخطوط المدمجة أو استورد خط ثلث مرخصا أولا.");
-  if (!rawFont.has(source)) {
-    rawFont.set(source, fetch(source).then(async (response) => {
-      if (!response.ok) throw new Error("تعذر تحميل ملف الخط.");
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength < 100 || bytes.byteLength > 3_000_000) throw new Error("حجم ملف الخط غير صالح.");
-      return bytes;
-    }).catch((error: unknown) => {
-      rawFont.delete(source);
-      throw error;
-    }));
-  }
-  return rawFont.get(source)!;
+const rawFont=createFontCache<Uint8Array>(5);
+const parsedFont=createFontCache<Font>(5);
+async function fontSource(font:FontPreset,custom?:string):Promise<string>{
+  const loader=FONT_URLS[font];
+  const source=font==="Custom Thuluth"?custom:loader?await loader():undefined;
+  if(!source)throw new Error("اختر أحد الخطوط المدمجة أو استورد خط ثلث مرخصا أولا.");
+  return source;
+}
+function bytesFor(source:string):Promise<Uint8Array>{
+  return rawFont.get(source,async()=>{
+    const response=await fetch(source);
+    if(!response.ok)throw new Error("تعذر تحميل ملف الخط.");
+    const bytes=new Uint8Array(await response.arrayBuffer());
+    if(bytes.byteLength<100||bytes.byteLength>3_000_000)throw new Error("حجم ملف الخط غير صالح.");
+    return bytes;
+  });
+}
+export async function loadFontBytes(font:FontPreset,custom?:string):Promise<Uint8Array>{
+  return bytesFor(await fontSource(font,custom));
+}
+export async function loadParsedFont(font:FontPreset,custom?:string):Promise<Font>{
+  const source=await fontSource(font,custom);
+  return parsedFont.get(source,async()=>{
+    const [bytes,kit]=await Promise.all([bytesFor(source),import("fontkit")]);
+    const face=kit.create(Buffer.from(bytes));
+    return face;
+  });
 }
 
 export interface ComposeOptions {
@@ -54,10 +65,7 @@ export async function composeArabicOutlines(options: ComposeOptions): Promise<Le
   if (!Number.isFinite(options.size) || options.size < 10 || options.size > 600) {
     throw new Error("حجم الخط يجب أن يكون بين 10 و600.");
   }
-  const bytes = await loadFontBytes(options.font, options.customFontData);
-  // Lazy-load the heavier font parser only when the user creates outlines.
-  const fontkit = await import("fontkit");
-  const font = fontkit.create(Buffer.from(bytes));
+  const font=await loadParsedFont(options.font,options.customFontData);
   return shapeArabicWithFont(font, { ...options, phrase });
 }
 
@@ -187,9 +195,7 @@ export async function listWordAlternates(
   customFontData?: string,
 ): Promise<OpenTypeAlternate[]> {
   if (!source.sourceText || !source.font || source.kind !== "outline" || !currentWord.length) return [];
-  const raw = await loadFontBytes(source.font, customFontData);
-  const kit = await import("fontkit");
-  const font = kit.create(Buffer.from(raw));
+  const font=await loadParsedFont(source.font,customFontData);
   const tags = font.availableFeatures ?? [];
   const currentBounds = letteringGroupBounds(currentWord);
   if (!currentBounds) return [];
