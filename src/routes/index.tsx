@@ -10,6 +10,7 @@ import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { StudioHeader } from "../components/toolbar/StudioHeader";
 import { StudioEmptyGuide } from "../components/canvas/StudioEmptyGuide";
 import { useAutosave } from "../hooks/useAutosave";
+import {useCustomTypeface} from "../hooks/useCustomTypeface";
 import { useServiceWorker } from "../lib/pwa";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 import { useLanguageBootstrap, useT } from "../i18n";
@@ -160,13 +161,6 @@ function CanvasWithShortcuts() {
   useStudioShortcuts();
   useAutosave();
   useServiceWorker();
-  const fontData = useStudio((s) => s.doc.customThuluthFont);
-  useEffect(() => {
-    if (!fontData || typeof FontFace === "undefined") return;
-    let active = true;
-    const face = new FontFace("Custom Thuluth", `url("${fontData}")`);
-    void face.load().then((loaded) => { if (active) document.fonts.add(loaded); }).catch(() => {});
-    return () => { active = false; };
-  }, [fontData]);
+  useCustomTypeface();
   return <StudioCanvas />;
 }
