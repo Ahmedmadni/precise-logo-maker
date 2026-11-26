@@ -200,7 +200,7 @@ export function buildKashidaOutline(options: {
   thickness: number;
   style: KashidaStyle;
 }): string | null {
-  if (![options.length, options.thickness, options.arch].every(Number.isFinite)) return null;
+  if (!["flat","arch","wave"].includes(options.style)||![options.length, options.thickness, options.arch].every(Number.isFinite)) return null;
   const length = Math.max(120, Math.min(2400, options.length));
   const thickness = Math.max(24, Math.min(220, options.thickness));
   const arch = Math.max(-320, Math.min(320, options.arch));
@@ -243,7 +243,7 @@ export function createKashidaItem(
   options: { length: number; arch: number; thickness: number; style: KashidaStyle },
 ): LetteringItem | null {
   const pathData = buildKashidaOutline(options);
-  if (!pathData) return null;
+  if (!pathData||anchor.hidden||(anchor.kind!=="outline"&&anchor.kind!=="text")||![anchor.x,anchor.y,anchor.size,anchor.rotation].every(Number.isFinite)||anchor.size<1||anchor.size>1000) return null;
   return {
     id: `kashida-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     kind: "outline",
@@ -270,7 +270,7 @@ export function createConnectedKashida(
   target: LetteringItem,
   options: { arch: number; thickness: number; style: KashidaStyle; nibAngle?: number; nibContrast?: number },
 ): LetteringItem | null {
-  if (source.hidden || target.hidden || !Number.isFinite(options.arch) ||
+  if (!["flat","arch","wave"].includes(options.style)||source.hidden || target.hidden || ![source.size,target.size].every(n=>Number.isFinite(n)&&n>=1&&n<=1000)||!Number.isFinite(options.arch) ||
       !Number.isFinite(options.thickness) || !Number.isFinite(options.nibAngle ?? 35) ||
       !Number.isFinite(options.nibContrast ?? 0)) return null;
   const item = createRibbonLink(source, target);
@@ -370,5 +370,18 @@ export function equalArcAngles(rx:number,ry:number,count:number,start:number,dir
     const span=cumulative[j]!-cumulative[j-1]!;
     const fraction=span>0?(distance-cumulative[j-1]!)/span:0;
     return start+(j-1+fraction)*step;
+  });
+}
+
+/** Existing visible connection between the same two joining sides, regardless
+ * of which direction the link was originally created. Hidden historical
+ * links do not prevent a new visible connection. */
+export function findExistingKashida(items:LetteringItem[],sourceId:string,targetId:string):LetteringItem|undefined{
+  return items.find(i=>{
+    const r=i.ribbon;
+    return i.kind==="bridge"&&!i.hidden&&!!r&&(
+      r.sourceGlyphId===sourceId&&r.targetGlyphId===targetId&&r.sourceSide==="exit"&&r.targetSide==="entry"||
+      r.sourceGlyphId===targetId&&r.targetGlyphId===sourceId&&r.sourceSide==="entry"&&r.targetSide==="exit"
+    );
   });
 }
