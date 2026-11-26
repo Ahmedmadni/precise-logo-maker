@@ -16,15 +16,17 @@ const TOOL_KEYS: Record<string, ToolId> = {
 
 const isTypingTarget = (el: EventTarget | null): boolean => {
   if (!(el instanceof HTMLElement)) return false;
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable;
+  return !!el.closest("input,textarea,select,button,[contenteditable]:not([contenteditable=false]),[role=slider],[role=spinbutton],[role=combobox]") || el.isContentEditable;
 };
 
 export function useStudioShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
+      if (e.defaultPrevented||e.isComposing||isTypingTarget(e.target)) return;
       const store = useStudio.getState();
       const mod = e.metaKey || e.ctrlKey;
+      const editingNodes=!!store.nodeLassoTargetId||store.editGlyphNodes||store.editGlyphContours||store.editJoinAnchors;
+      const scoped=editingNodes||store.glyphLassoActive||!!store.knifeTargetId;
 
       if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
@@ -33,6 +35,7 @@ export function useStudioShortcuts(): void {
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
+        if(scoped){e.preventDefault();return;}
         if (store.selection.length > 0) {
           e.preventDefault();
           store.deleteSelection();
@@ -50,7 +53,16 @@ export function useStudioShortcuts(): void {
       }
       if (mod && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        store.duplicateSelection();
+        if(!scoped)store.duplicateSelection();
+        return;
+      }
+      if(!mod&&e.key.startsWith("Arrow")&&store.nodeLassoTargetId){
+        e.preventDefault();
+        const selection=store.pathNodeSelection;
+        if(selection?.objectId===store.nodeLassoTargetId&&selection.indices.length){
+          const step=e.shiftKey?10:1;
+          store.moveSelectedPathNodes(selection.objectId,selection.geometry,selection.indices,e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,e.key==="ArrowUp"?-step:e.key==="ArrowDown"?step:0);
+        }
         return;
       }
       if (!mod && e.key.startsWith("Arrow") && store.glyphLassoActive && store.glyphMultiIds.length && store.doc.lettering) {
@@ -59,6 +71,7 @@ export function useStudioShortcuts(): void {
         store.moveGlyphMulti(store.doc.lettering,store.glyphMultiIds,e.key==="ArrowLeft"?-step:e.key==="ArrowRight"?step:0,e.key==="ArrowUp"?-step:e.key==="ArrowDown"?step:0);
         return;
       }
+      if(!mod&&e.key.startsWith("Arrow")&&scoped){e.preventDefault();return;}
       if (!mod && e.key.startsWith("Arrow") && store.selection.length > 0) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
@@ -67,7 +80,7 @@ export function useStudioShortcuts(): void {
         store.translateSelection(dx, dy);
         return;
       }
-      if (mod) return;
+      if (mod||e.altKey) return;
       // Shift+G hides every grid; G selects the cell brush.
       if (e.shiftKey && e.key.toLowerCase() === "g") {
         e.preventDefault();
