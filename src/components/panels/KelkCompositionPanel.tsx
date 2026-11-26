@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { FreePathLayoutPanel } from "./FreePathLayoutPanel";
 import { measureOpticalGaps, suggestOpticalArrangement } from "../../calligraphy/opticalSpacing";
 import { Minimize2, Maximize2, Spline, LayoutGrid, MoveHorizontal, Waypoints } from "lucide-react";
-import { letteringTransform, safePath, safeColor, type LetteringItem } from "../../calligraphy/model";
+import { safeColor, type LetteringItem } from "../../calligraphy/model";
 import { letteringGroupBounds } from "../../calligraphy/morph";
 import { outlineNodes } from "../../calligraphy/pathEditor";
 import { buildRibbonPath } from "../../calligraphy/ribbonJoin";
@@ -16,11 +16,14 @@ import {
   createKashidaItem,
   buildKashidaOutline,
   createConnectedKashida,
+  findExistingKashida,
   type KashidaStyle,
   type KelkLayoutStyle,
 } from "../../calligraphy/kelkComposition";
 import { useStudio } from "../../store/studioStore";
 import { suggestRibbonCapFit } from "../../calligraphy/ribbonCapFit";
+import {analyzeRibbonSafety} from "../../calligraphy/ribbonSafety";
+import {LetteringGlyph} from "../canvas/LetteringGlyph";
 
 const btn = "inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2 text-xs text-foreground hover:bg-accent active:scale-[.98] disabled:opacity-40";
 
@@ -48,6 +51,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const addLettering = useStudio((s) => s.addLettering);
   const commitPreview = useStudio((s) => s.commitLetteringPreview);
   const moveScope = useStudio((s) => s.letteringMoveScope);
+  const allLettering=useStudio(s=>s.doc.lettering);
   const [section,setSection]=useState<"layout"|"spacing"|"paths"|"kashida">("layout");
   const [kashidaStyle, setKashidaStyle] = useState<KashidaStyle>("arch");
   const [kashidaLength, setKashidaLength] = useState(650);
@@ -76,6 +80,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
   const eligibleTargets = siblings.filter(item => item.id !== selected.id && item.kind === "outline" && !item.hidden && !!item.pathData);
   const target = eligibleTargets.find(item => item.id === targetId);
   const [connectionError, setConnectionError] = useState(false);
+  const existingConnection=target?findExistingKashida(allLettering??[],selected.id,target.id):undefined;
   const [autoFitCaps, setAutoFitCaps] = useState(false);
   const [nibAngle, setNibAngle] = useState(35);
   const [nibContrast, setNibContrast] = useState(0);
@@ -85,8 +90,9 @@ export function KelkCompositionPanel({ selected, siblings }: {
     const fit = autoFitCaps ? suggestRibbonCapFit(item, all) : null;
     return { item: fit ? { ...item, ribbon: fit.ribbon } : item, fitted: !!fit };
   };
-  const connection = target ? prepareConnection(selected, target, siblings) : null;
-  const previewGlyphs = target ? [selected, target] : [];
+  const connection = section==="kashida"&&target&&!existingConnection ? prepareConnection(selected, target, siblings) : null;
+  const safety=connection?analyzeRibbonSafety(connection.item,siblings):null;
+  const previewGlyphs = section==="kashida"&&target ? [selected, target] : [];
   const previewPath = connection ? buildRibbonPath(connection.item, previewGlyphs) : null;
   const glyphBounds = letteringGroupBounds(previewGlyphs);
   const previewNodes = previewPath ? outlineNodes(previewPath) : [];
@@ -103,7 +109,7 @@ export function KelkCompositionPanel({ selected, siblings }: {
     const latest = useStudio.getState().doc.lettering ?? [];
     const source = latest.find(item => item.id === selected.id);
     const destination = latest.find(item => item.id === targetId);
-    const prepared = source && destination ? prepareConnection(source, destination, latest) : null;
+    const prepared = source && destination&&!findExistingKashida(latest,source.id,destination.id) ? prepareConnection(source, destination, latest) : null;
     setConnectionError(!prepared);
     if (prepared) addLettering(prepared.item);
   };
@@ -154,7 +160,8 @@ export function KelkCompositionPanel({ selected, siblings }: {
 
   const onInsertKashida = () => {
     commitPreview();
-    const item = createKashidaItem(selected, kashidaOptions);
+    const latest=useStudio.getState().doc.lettering?.find(i=>i.id===selected.id);
+    const item = latest?createKashidaItem(latest, kashidaOptions):null;
     if (item) addLettering(item);
   };
 
@@ -374,17 +381,14 @@ export function KelkCompositionPanel({ selected, siblings }: {
             {previewPath && previewBounds && connection ? <>
               <svg role="img" aria-label="معاينة الحرفين والكشيدة المرتبطة" viewBox={previewBounds} className="block h-32 w-full" preserveAspectRatio="xMidYMid meet">
                 <path d={previewPath} fill={safeColor(connection.item.color)} />
-                {previewGlyphs.map(glyph => {
-                  const scale = glyph.size / (glyph.unitsPerEm || 1000);
-                  return <g key={glyph.id} transform={letteringTransform(glyph)} fill={safeColor(glyph.color)}>
-                    <path d={safePath(glyph.pathData)} transform={`scale(${scale} ${-scale})`} fillRule={glyph.fillRule ?? "nonzero"} stroke={safeColor(glyph.color)} strokeWidth={scale > 0 ? (glyph.weight ?? 0)/scale : 0} strokeLinejoin="round" />
-                  </g>;
-                })}
+                {previewGlyphs.map(glyph=><LetteringGlyph key={glyph.id} item={glyph} selected={false}/>)}
               </svg>
               {autoFitCaps && <p className="text-[11px] text-muted-foreground">{connection.fitted ? "تم اقتراح مطابقة الأطراف." : "لا توجد مطابقة إضافية موثوقة؛ الإعدادات الحالية محفوظة."}</p>}
             </> : <p className="py-2 text-xs text-muted-foreground">لا تتوفر معاينة صالحة. تحقق من نقاط الاتصال.</p>}
           </div>}
-          <button type="button" className={`${btn} w-full`} disabled={!connection || !previewPath} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
+          {existingConnection&&<p role="status" className="text-xs text-muted-foreground">توجد وصلة بين هذين الطرفين بالفعل؛ عدّلها من أدوات الوصلة بدل تكرارها.</p>}
+          {safety?.needsReview&&<p role="status" className="rounded border border-border p-2 text-xs text-muted-foreground">راجع عرض الوصلة وانحناءها؛ رُصدت مؤشرات هندسية لاحتمال التداخل أو انعطاف حاد.</p>}
+          <button type="button" className={`${btn} w-full`} disabled={!connection || !previewPath||!!existingConnection} onClick={insertConnected}>إنشاء وصلة مرتبطة</button>
           {connectionError && <p role="alert" className="text-xs text-destructive">تعذر إنشاء الوصلة. راجع نقطتي الاتصال والمسافة بين الحرفين.</p>}
         </div>}
       </div>
