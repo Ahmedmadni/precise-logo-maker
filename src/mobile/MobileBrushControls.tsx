@@ -21,7 +21,7 @@ export function MobileBrushControls({ panelOpen }: { panelOpen: boolean }) {
   ] as const;
   return (
     <aside aria-label="التحكم السريع بالفرشاة" dir="rtl"
-      className="absolute inset-x-2 bottom-3 z-20 max-h-[min(70dvh,32rem)] overflow-y-auto rounded-2xl border border-primary/30 bg-card/95 p-2 text-foreground shadow-xl backdrop-blur-lg sm:inset-x-auto sm:end-3 sm:w-[min(23rem,calc(100%-1.5rem))] lg:hidden">
+      className="absolute inset-x-2 bottom-3 z-20 max-h-[min(55dvh,calc(100%-1rem),26rem)] overflow-y-auto overscroll-contain touch-pan-y rounded-2xl border border-primary/30 bg-card/95 p-2 text-foreground shadow-xl backdrop-blur-lg sm:inset-x-auto sm:end-3 sm:w-[min(23rem,calc(100%-1.5rem))] [@media(min-width:900px)_and_(orientation:landscape)]:hidden min-[1200px]:hidden">
       <div className="flex min-h-11 items-center gap-1.5">
         <Paintbrush className="mx-1 h-5 w-5 shrink-0 text-primary" aria-hidden />
         <div className="flex min-w-0 flex-1 items-center gap-1">
