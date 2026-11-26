@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CornerDownRight, GitBranchPlus, Minus, Spline, Waypoints } from "lucide-react";
 import type { LetteringItem } from "../../calligraphy/model";
 import {
@@ -16,7 +16,7 @@ export function GlyphNodeTopologyActions({ item, nodeId, compact = false }: {
   const [notice, setNotice] = useState("");
   const [maxError, setMaxError] = useState(0.5);
   const path = item.pathData ?? "";
-  const available = outlineNodeActions(path, nodeId, maxError);
+  const available = useMemo(()=>outlineNodeActions(path,nodeId,maxError),[path,nodeId,maxError]);
   const setNode = useStudio((s) => s.setSelectedGlyphNodeId);
   const update = useStudio((s) => s.updateLettering);
 
@@ -27,6 +27,7 @@ export function GlyphNodeTopologyActions({ item, nodeId, compact = false }: {
     state.commitLetteringPreview();
     const current = useStudio.getState().doc.lettering?.find((glyph) => glyph.id === item.id);
     if (current?.kind !== "outline" || !current.pathData) return;
+    if(current.hidden||current.pathData!==path||useStudio.getState().selectedLetteringId!==item.id){setNotice("تغير المسار أو التحديد؛ اختر العقدة مجددًا.");return;}
     const result = action === "insert"
       ? insertOutlineAnchor(current.pathData, nodeId)
       : action === "remove"
@@ -39,7 +40,7 @@ export function GlyphNodeTopologyActions({ item, nodeId, compact = false }: {
     update(item.id, { pathData: result.path });
     setNode(result.selectedNodeId);
     setNotice(action === "insert" ? "تمت إضافة عقدة دون تغيير المنحنى." :
-      action === "remove" ? "حُذفت العقدة بعد فحص الانحراف الهندسي (حدّ أقصى مرصود " + (result.maxDeviation ?? 0).toFixed(3) + " وحدة)." :
+      action === "remove" ? "حُذفت العقدة بعد فحص الانحراف الهندسي (حدّ أعلى محافظ " + (result.maxDeviation ?? 0).toFixed(3) + " وحدة)." :
         action === "corner" ? "تحولت إلى زاوية حادة." :
           action === "smooth" ? "تم تنعيم اتصال المماسات." :
             "أصبحت المقابض متقابلة ومتساوية الطول.");
@@ -68,7 +69,7 @@ export function GlyphNodeTopologyActions({ item, nodeId, compact = false }: {
       </label>
       {available.remove && available.removeDeviation !== null && (
         <p className="text-[11px] tabular-nums text-muted-foreground">
-          أقصى انحراف مقدّر: {available.removeDeviation.toFixed(3)} وحدة.
+          حدّ الانحراف الأعلى: {available.removeDeviation.toFixed(3)} وحدة.
           الحذف يخضع أيضًا لفحص استمرارية المنحنى.
         </p>
       )}
