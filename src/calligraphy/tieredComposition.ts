@@ -1,5 +1,6 @@
 import type {LetteringItem} from "./model";
 import {preciseGlyphBounds} from "./morph";
+import {decorationBounds} from "./decorationPlacement";
 
 export type TierStyle="balanced"|"pyramid"|"cascade";
 export type TierOptions={rows:number;style:TierStyle;horizontalGap:number;verticalGap:number;stagger:number};
@@ -26,8 +27,18 @@ export function composeGlyphTiers(items:LetteringItem[],ids:readonly string[],op
     const minX=Math.min(...boxes.map(b=>b!.x)),minY=Math.min(...boxes.map(b=>b!.y)),maxX=Math.max(...boxes.map(b=>b!.x+b!.width)),maxY=Math.max(...boxes.map(b=>b!.y+b!.height));
     blocks.push({id,glyphs:members,x:minX,y:minY,width:maxX-minX,height:maxY-minY});
   }
-  // Read original spatial order from right to left; keep each word rigid.
-  blocks.sort((a,b)=>(b.x+b.width/2)-(a.x+a.width/2)||a.y-b.y||a.id.localeCompare(b.id));
+  // Read rows from top to bottom, words from right to left. A shared
+  // center band prevents reapplying a preset from interleaving existing rows.
+  const centerY=(b:Block)=>b.y+b.height/2;
+  const bands:{center:number;minHeight:number;blocks:Block[]}[]=[];
+  for(const block of [...blocks].sort((a,b)=>centerY(a)-centerY(b)||b.x-a.x||a.id.localeCompare(b.id))){
+    const band=bands.at(-1);
+    if(band&&Math.abs(centerY(block)-band.center)<=Math.min(band.minHeight,block.height)*.25+1e-7){
+      band.blocks.push(block);
+      band.minHeight=Math.min(band.minHeight,block.height);
+    }else bands.push({center:centerY(block),minHeight:block.height,blocks:[block]});
+  }
+  blocks.splice(0,blocks.length,...bands.flatMap(b=>b.blocks.sort((a,b)=>(b.x+b.width/2)-(a.x+a.width/2)||a.id.localeCompare(b.id))));
   const cx=(Math.min(...blocks.map(b=>b.x))+Math.max(...blocks.map(b=>b.x+b.width)))/2;
   const cy=(Math.min(...blocks.map(b=>b.y))+Math.max(...blocks.map(b=>b.y+b.height)))/2;
   const counts=Array(rows).fill(1) as number[];
@@ -64,4 +75,16 @@ export function composeGlyphTiers(items:LetteringItem[],ids:readonly string[],op
   });
   if(next.some(i=>!Number.isFinite(i.x)||!Number.isFinite(i.y)))return {ok:false,reason:"invalid"};
   return {ok:true,items:next,blocks:blocks.length,rows,changed:next.some((i,j)=>i!==items[j])};
+}
+
+/** Same artboard-fit gate for preview and store commit. Include attached
+ * visible marks and live connections, not just the selected outline boxes. */
+export function tierSelectionFits(items:LetteringItem[],ids:readonly string[],board:{width:number;height:number}):boolean{
+  if(![board.width,board.height].every(n=>Number.isFinite(n)&&n>0))return false;
+  const selected=new Set(ids);
+  const affected=items.filter(i=>!i.hidden&&(selected.has(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&selected.has(i.attachedToGlyphId)||i.kind==="bridge"&&!!i.ribbon&&selected.has(i.ribbon.sourceGlyphId)&&selected.has(i.ribbon.targetGlyphId)));
+  return affected.length>0&&affected.every(i=>{
+    const b=decorationBounds(i,items);
+    return !!b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX>=-1e-7&&b.minY>=-1e-7&&b.maxX<=board.width+1e-7&&b.maxY<=board.height+1e-7;
+  });
 }
