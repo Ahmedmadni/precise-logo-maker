@@ -29,6 +29,7 @@ import { cleanStroke } from "../../core/tracing/simplify";
 import { appendBrushSamples, brushPressure, buildBrushStroke, type BrushSample } from "../../core/tracing/vectorBrush";
 import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
+import {appendPenPoint} from "../../core/tracing/penTrace";
 import { geometryToPathData } from "../../objects/render";
 import {lassoHits,combineLassoSelection,lassoNodeIndices,combineNodeSelection,type LassoMode} from "../../editor/lassoSelection";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
@@ -159,16 +160,22 @@ export function StudioCanvas() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pen, setPen] = useState<Point[] | null>(null);
   const penActiveRef = useRef(false);
+  const penTraceRef=useRef<Point[]>([]);
+  const penSchedulerRef=useRef<BrushPreviewScheduler<Point>|null>(null);
   const [brushTrail, setBrushTrail] = useState<BrushSample[]>([]);
   const brushTrailRef = useRef<BrushSample[] | null>(null);
   // The full-resolution trace remains in brushTrailRef; only the SVG preview
   // state publishes once per display frame, even on 120/240 Hz pens.
   const brushPreviewSchedulerRef = useRef<BrushPreviewScheduler | null>(null);
   useEffect(() => {
-    const scheduler = createBrushPreviewScheduler((samples) => setBrushTrail(samples));
+    const scheduler = createBrushPreviewScheduler<BrushSample>((samples) => setBrushTrail(samples));
+    const penScheduler=createBrushPreviewScheduler<Point>(setPen);
+    penSchedulerRef.current=penScheduler;
     brushPreviewSchedulerRef.current = scheduler;
     return () => {
       scheduler.dispose();
+      penScheduler.dispose();
+      penSchedulerRef.current=null;
       brushPreviewSchedulerRef.current = null;
     };
   }, []);
@@ -458,6 +465,8 @@ export function StudioCanvas() {
     setHandleDrag(null);
     knifeDrag.current=null;setKnifeLine(null);setKnifeProposal(null);setKnifeNotice("");
     penActiveRef.current = false;
+    penTraceRef.current=[];
+    penSchedulerRef.current?.clear();
     setPen(null);
     brushTrailRef.current = null;
     brushPreviewSchedulerRef.current?.clear();
@@ -600,7 +609,9 @@ export function StudioCanvas() {
 
     if (tool === "pen") {
       penActiveRef.current = true;
-      setPen([magnetise(world)]);
+      penSchedulerRef.current?.clear();
+      penTraceRef.current=[magnetise(world)];
+      setPen([...penTraceRef.current]);
       return;
     }
 
@@ -889,6 +900,20 @@ export function StudioCanvas() {
       return;
     }
 
+    if(penActiveRef.current){
+      const points=penTraceRef.current;
+      const events=[...(e.nativeEvent.getCoalescedEvents?.()??[]),e.nativeEvent];
+      let changed=false;
+      for(const event of events){
+        const raw=toWorld(event.clientX,event.clientY);
+        const last=points.at(-1);
+        if(last&&dist(last,raw)<PEN_SAMPLE_PIXELS/view.zoom)continue;
+        changed=appendPenPoint(points,magnetise(raw,last??null),PEN_SAMPLE_PIXELS/view.zoom)||changed;
+      }
+      if(changed)penSchedulerRef.current?.enqueue(points);
+      return;
+    }
+
     // The cell brush works off raw grid arithmetic — no snapping pass needed.
     if (tool === "cell") {
       setSnap(null);
@@ -911,15 +936,7 @@ export function StudioCanvas() {
     setSnap(tool === "pen" ? null : s);
     setHoverWorld(raw ? world : point);
     setCursor(raw ? world : point);
-    if (penActiveRef.current) {
-      setPen((prev) => {
-        const list = prev ?? [];
-        const last = list[list.length - 1];
-        if (last && dist(last, world) < PEN_SAMPLE_PIXELS / view.zoom) return list;
-        return [...list, magnetise(world, last ?? null)];
-      });
-      return;
-    }
+
     if (handleDrag) {
       const base = doc.objects.find((o) => o.id === handleDrag.objectId);
       if (base) {
@@ -1111,7 +1128,10 @@ export function StudioCanvas() {
     }
     if (penActiveRef.current) {
       penActiveRef.current = false;
-      const stroke = pen ?? [];
+      const stroke=penTraceRef.current;
+      penTraceRef.current=[];
+      penSchedulerRef.current?.clear();
+      if(e)appendPenPoint(stroke,magnetise(toWorld(e.clientX,e.clientY),stroke.at(-1)??null),PEN_SAMPLE_PIXELS/view.zoom,true);
       if (stroke.length >= 2) {
         // Straighten the wobble out of the stroke and promote it to a line or
         // arc when that is what the hand was aiming for.
