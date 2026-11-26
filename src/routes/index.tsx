@@ -8,6 +8,7 @@ import { MobileBrushControls } from "../mobile/MobileBrushControls";
 import { MobileNodeControls } from "../mobile/MobileNodeControls";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
+import { AutosaveStatus } from "../components/panels/AutosaveStatus";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { StudioHeader } from "../components/toolbar/StudioHeader";
@@ -72,6 +73,7 @@ function StudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeader />
+      <ClientOnly fallback={null}><AutosaveStatus /></ClientOnly>
       <div className="flex min-h-0 flex-1">
         <div className="hidden min-h-0 shrink-0 [@media(min-width:900px)_and_(orientation:landscape)]:flex min-[1200px]:flex flex-col border-e border-border">
           <button type="button" onClick={() => setDesktopPanelOpen((value) => !value)}
