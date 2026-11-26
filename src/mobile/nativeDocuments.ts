@@ -39,6 +39,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 async function saveBlob(blob: Blob, filename: string, mimeType: string): Promise<boolean> {
   requireAndroid();
+  if (mimeType === "application/json" && blob.size > 24 * 1024 * 1024) throw new Error("Project exceeds 24 MiB reopen limit");
   if (blob.size > 32 * 1024 * 1024) throw new Error("File exceeds 32 MiB Android export limit");
   const response = await documents.saveFile({ filename, mimeType, base64: await blobToBase64(blob) });
   if (response.cancelled) return false;
