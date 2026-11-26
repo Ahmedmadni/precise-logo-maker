@@ -57,13 +57,14 @@ export const smoothPolyline = (points: Point[], passes: number, cornerAngle = 0)
   return current;
 };
 
-/** Perpendicular distance from `p` to the infinite line through `a` and `b`. */
+/** Distance to the finite segment, so overshoots and reversals are retained. */
 const lineDistance = (p: Point, a: Point, b: Point): number => {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const l = Math.hypot(dx, dy);
-  if (l < 1e-9) return dist(p, a);
-  return Math.abs(dy * (p.x - a.x) - dx * (p.y - a.y)) / l;
+  const l2=dx*dx+dy*dy;
+  if(l2<1e-18)return dist(p,a);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);
 };
 
 /** Ramer–Douglas–Peucker: keeps the corners, drops everything within tolerance. */
@@ -180,31 +181,37 @@ export const cleanStroke = (
   options: CleanOptions = DEFAULT_CLEAN,
   closed = false,
 ): Geometry | null => {
-  if (raw.length < 2) return null;
+  if(raw.length<2||raw.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y))||!Number.isFinite(options.tolerance)||options.tolerance<0||!Number.isFinite(options.smoothing)||options.smoothing<0||options.smoothing>20)return null;
   const smoothed = smoothPolyline(raw, options.smoothing, options.cornerAngle ?? 0);
   const points = simplifyPath(smoothed, options.tolerance);
   const first = points[0]!;
   const last = points[points.length - 1]!;
   if (points.length < 2) return null;
 
-  if (!options.fitShapes) return { kind: "path", points, closed };
+  if (!options.fitShapes || closed) return { kind: "path", points, closed };
 
   const span = dist(first, last);
   const straightError = straightness(smoothed);
   // A stroke that never strays far from the line between its ends is a line.
-  if (straightError <= Math.max(options.tolerance, span * 0.02)) {
+  const traveled=smoothed.slice(1).reduce((sum,p,i)=>sum+dist(smoothed[i]!,p),0);
+  if (span>1e-9&&traveled<=span*1.12+options.tolerance&&straightError <= Math.max(options.tolerance, span * 0.02)) {
     return { kind: "line", a: first, b: last };
   }
 
   const fit = fitCircle(smoothed);
   if (fit && fit.error <= Math.max(options.tolerance * 1.5, fit.radius * 0.05)) {
     const sweep = signedSweep(smoothed, fit.center);
-    // Barely any turn: the circle is just a bowed straight line.
-    if (Math.abs(sweep) <= 25) return { kind: "line", a: first, b: last };
-    // A full loop back to the start is a circle.
-    if (Math.abs(sweep) > 350) {
+    // A reversing or multi-loop gesture is not a single arc.
+    const absoluteSweep=smoothed.slice(1).reduce((sum,p,i)=>{
+      let d=angleOf(fit.center,p)-angleOf(fit.center,smoothed[i]!);
+      if(d>180)d-=360;if(d< -180)d+=360;return sum+Math.abs(d);
+    },0);
+    if(absoluteSweep-Math.abs(sweep)>15||Math.abs(sweep)>370||Math.abs(sweep)<=25)return {kind:"path",points,closed};
+    // A full loop near its start is a circle.
+    if (Math.abs(sweep) > 350 && span<=Math.max(options.tolerance,fit.radius*.18)) {
       return { kind: "circle", center: fit.center, radius: fit.radius };
     }
+    if(Math.abs(sweep)>350)return {kind:"path",points,closed};
     // ArcGeometry always sweeps counter-clockwise from start to end.
     const startAngle = angleOf(fit.center, sweep >= 0 ? first : last);
     const endAngle = angleOf(fit.center, sweep >= 0 ? last : first);
