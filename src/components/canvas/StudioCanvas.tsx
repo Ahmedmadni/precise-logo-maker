@@ -8,7 +8,6 @@ import {
 } from "../../core/coordinates/view";
 import {
   angleOf,
-  closestPointOnGeometry,
   dist,
   geometryBounds,
   pt,
@@ -190,7 +189,7 @@ export function StudioCanvas() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
-  const dragRef = useRef<{ start: Point; source: VectorObject[]; ids: string[] } | null>(null);
+  const dragRef = useRef<{ start: Point; source: VectorObject[]; ids: string[]; targets:Geometry[] } | null>(null);
   const letterDragRef = useRef<{ id: string; start: Point; scope: "glyph" | "word"; groupId?: string } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
@@ -430,6 +429,13 @@ export function StudioCanvas() {
       anchor ? constrainPoint(anchor, point, precision, shift) : point,
     [precision],
   );
+
+  const dragMovement=(drag:NonNullable<typeof dragRef.current>,world:Point,free:boolean)=>{
+    if(dist(world,drag.start)*view.zoom<2)return {offset:null,snap:null};
+    const snap=free?null:resolveSnap({cursor:world,tolerance:SNAP_PIXELS/view.zoom,gridPoints:gridData.points,gridGeometry:gridData.geometry,objectGeometry:drag.targets,settings:snapSettings});
+    const end=snap?.point??world;
+    return {offset:pt(end.x-drag.start.x,end.y-drag.start.y),snap};
+  };
 
   const hitTest=useCallback((world:Point)=>hitObject(doc.objects,world,view.zoom,HIT_PIXELS,guideLayer),[doc.objects,view.zoom,guideLayer]);
 
@@ -727,7 +733,8 @@ export function StudioCanvas() {
         else if (!selection.includes(hit)) setSelection([hit]);
         const state=useStudio.getState();
         if(!state.selection.includes(hit))return;
-        dragRef.current = { start: world, source:state.doc.objects, ids:[...state.selection] };
+        const ids=[...state.selection],selected=new Set(ids);
+        dragRef.current = { start:world,source:state.doc.objects,ids,targets:state.doc.objects.filter(o=>o.visible&&!selected.has(o.id)&&!(o.guide&&state.guideLayer.hidden)).map(o=>o.geometry) };
         setDragOffset(pt(0, 0));
         return;
       }
@@ -905,8 +912,8 @@ export function StudioCanvas() {
     if(dragRef.current){
       const drag=dragRef.current;
       if(doc.objects!==drag.source){setDragOffset(null);return;}
-      const dx=world.x-drag.start.x,dy=world.y-drag.start.y;
-      setDragOffset(Math.hypot(dx,dy)*view.zoom>=2?pt(dx,dy):null);
+      const movement=dragMovement(drag,world,e.altKey);
+      setDragOffset(movement.offset);setSnap(movement.snap);
       return;
     }
     // The cell brush works off raw grid arithmetic — no snapping pass needed.
@@ -1160,8 +1167,9 @@ export function StudioCanvas() {
       const state=useStudio.getState();
       if(!e||state.doc.objects!==drag.source||JSON.stringify(state.selection)!==JSON.stringify(drag.ids))return;
       const end=toWorld(e.clientX,e.clientY);
-      const dx=end.x-drag.start.x,dy=end.y-drag.start.y;
-      if(Math.hypot(dx,dy)*view.zoom>=2)translateSelection(dx,dy);
+      const {offset}=dragMovement(drag,end,e.altKey);
+      setSnap(null);
+      if(offset)translateSelection(offset.x,offset.y);
       return;
     }
     if (box) {
