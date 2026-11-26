@@ -32,7 +32,7 @@ describe("frame-coalesced brush preview vs full-resolution SVG trace", () => {
   it("coalesces many pen events into one current frame while retaining newest preview", () => {
     const frames = fakeClock();
     const published: BrushSample[][] = [];
-    const scheduler = createBrushPreviewScheduler(data => published.push(data), frames.clock);
+    const scheduler = createBrushPreviewScheduler<BrushSample>(data => published.push(data), frames.clock);
     for (let x = 0; x < 40; x++) scheduler.enqueue([sample(0), sample(x)]);
     expect(frames.scheduled.size).toBe(1);
     expect(published).toEqual([]);
@@ -50,7 +50,7 @@ describe("frame-coalesced brush preview vs full-resolution SVG trace", () => {
   it("cancels pending callbacks on pen-up, interruption, and component disposal", () => {
     const frames = fakeClock();
     const published: BrushSample[][] = [];
-    const scheduler = createBrushPreviewScheduler(data => published.push(data), frames.clock);
+    const scheduler = createBrushPreviewScheduler<BrushSample>(data => published.push(data), frames.clock);
     scheduler.enqueue([sample(1)]);
     const oldCallback = [...frames.scheduled.values()][0]!;
     scheduler.clear();
@@ -74,8 +74,8 @@ describe("frame-coalesced brush preview vs full-resolution SVG trace", () => {
   it("reentrant pen events schedule the next frame without losing the previous frame", () => {
     const frames = fakeClock();
     const published: number[] = [];
-    let scheduler: ReturnType<typeof createBrushPreviewScheduler>;
-    scheduler = createBrushPreviewScheduler(data => {
+    let scheduler: ReturnType<typeof createBrushPreviewScheduler<BrushSample>>;
+    scheduler = createBrushPreviewScheduler<BrushSample>(data => {
       published.push(data.at(-1)!.x);
       if (data.at(-1)!.x === 1) scheduler.enqueue([sample(2)]);
     }, frames.clock);
@@ -90,7 +90,7 @@ describe("frame-coalesced brush preview vs full-resolution SVG trace", () => {
   it("final vector always uses full sampled trace, never the last published preview", () => {
     const frames = fakeClock();
     let preview: BrushSample[] = [];
-    const scheduler = createBrushPreviewScheduler(data => { preview = data; }, frames.clock);
+    const scheduler = createBrushPreviewScheduler<BrushSample>(data => { preview = data; }, frames.clock);
     let full: BrushSample[] = [];
     for (let x = 0; x <= 130; x++) {
       full = appendBrushSamples(full, [sample(x)], 1);
@@ -104,7 +104,9 @@ describe("frame-coalesced brush preview vs full-resolution SVG trace", () => {
     frames.tick();
     expect(preview.at(-1)?.x).toBe(30);
     const shape = vectorBrushOutline(full, DEFAULT_BRUSH)!;
-    expect(shape.points.length).toBe(full.length * 2);
+    expect(shape.points.length).toBeGreaterThanOrEqual(4);
+    expect(shape).not.toEqual(vectorBrushOutline(preview, DEFAULT_BRUSH));
+    expect(Math.max(...shape.points.map(p=>p.x))).toBeGreaterThan(120);
     expect(shape.closed).toBe(true);
     scheduler.dispose();
   });

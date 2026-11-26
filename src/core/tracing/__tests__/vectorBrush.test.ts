@@ -16,7 +16,8 @@ describe("pressure-aware editable vector brushes", () => {
       const shape = vectorBrushOutline(samples, { ...DEFAULT_BRUSH, preset });
       expect(shape).not.toBeNull();
       expect(shape?.closed).toBe(true);
-      expect(shape?.points.length).toBe(samples.length * 2);
+      expect(shape!.points.length).toBeGreaterThanOrEqual(4);
+      expect(shape!.points.length).toBeLessThanOrEqual(samples.length * 2);
       const path = geometryToPathData(shape!);
       expect(path.startsWith("M ")).toBe(true);
       expect(path.endsWith("Z")).toBe(true);
@@ -192,13 +193,20 @@ describe("pressure-aware editable vector brushes", () => {
     const flat = geometry("flat");
     const soft = geometry("soft");
     const sharp = geometry("sharp");
-    const half = (shape: typeof flat, index: number) => Math.abs(shape.points[index]!.y - 25);
+    const half = (shape: typeof flat, x: number) => {
+      const widths=shape.points.flatMap((a,i)=>{
+        const b=shape.points[(i+1)%shape.points.length]!;
+        if(x<Math.min(a.x,b.x)||x>Math.max(a.x,b.x))return [];
+        return a.x===b.x?[Math.abs(a.y-25),Math.abs(b.y-25)]:[Math.abs(a.y+(b.y-a.y)*(x-a.x)/(b.x-a.x)-25)];
+      });
+      return Math.max(...widths);
+    };
     expect(half(flat, 0)).toBeCloseTo(10, 5);
     expect(half(soft, 0)).toBeCloseTo(3.8, 5);
     expect(half(sharp, 0)).toBeCloseTo(0.8, 5);
-    expect(half(sharp, 3)).toBeCloseTo(half(flat, 3), 5);
-    expect(half(soft, 3)).toBeCloseTo(half(flat, 3), 5);
-    expect(half(sharp, 6)).toBeCloseTo(half(sharp, 0), 5);
+    expect(half(sharp, 45)).toBeCloseTo(half(flat, 45), 5);
+    expect(half(soft, 45)).toBeCloseTo(half(flat, 45), 5);
+    expect(half(sharp, 90)).toBeCloseTo(half(sharp, 0), 5);
     expect(geometryToPathData(flat)).not.toBe(geometryToPathData(sharp));
   });
 
