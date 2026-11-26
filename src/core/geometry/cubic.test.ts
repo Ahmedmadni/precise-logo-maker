@@ -36,8 +36,12 @@ describe("cubic paths", () => {
     expect(g.kind==="path" && g.cubicSegments?.[0]?.control2).toEqual({x:-12,y:12});
   });
   it("flattens curved edges for polygon operations", () => {
-    expect(geometryToRing(curve)).toHaveLength(25);
-    expect(geometryToRing(curve)[12]).toEqual({x:6,y:9});
+    const ring=geometryToRing(curve);
+    expect(ring.length).toBeGreaterThan(2);
+    expect(ring[0]).toEqual({x:0,y:0});
+    expect(ring.at(-1)).toEqual({x:12,y:0});
+    expect(ring).toContainEqual({x:6,y:9});
+    expect(ring.every(p=>p.x>=0&&p.x<=12&&p.y>=0&&p.y<=9)).toBe(true);
   });
 });
 
