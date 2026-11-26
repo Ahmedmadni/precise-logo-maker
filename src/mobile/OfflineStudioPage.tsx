@@ -10,6 +10,7 @@ import { MobileBrushControls } from "./MobileBrushControls";
 import { MobileNodeControls } from "./MobileNodeControls";
 import { StudioEmptyGuide } from "../components/canvas/StudioEmptyGuide";
 import { useAutosave } from "../hooks/useAutosave";
+import {useCustomTypeface} from "../hooks/useCustomTypeface";
 import { useStudioShortcuts } from "../hooks/useStudioShortcuts";
 import { useLanguageBootstrap, useT } from "../i18n";
 import { useStudio } from "../store/studioStore";
@@ -209,13 +210,6 @@ function LanguageSync() {
 function CanvasWithShortcuts() {
   useStudioShortcuts();
   useAutosave();
-  const fontData = useStudio((s) => s.doc.customThuluthFont);
-  useEffect(() => {
-    if (!fontData || typeof FontFace === "undefined") return;
-    let active = true;
-    const face = new FontFace("Custom Thuluth", `url("${fontData}")`);
-    void face.load().then((loaded) => { if (active) document.fonts.add(loaded); }).catch(() => {});
-    return () => { active = false; };
-  }, [fontData]);
+  useCustomTypeface();
   return <StudioCanvas />;
 }
