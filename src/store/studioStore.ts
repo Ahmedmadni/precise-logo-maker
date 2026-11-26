@@ -481,10 +481,11 @@ export const useStudio = create<StudioState>()((set, get) => {
     },
     nodeLassoTargetId:null,
     pathNodeSelection:null,
-    setNodeLassoTarget:(nodeLassoTargetId)=>set({nodeLassoTargetId,glyphLassoActive:false,glyphMultiIds:[],lassoActive:!!nodeLassoTargetId,tool:"select",knifeTargetId:null,pathControlSelection:null}),
+    setNodeLassoTarget:(nodeLassoTargetId)=>set(s=>({nodeLassoTargetId,glyphLassoActive:false,glyphMultiIds:[],lassoActive:!!nodeLassoTargetId,tool:"select",knifeTargetId:null,pathControlSelection:null,pathNodeSelection:nodeLassoTargetId&&s.pathNodeSelection?.objectId===nodeLassoTargetId?s.pathNodeSelection:null})),
     setPathNodeSelection:(pathNodeSelection)=>set({pathNodeSelection}),
     moveSelectedPathNodes:(objectId,source,indices,dx,dy)=>{
       const s=get(),o=s.doc.objects.find(o=>o.id===objectId);
+      if(![dx,dy].every(Number.isFinite)||(dx===0&&dy===0)||!indices.length||!s.pathNodeSelection||s.pathNodeSelection.geometry!==source||s.pathNodeSelection.objectId!==objectId||JSON.stringify(s.pathNodeSelection.indices)!==JSON.stringify(indices))return false;
       if(!o||o.geometry!==source||s.selection.length!==1||s.selection[0]!==objectId||o.locked||!o.visible||o.guide||source.holes?.length||s.nodeLassoTargetId!==objectId||s.guideLayer.edit)return false;
       const next=nudgePathNodes(source,indices,dx,dy);
       if(next===source)return false;
