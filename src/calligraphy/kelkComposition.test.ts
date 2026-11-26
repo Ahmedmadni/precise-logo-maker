@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildKashidaOutline, createConnectedKashida, arrangeWordBounds, adjustGroupOverlap } from "./kelkComposition";
+import { buildKashidaOutline, createConnectedKashida, createKashidaItem, findExistingKashida, arrangeWordBounds, adjustGroupOverlap } from "./kelkComposition";
 import { buildRibbonPath, sampleRibbon } from "./ribbonJoin";
 import type { LetteringItem } from "./model";
 import { preciseGlyphBounds } from "./morph";
@@ -68,5 +68,22 @@ describe("precise outline bounds and arrangement", () => {
     const xs=group.map(g=>patches.find(p=>p.id===g.id)?.patch.x??g.x);
     expect(xs[0]!).toBeGreaterThan(xs[1]!);
     expect(xs[1]!).toBeGreaterThan(xs[2]!);
+  });
+});
+
+describe("kashida connection integrity",()=>{
+  it("detects a connection between the same joining sides",()=>{
+    const bridge=createConnectedKashida(source,target,options);
+    if(!bridge?.ribbon)throw Error("Missing bridge");
+    expect(findExistingKashida([bridge],source.id,target.id)).toBe(bridge);
+    expect(findExistingKashida([{...bridge,hidden:true}],source.id,target.id)).toBeUndefined();
+    expect(findExistingKashida([bridge],source.id,"other")).toBeUndefined();
+    const reversed={...bridge,ribbon:{...bridge.ribbon,sourceGlyphId:target.id,targetGlyphId:source.id,sourceSide:"entry" as const,targetSide:"exit" as const}};
+    expect(findExistingKashida([reversed],source.id,target.id)).toBe(reversed);
+  });
+  it("rejects invalid glyph sizes for connected and independent kashida",()=>{
+    expect(createConnectedKashida({...source,size:NaN},target,options)).toBeNull();
+    expect(createKashidaItem({...source,size:0},{...options,length:600})).toBeNull();
+    expect(createKashidaItem({...source,hidden:true},{...options,length:600})).toBeNull();
   });
 });
