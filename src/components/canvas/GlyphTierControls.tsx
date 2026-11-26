@@ -1,7 +1,6 @@
 import {useState,useMemo,useEffect} from "react";
 import {useStudio} from "../../store/studioStore";
-import {composeGlyphTiers,type TierStyle} from "../../calligraphy/tieredComposition";
-import {decorationBounds} from "../../calligraphy/decorationPlacement";
+import {composeGlyphTiers,tierSelectionFits,type TierStyle} from "../../calligraphy/tieredComposition";
 import {LetteringGlyph} from "./LetteringGlyph";
 import {BUILTIN_TIER_PRESETS,decodeTierPresets,saveTierPreset,TIER_PRESET_KEY,type TierPreset} from "../../calligraphy/tierPresets";
 
@@ -40,8 +39,7 @@ export function GlyphTierControls(){
   const selected=new Set(ids);
   const belongs=(i:NonNullable<typeof source>[number])=>!i.hidden&&(selected.has(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&selected.has(i.attachedToGlyphId)||i.kind==="bridge"&&!!i.ribbon&&selected.has(i.ribbon.sourceGlyphId)&&selected.has(i.ribbon.targetGlyphId));
   const preview=result?.ok?result.items.filter(belongs).sort((a,b)=>Number(b.kind==="bridge")-Number(a.kind==="bridge")):[];
-  const bounds=result?.ok?preview.map(i=>decorationBounds(i,result.items)):[];
-  const fits=result?.ok&&bounds.every(b=>!!b&&b.minX>=0&&b.minY>=0&&b.maxX<=doc.artboard.width&&b.maxY<=doc.artboard.height);
+  const fits=!!result?.ok&&tierSelectionFits(result.items,ids,doc.artboard);
   return <details open={open} onToggle={e=>setOpen(e.currentTarget.open)} className="mt-1 rounded border border-border p-2">
     <summary className="cursor-pointer py-1 text-xs font-semibold">التكوين متعدد المستويات</summary>
     {open&&<div className="space-y-2">
@@ -75,7 +73,7 @@ export function GlyphTierControls(){
       </>}
       {result&&!result.ok&&<p className="text-xs text-muted-foreground">{{selection:"حدد وحدات كاملة بعدد يكفي للمستويات المختارة (حتى 24 وحدة).","partial-word":"حدد جميع حروف الكلمة قبل توزيعها.",bridge:"الترتيب يشوه وصلة بين وحدتين؛ حافظ على الوصلة أو عدلها أولًا.",invalid:"المسارات أو الإعدادات غير صالحة.",overlap:"التراكب الرأسي كبير جدًا."}[result.reason]}</p>}
       {notice&&<p role="status" className="text-xs">{notice}</p>}
-      <p className="text-[10px] text-muted-foreground">ترتيب مكاني من اليمين إلى اليسار يحافظ على الكلمة كوحدة واحدة. التراكب السالب مقصود، ولا يتم التحقق من اصطدام الحبر أو العناصر غير المحددة.</p>
+      <p className="text-[10px] text-muted-foreground">ترتيب مكاني من أعلى إلى أسفل، ومن اليمين إلى اليسار داخل المستوى يحافظ على الكلمة كوحدة واحدة. التراكب السالب مقصود، ولا يتم التحقق من اصطدام الحبر أو العناصر غير المحددة.</p>
     </div>}
   </details>;
 }
