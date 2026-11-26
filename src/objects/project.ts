@@ -41,8 +41,7 @@ export const parseProject = (raw: string): DocumentState | null => {
       const g=object.geometry;
       switch(g.kind){
         case "line":if(!validPoint(g.a)||!validPoint(g.b))return null;break;
-        case "arc":if(![g.startAngle,g.endAngle].every(Number.isFinite))return null;
-          // falls through to common circle validation
+        case "arc":if(![g.startAngle,g.endAngle].every(Number.isFinite)||!validPoint(g.center)||!Number.isFinite(g.radius)||g.radius<0)return null;break;
         case "circle":if(!validPoint(g.center)||!Number.isFinite(g.radius)||g.radius<0)return null;break;
         case "path":if(!Array.isArray(g.points)||g.points.length>50000||!g.points.every(validPoint)||typeof g.closed!=="boolean"||g.cubicSegments!==undefined&&(!Array.isArray(g.cubicSegments)||g.cubicSegments.length>g.points.length||g.cubicSegments.some(seg=>seg!==null&&(!seg||!validPoint(seg.control1)||!validPoint(seg.control2)))))return null;break;
         default:return null;
