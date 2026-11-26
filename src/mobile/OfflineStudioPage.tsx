@@ -4,6 +4,7 @@ import { StudioCanvas } from "../components/canvas/StudioCanvas";
 import { SelectionQuickEdit } from "../components/canvas/SelectionQuickEdit";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
+import { AutosaveStatus } from "../components/panels/AutosaveStatus";
 import { ToolRail } from "../components/toolbar/ToolRail";
 import { MobileToolDock } from "../components/toolbar/MobileToolDock";
 import { StudioHeaderOffline } from "./StudioHeaderOffline";
@@ -54,6 +55,7 @@ export function OfflineStudioPage() {
         <LanguageSync />
       </ClientOnly>
       <StudioHeaderOffline appearance={appearance} onAppearanceChange={setAppearance} />
+      <ClientOnly fallback={null}><AutosaveStatus /></ClientOnly>
       {/* At desktop sizes the inspector docks beside—not above—the canvas. */}
       <div className="flex min-h-0 flex-1">
         <div className="hidden min-h-0 shrink-0 sm:flex">
