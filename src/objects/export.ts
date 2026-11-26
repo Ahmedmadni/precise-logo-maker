@@ -40,7 +40,10 @@ export function pngDimensions(artboard:Pick<Artboard,"width"|"height">,size:numb
   if(width>MAX_PNG_EDGE||height>MAX_PNG_EDGE||width*height>MAX_PNG_PIXELS)return null;
   return {width,height};
 }
-export const hasExportLiveText=(doc:DocumentState):boolean=>(doc.lettering??[]).some(i=>!i.hidden&&i.kind==="text"&&!!i.text?.trim());
+export const hasExportLiveText=(doc:DocumentState):boolean=>(doc.lettering??[]).some(i=>!i.hidden&&i.kind==="text"&&typeof i.text==="string"&&!!i.text.trim());
+
+/** Count visible export candidates; editor-only construction guides are excluded. */
+export const hasExportArtwork=(doc:DocumentState):boolean=>doc.objects.some(o=>o.visible&&!o.guide&&(o.style.opacity??1)>0)||(doc.lettering??[]).some(i=>!i.hidden&&(i.kind!=="text"||typeof i.text==="string"&&!!i.text.trim()));
 
 export const buildSvgDocument = (
   doc: DocumentState,
@@ -49,6 +52,7 @@ export const buildSvgDocument = (
 ): string => {
   const a: Artboard = doc.artboard;
   if(![a.width,a.height].every(n=>typeof n==="number"&&Number.isFinite(n)&&n>0))throw new Error("Invalid artboard dimensions");
+  if(rasterSize&&(![rasterSize.width,rasterSize.height].every(n=>Number.isInteger(n)&&n>0&&n<=MAX_PNG_EDGE)||rasterSize.width*rasterSize.height>MAX_PNG_PIXELS))throw new Error("Invalid raster viewport");
   const body = doc.objects
     .filter((o) => o.visible && !o.guide)
     .map(objectToSvg)
@@ -97,8 +101,13 @@ export const renderPng = async (doc: DocumentState, size: number, options: Expor
     const image = new Image();
     image.decoding = "async";
     await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Failed to rasterise SVG"));
+      const finish=(error?:Error)=>{
+        clearTimeout(timeout);image.onload=null;image.onerror=null;
+        if(error)reject(error);else resolve();
+      };
+      const timeout=setTimeout(()=>finish(new Error("SVG rasterisation timed out")),30000);
+      image.onload = () => finish();
+      image.onerror = () => finish(new Error("Failed to rasterise SVG"));
       image.src = url;
     });
     canvas = document.createElement("canvas");
@@ -109,7 +118,11 @@ export const renderPng = async (doc: DocumentState, size: number, options: Expor
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     const raster=canvas;
     return await new Promise<Blob>((resolve, reject) => {
-      raster.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("PNG encoding failed"))), "image/png");
+      const timeout=setTimeout(()=>reject(new Error("PNG encoding timed out")),30000);
+      try{raster.toBlob(blob=>{
+        clearTimeout(timeout);
+        if(blob&&blob.size>0)resolve(blob);else reject(new Error("PNG encoding failed"));
+      },"image/png");}catch(error){clearTimeout(timeout);reject(error);}
     });
   } finally {
     if(canvas){canvas.width=0;canvas.height=0;}
@@ -129,5 +142,5 @@ export const downloadPng = async (
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
