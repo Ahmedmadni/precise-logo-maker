@@ -39,12 +39,14 @@ describe("bounded vector brush preview versus final saved outline", () => {
     expect(brushPreviewBudget(1.5)).toBe(576);
     expect(brushPreviewBudget(3.99)).toBe(576);
     expect(brushPreviewBudget(4)).toBe(768);
+    const exactBefore=vectorBrushOutline(longStroke, DEFAULT_BRUSH);
     const low = vectorBrushPreviewOutline(longStroke, DEFAULT_BRUSH, 0.6)!;
     const high = vectorBrushPreviewOutline(longStroke, DEFAULT_BRUSH, 6)!;
     expect(brushPreviewSamples(longStroke,6).length).toBeGreaterThan(brushPreviewSamples(longStroke,.6).length);
     expect(high.closed&&low.closed).toBe(true);
     const exact = vectorBrushOutline(longStroke, DEFAULT_BRUSH)!;
-    expect(exact).toEqual(vectorBrushOutline(longStroke, DEFAULT_BRUSH));
+    expect(exact).toEqual(exactBefore);
+    expect(brushPreviewSamples(longStroke,.6)).not.toEqual(brushPreviewSamples(longStroke,6));
   });
 
   it("keeps short brush marks identical to final outlines for all presets", () => {
