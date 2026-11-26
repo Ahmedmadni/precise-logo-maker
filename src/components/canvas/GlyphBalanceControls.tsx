@@ -26,12 +26,12 @@ export function GlyphBalanceControls(){
   const fits=!!next&&moved.every(i=>{const box=decorationBounds(i,next);return !!box&&box.minX>=0&&box.minY>=0&&box.maxX<=w&&box.maxY<=h;});
   const show=(items:typeof source,label:string,offsetX:number,offsetY:number)=><div><p className="text-xs">{label}</p><svg viewBox={`0 0 ${w} ${h}`} className="h-28 w-full rounded border border-border bg-background" aria-label={label}>
     <path d={`M ${w/2} 0 V ${h} M 0 ${h/2} H ${w}`} stroke="currentColor" strokeOpacity=".35" strokeDasharray="4 3" vectorEffect="non-scaling-stroke"/>
-    {items.filter(i=>!i.hidden&&ids.includes(i.id)).map(i=><LetteringGlyph key={i.id} item={i} selected={false} allItems={items}/>)}
+    {items.filter(i=>!i.hidden&&(allowed?.ok&&allowed.ids.has(i.id)||ids.includes(i.id)||i.kind==="bridge"&&i.ribbon&&ids.includes(i.ribbon.sourceGlyphId)&&ids.includes(i.ribbon.targetGlyphId))).sort((a,b)=>Number(b.kind==="bridge")-Number(a.kind==="bridge")).map(i=><LetteringGlyph key={i.id} item={i} selected={false} allItems={items}/>)}
     {current?.ok&&<circle cx={current.centroid.x+offsetX} cy={current.centroid.y+offsetY} r={Math.max(w,h)*.009} fill="#ef4444"/>}
   </svg></div>;
   return <details className="mt-1 rounded border border-border p-2">
     <summary className="cursor-pointer py-1 text-xs font-semibold">التوازن البصري</summary>
-    <div className="max-h-[35dvh] space-y-2 overflow-y-auto">
+    <div className="space-y-2">
       <button type="button" disabled={!ids.length||ids.length>20} className="min-h-10 w-full rounded border border-border text-xs disabled:opacity-40" onClick={()=>{setReport({doc,key,result:analyzeInkBalance(source,ids)});setNotice("");}}>تحليل كثافة الحبر</button>
       {current?.ok&&<>
         <p className="text-xs">مساحة الحبر: {current.area.toFixed(1)} px² · الكثافة: {(current.density*100).toFixed(1)}%</p>
