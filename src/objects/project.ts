@@ -28,10 +28,25 @@ export const serializeProject = (doc: DocumentState): string =>
 export const parseProject = (raw: string): DocumentState | null => {
   try {
     const data = JSON.parse(raw) as Partial<ProjectFile>;
-    if (data.format !== PROJECT_FORMAT || !data.version || data.version > PROJECT_VERSION) return null;
+    if (data.format !== PROJECT_FORMAT || !Number.isInteger(data.version) || data.version!<1 || data.version! > PROJECT_VERSION) return null;
     const doc = data.document;
     if (!doc || !doc.artboard || !Array.isArray(doc.objects) || !Array.isArray(doc.grids)) {
       return null;
+    }
+    if(![doc.artboard.width,doc.artboard.height].every(n=>Number.isFinite(n)&&n>0))return null;
+    if(doc.lettering!==undefined&&(!Array.isArray(doc.lettering)||doc.lettering.some(i=>!i||typeof i.id!=="string"||!["outline","text","haraka","ornament","bridge"].includes(i.kind)||![i.x,i.y,i.size,i.rotation].every(Number.isFinite)||typeof i.color!=="string")))return null;
+    const validPoint=(p:unknown):boolean=>!!p&&typeof p==="object"&&"x" in p&&"y" in p&&typeof p.x==="number"&&typeof p.y==="number"&&Number.isFinite(p.x)&&Number.isFinite(p.y);
+    for(const object of doc.objects){
+      if(!object||typeof object.id!=="string"||typeof object.name!=="string"||!object.style||typeof object.style.stroke!=="string"||typeof object.style.fill!=="string"||!Number.isFinite(object.style.strokeWidth)||!object.geometry)return null;
+      const g=object.geometry;
+      switch(g.kind){
+        case "line":if(!validPoint(g.a)||!validPoint(g.b))return null;break;
+        case "arc":if(![g.startAngle,g.endAngle].every(Number.isFinite))return null;
+          // falls through to common circle validation
+        case "circle":if(!validPoint(g.center)||!Number.isFinite(g.radius)||g.radius<0)return null;break;
+        case "path":if(!Array.isArray(g.points)||g.points.length>50000||!g.points.every(validPoint)||typeof g.closed!=="boolean"||g.cubicSegments!==undefined&&(!Array.isArray(g.cubicSegments)||g.cubicSegments.length>g.points.length||g.cubicSegments.some(seg=>seg!==null&&(!seg||!validPoint(seg.control1)||!validPoint(seg.control2)))))return null;break;
+        default:return null;
+      }
     }
     // Compound paths have a stricter shape contract: never restore malformed
     // inner rings into the renderer or pathfinder.
@@ -60,7 +75,7 @@ const download = (content: BlobPart, type: string, filename: string): void => {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 
 export const downloadProject = (doc: DocumentState, filename = "design.logo"): void =>
@@ -114,21 +129,31 @@ let dbPromise: Promise<IDBDatabase | null> | undefined;
 const openLocalDb = (): Promise<IDBDatabase | null> => {
   if (dbPromise) return dbPromise;
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  dbPromise = new Promise((resolve) => {
+  const attempt = new Promise<IDBDatabase | null>((resolve) => {
+    let settled=false;
+    const finish=(db:IDBDatabase|null)=>{
+      if(settled){db?.close();return;}
+      settled=true;resolve(db);
+    };
     try {
       const request = indexedDB.open(DB_NAME, 1);
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-      request.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
+      request.onsuccess = () => {
+        const db=request.result;
+        db.onversionchange=()=>{db.close();if(dbPromise===attempt)dbPromise=undefined;};
+        db.onclose=()=>{if(dbPromise===attempt)dbPromise=undefined;};
+        finish(db);
+      };
+      request.onerror = () => finish(null);
+      request.onblocked = () => finish(null);
+    } catch { finish(null); }
   });
-  return dbPromise;
+  dbPromise=attempt;
+  void attempt.then(db=>{if(!db&&dbPromise===attempt)dbPromise=undefined;});
+  return attempt;
 };
 
 export const saveLargeAutosave = async (doc: DocumentState,payload=autosavePayload(doc)): Promise<boolean> => {
