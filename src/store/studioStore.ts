@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {trimUndo,jumpHistory} from "./historyBudget";
+import {canHitObject} from "../editor/objectHitTest";
 import type { ControlLinkMode } from "../calligraphy/handleCoupling";
 import type { LetteringItem } from "../calligraphy/model";
 import {
@@ -1083,16 +1084,13 @@ export const useStudio = create<StudioState>()((set, get) => {
     clearSelection: () => set({ selection: [],nodeLassoTargetId:null,pathNodeSelection:null,knifeTargetId:null,pathControlSelection:null }),
 
     translateSelection: (dx, dy) => {
-      const ids = get().selection;
-      if (ids.length === 0 || (dx === 0 && dy === 0)) return;
-      commit("Move selection", (doc) => ({
-        ...doc,
-        objects: doc.objects.map((o) =>
-          ids.includes(o.id) && !o.locked
-            ? { ...o, geometry: translateGeometry(o.geometry, dx, dy) }
-            : o,
-        ),
-      }));
+      const state=get();
+      if(!Number.isFinite(dx)||!Number.isFinite(dy)||(dx===0&&dy===0))return;
+      const ids=new Set(state.selection);
+      if(!state.doc.objects.some(o=>ids.has(o.id)&&canHitObject(o,state.guideLayer)))return;
+      commit("Move selection",doc=>({...doc,objects:doc.objects.map(o=>
+        ids.has(o.id)&&canHitObject(o,state.guideLayer)?{...o,geometry:translateGeometry(o.geometry,dx,dy)}:o
+      )}));
     },
 
     rotateSelection: (angle) => {
