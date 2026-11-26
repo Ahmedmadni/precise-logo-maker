@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {pngDimensions,buildSvgDocument,hasExportLiveText} from "./export";
+import {pngDimensions,buildSvgDocument,hasExportLiveText,hasExportArtwork} from "./export";
 import type {DocumentState} from "../store/studioStore";
 const doc={artboard:{width:800,height:400,unit:"px",background:"#fff"},objects:[],grids:[],lettering:[]} as DocumentState;
 describe("export safety",()=>{
@@ -24,5 +24,19 @@ describe("export safety",()=>{
     expect(hasExportLiveText({...doc,lettering:[item]})).toBe(true);
     expect(hasExportLiveText({...doc,lettering:[{...item,hidden:true}]})).toBe(false);
     expect(hasExportLiveText(doc)).toBe(false);
+  });
+});
+
+describe("export artwork and viewport validation",()=>{
+  it("excludes hidden lettering and blank live text",()=>{
+    const item={id:"t",kind:"text" as const,x:0,y:0,size:40,rotation:0,color:"#000",text:"خط"};
+    expect(hasExportArtwork({...doc,lettering:[item]})).toBe(true);
+    expect(hasExportArtwork({...doc,lettering:[{...item,hidden:true}]})).toBe(false);
+    expect(hasExportArtwork({...doc,lettering:[{...item,text:"  "}]})).toBe(false);
+  });
+  it("rejects direct raster viewport requests outside supported allocation",()=>{
+    for(const viewport of [{width:4097,height:1},{width:0,height:100},{width:1.5,height:100},{width:100,height:Infinity}]){
+      expect(()=>buildSvgDocument(doc,{background:false},viewport)).toThrow();
+    }
   });
 });
