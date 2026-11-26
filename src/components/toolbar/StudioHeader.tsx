@@ -4,7 +4,7 @@ import {
   ImagePlus, Languages, Maximize2, Redo2, RotateCcw, Save, Settings2,
   Undo2, X,
 } from "lucide-react";
-import { downloadSvg, downloadPng, pngDimensions, hasExportLiveText } from "../../objects/export";
+import { downloadSvg, downloadPng, pngDimensions, hasExportLiveText, hasExportArtwork } from "../../objects/export";
 import { downloadProject, readProjectFile } from "../../objects/project";
 import { readReferenceImage } from "../../objects/reference";
 import { fitBounds } from "../../core/coordinates/view";
@@ -39,6 +39,7 @@ export function StudioHeader() {
   const [pngSize, setPngSize] = useState(2048);
   const selectedPngDimensions=pngDimensions(doc.artboard,pngSize);
   const [busy, setBusy] = useState(false);
+  const exporting=useRef(false);
   const [error, setError] = useState("");
   const projectFile = useRef<HTMLInputElement>(null);
   const referenceFile = useRef<HTMLInputElement>(null);
@@ -73,16 +74,24 @@ export function StudioHeader() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "تعذر فتح الصورة"); }
   };
   const exportImage = async () => {
-    setBusy(true); setError("");
+    if(exporting.current||busy)return;
+    exporting.current=true;setBusy(true); setError("");
     try {
-      await downloadPng(doc, pngSize, transparent ? `logo-${pngSize}-transparent.png` : `logo-${pngSize}.png`, { background: !transparent });
+      const state=useStudio.getState();state.commitLetteringPreview();
+      const snapshot=useStudio.getState().doc;
+      if(!hasExportArtwork(snapshot))throw new Error("No visible artwork");
+      await downloadPng(snapshot, pngSize, transparent ? `logo-${pngSize}-transparent.png` : `logo-${pngSize}.png`, { background: !transparent });
       close();
     } catch { setError(tr("فشل تصدير PNG. جرّب تصدير SVG.", "PNG export failed. Try SVG.")); }
-    finally { setBusy(false); }
+    finally { exporting.current=false;setBusy(false); }
   };
   const exportVector = () => {
+    if(exporting.current||busy)return;
     try {
-      downloadSvg(doc, transparent ? "logo-transparent.svg" : "logo.svg", { background: !transparent });
+      useStudio.getState().commitLetteringPreview();
+      const snapshot=useStudio.getState().doc;
+      if(!hasExportArtwork(snapshot))throw new Error("No visible artwork");
+      downloadSvg(snapshot, transparent ? "logo-transparent.svg" : "logo.svg", { background: !transparent });
       close();
     } catch { setError(tr("تعذر تصدير SVG.", "SVG export failed.")); }
   };
@@ -146,7 +155,7 @@ export function StudioHeader() {
             <button type="button" className={action} disabled={!canRedo} onClick={() => { redo(); close(); }}><Redo2 className="h-5 w-5 text-primary" />{tr("إعادة آخر تعديل", "Redo last edit")}</button>
             <button type="button" className={action} onClick={() => setMenu("view")}><Settings2 className="h-5 w-5 text-primary" />{tr("خيارات العرض والشبكات", "View & grid options")}</button>
             <button type="button" className={action} onClick={() => projectFile.current?.click()}><FolderOpen className="h-5 w-5 text-primary" />{tr("فتح مشروع محفوظ (.logo)", "Open .logo project")}</button>
-            <button type="button" className={action} onClick={() => { downloadProject(doc); close(); }}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
+            <button type="button" className={action} onClick={() => { try{useStudio.getState().commitLetteringPreview();downloadProject(useStudio.getState().doc);close();}catch{setError(tr("تعذر حفظ المشروع","Project save failed"));} }}><Save className="h-5 w-5 text-primary" />{tr("حفظ نسخة احتياطية للمشروع", "Save project backup")}</button>
             <button type="button" className={action} onClick={() => referenceFile.current?.click()}><ImagePlus className="h-5 w-5 text-primary" />{tr("إضافة صورة مرجعية", "Add reference image")}</button>
             <button type="button" className={action} onClick={() => { setLang(lang === "ar" ? "en" : "ar"); close(); }}>
               <Languages className="h-5 w-5 text-primary" />{tr("اللغة: العربية", "Language: English")}</button>
@@ -173,7 +182,7 @@ export function StudioHeader() {
                 className="h-4 w-4 accent-[var(--color-primary)]" />
               {tr("خلفية شفافة", "Transparent background")}
             </label>
-            <button type="button" disabled={count === 0} onClick={exportVector}
+            <button type="button" disabled={!hasExportArtwork(doc)||busy} onClick={exportVector}
               className="flex min-h-14 w-full items-center justify-between rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-semibold disabled:opacity-40">
               <span>SVG <span className="block text-[11px] font-normal text-muted-foreground">{tr("فيكتور قابل للتكبير دون فقد دقة", "Scalable vector artwork")}</span></span>
               <Download className="h-5 w-5 text-primary" />
@@ -187,7 +196,7 @@ export function StudioHeader() {
             </label>
             {!selectedPngDimensions&&<p className="text-xs text-destructive">{tr("اختر عرضًا أصغر؛ الحد الأقصى 4096 بكسل لكل ضلع.","Choose a smaller width; maximum 4096 px per edge.")}</p>}
             {hasExportLiveText(doc)&&<p className="rounded border border-border p-2 text-xs leading-5 text-muted-foreground">{tr("يحتوي التصميم على نصوص حية؛ قد تختلف الخطوط في الملف المصدر. حوّل النصوص إلى مسارات فيكتور قبل التصدير لضمان ثبات شكل الحروف.","Live text may render with different fonts in exported files. Convert text to vector outlines before export for consistent glyph shapes.")}</p>}
-            <button type="button" disabled={count === 0 || busy || !selectedPngDimensions} onClick={() => void exportImage()}
+            <button type="button" disabled={!hasExportArtwork(doc) || busy || !selectedPngDimensions} onClick={() => void exportImage()}
               className="flex min-h-14 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-40">
               {busy ? tr("جار التصدير...", "Exporting...") : "PNG"}
               <Download className="h-5 w-5" />
