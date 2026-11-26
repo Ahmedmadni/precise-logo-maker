@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useMemo,useState} from "react";
 import {useStudio} from "../../store/studioStore";
 import {glyphGroupPivot,groupMoveIds,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,glyphOverlapCandidates,type GlyphArrangeAxis,type GlyphArrangeMode} from "../../calligraphy/groupSelection";
 import {preciseGlyphBounds} from "../../calligraphy/morph";
@@ -27,28 +27,31 @@ export function GlyphGroupTransformControls(){
   const [suggestions,setSuggestions]=useState<{source:LetteringItem[];key:string;result:SpacingSuggestionsResult}|null>(null);
   const [budget,setBudget]=useState(5);
   const [ink,setInk]=useState<{source:LetteringItem[];key:string;before:InkAnalysis;after:InkAnalysis|null}|null>(null);
-  if(!source||!ids.length)return null;
-  const allowed=groupMoveIds(source,ids);
-  const pivot=glyphGroupPivot(source,ids);
-  const arrangement=open&&tab==="arrange"?arrangeGlyphSelection(source,ids,axis,mode):null;
-  const spacing=open&&tab==="spacing"?spaceGlyphSelection(source,ids,axis,gap.trim()?Number(gap):NaN):null;
-  const beforeOverlaps=open&&tab==="spacing"?glyphOverlapCandidates(source,ids):[];
-  const afterOverlaps=spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[];
+  const items=source??[];
+  const groupTab=open&&(tab==="transform"||tab==="arrange"||tab==="spacing");
+  const allowed=useMemo(()=>groupMoveIds(items,ids),[source,ids]);
+  const pivot=useMemo(()=>groupTab?glyphGroupPivot(items,ids):null,[source,ids,groupTab]);
+  const arrangement=useMemo(()=>open&&tab==="arrange"?arrangeGlyphSelection(items,ids,axis,mode):null,[source,ids,open,tab,axis,mode]);
+  const spacing=useMemo(()=>open&&tab==="spacing"?spaceGlyphSelection(items,ids,axis,gap.trim()?Number(gap):NaN):null,[source,ids,open,tab,axis,gap]);
+  const beforeOverlaps=useMemo(()=>open&&tab==="spacing"?glyphOverlapCandidates(items,ids):[],[source,ids,open,tab]);
+  const afterOverlaps=useMemo(()=>spacing?.ok?glyphOverlapCandidates(spacing.items,ids):[],[spacing,ids]);
   const suggestionKey=JSON.stringify([ids,axis]);
   const currentSuggestions=suggestions?.source===source&&suggestions.key===suggestionKey?suggestions.result:null;
   const recommended=currentSuggestions?.ok?pickSpacingSuggestion(currentSuggestions.options,budget/100):null;
   const inkKey=JSON.stringify([ids,axis,gap]);
   const currentInk=ink?.source===source&&ink.key===inkKey?ink:null;
   const shownInk=currentInk?(spacing?.ok?currentInk.after:currentInk.before):null;
-  const next=open&&tab!=="balance"&&tab!=="tiers"?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(source,ids,{scale:scale/100,degrees}):null):null;
-  const visible=(next??source).filter(i=>!i.hidden&&((ids.includes(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&ids.includes(i.attachedToGlyphId))||i.kind==="bridge"&&i.ribbon&&ids.includes(i.ribbon.sourceGlyphId)&&ids.includes(i.ribbon.targetGlyphId)));
-  const boxes=[...source,...(next??[])].filter(i=>ids.includes(i.id)).map(preciseGlyphBounds).filter((b):b is NonNullable<typeof b>=>!!b);
-  const minX=Math.min(...boxes.map(b=>b.x)),minY=Math.min(...boxes.map(b=>b.y)),maxX=Math.max(...boxes.map(b=>b.x+b.width)),maxY=Math.max(...boxes.map(b=>b.y+b.height));
+  const next=useMemo(()=>groupTab?(tab==="spacing"?(spacing?.ok?spacing.items:null):tab==="arrange"?(arrangement?.ok?arrangement.items:null):allowed.ok?transformGlyphSelection(items,ids,{scale:scale/100,degrees}):null):null,[groupTab,tab,spacing,arrangement,allowed,source,ids,scale,degrees]);
+  const selected=useMemo(()=>new Set(ids),[ids]);
+  const visible=useMemo(()=>groupTab?(next??items).filter(i=>!i.hidden&&(selected.has(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&selected.has(i.attachedToGlyphId)||i.kind==="bridge"&&!!i.ribbon&&selected.has(i.ribbon.sourceGlyphId)&&selected.has(i.ribbon.targetGlyphId))):[],[groupTab,next,source,selected]);
+  const boxes=useMemo(()=>groupTab?[...items,...(next??[])].filter(i=>selected.has(i.id)).map(preciseGlyphBounds).filter((b):b is NonNullable<typeof b>=>!!b):[],[groupTab,source,next,selected]);
+  const minX=boxes.length?Math.min(...boxes.map(b=>b.x)):0,minY=boxes.length?Math.min(...boxes.map(b=>b.y)):0,maxX=boxes.length?Math.max(...boxes.map(b=>b.x+b.width)):1,maxY=boxes.length?Math.max(...boxes.map(b=>b.y+b.height)):1;
   const pad=Math.max(10,(maxX-minX)*.15,(maxY-minY)*.15,...visible.filter(i=>i.kind==="haraka").map(i=>i.size));
   const viewBox=[minX-pad,minY-pad,maxX-minX+2*pad,maxY-minY+2*pad].join(" ");
+  if(!source||!ids.length)return null;
   return <div className="mt-1 border-t border-border pt-1">
     <button type="button" className="min-h-9 w-full rounded border border-border text-xs" aria-expanded={open} onClick={()=>{setOpen(!open);setNotice("");}}>تنسيق الحروف ({ids.length})</button>
-    {open&&<div className="max-h-[35dvh] w-full max-w-[300px] space-y-1 overflow-y-auto pt-2">
+    {open&&<div className="w-full max-w-[320px] space-y-2 pt-2">
       <div className="grid grid-cols-3 gap-1">{([{id:"transform",label:"التحويل"},{id:"arrange",label:"المحاذاة"},{id:"spacing",label:"التداخل"},{id:"balance",label:"التوازن"},{id:"tiers",label:"التكوين والقوالب"}] as const).map(v=><button type="button" key={v.id} aria-pressed={tab===v.id} className={`min-h-10 rounded border text-xs ${tab===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>{setTab(v.id);setNotice("");}}>{v.label}</button>)}</div>
       {tab==="balance"?<GlyphBalanceControls/>:tab==="tiers"?<GlyphTierControls/>:tab==="spacing"?<>
         <div className="grid grid-cols-2 gap-1">{([{id:"x",label:"أفقي"},{id:"y",label:"رأسي"}] as const).map(v=><button type="button" key={v.id} aria-pressed={axis===v.id} className={`min-h-10 rounded border text-xs ${axis===v.id?"border-primary bg-primary/10":"border-border"}`} onClick={()=>setAxis(v.id)}>{v.label}</button>)}</div>
