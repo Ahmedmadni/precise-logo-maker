@@ -39,12 +39,12 @@ export function GlyphTierControls(){
   const result=useMemo(()=>open&&source?composeGlyphTiers(source,ids,options):null,[open,source,ids,options]);
   const selected=new Set(ids);
   const belongs=(i:NonNullable<typeof source>[number])=>!i.hidden&&(selected.has(i.id)||i.kind==="haraka"&&!!i.attachedToGlyphId&&selected.has(i.attachedToGlyphId)||i.kind==="bridge"&&!!i.ribbon&&selected.has(i.ribbon.sourceGlyphId)&&selected.has(i.ribbon.targetGlyphId));
-  const preview=result?.ok?result.items.filter(belongs):[];
+  const preview=result?.ok?result.items.filter(belongs).sort((a,b)=>Number(b.kind==="bridge")-Number(a.kind==="bridge")):[];
   const bounds=result?.ok?preview.map(i=>decorationBounds(i,result.items)):[];
   const fits=result?.ok&&bounds.every(b=>!!b&&b.minX>=0&&b.minY>=0&&b.maxX<=doc.artboard.width&&b.maxY<=doc.artboard.height);
   return <details open={open} onToggle={e=>setOpen(e.currentTarget.open)} className="mt-1 rounded border border-border p-2">
     <summary className="cursor-pointer py-1 text-xs font-semibold">التكوين متعدد المستويات</summary>
-    {open&&<div className="max-h-[35dvh] space-y-2 overflow-y-auto">
+    {open&&<div className="space-y-2">
       <details className="rounded border border-border p-2">
         <summary className="cursor-pointer py-2 text-xs font-semibold">مكتبة قوالب التكوين</summary>
         <div className="space-y-2">
