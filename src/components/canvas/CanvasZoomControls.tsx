@@ -4,7 +4,11 @@ import { artboardWorldBounds, useStudio } from "../../store/studioStore";
 
 /** Compact mobile controls for precise stylus work without obscuring the glyph. */
 export function CanvasZoomControls() {
-  const doc = useStudio((s) => s.doc);
+  const artboard=useStudio(s=>s.doc.artboard);
+  const tool=useStudio(s=>s.tool);
+  const editNodes=useStudio(s=>s.editGlyphNodes);
+  const selected=useStudio(s=>!!s.selectedLetteringId||s.selection.length>0);
+  const editing=useStudio(s=>s.glyphLassoActive||!!s.nodeLassoTargetId||!!s.knifeTargetId||s.editGlyphContours);
   const view = useStudio((s) => s.view);
   const viewport = useStudio((s) => s.viewport);
   const setView = useStudio((s) => s.setView);
@@ -14,13 +18,15 @@ export function CanvasZoomControls() {
       view.zoom * factor));
   };
   const fit = () => {
-    setView(fitBounds(artboardWorldBounds(doc.artboard),
+    setView(fitBounds(artboardWorldBounds(artboard),
       viewport.width, viewport.height));
   };
+  // Brush/node overlays own the lower canvas while editing; pinch still works.
+  if(tool==="brush"||editNodes||editing)return null;
   return (
-    <div dir="ltr" aria-label="أدوات تكبير مساحة الرسم"
-      className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm sm:hidden"
-      onPointerDown={(event) => event.stopPropagation()}>
+    <div data-canvas-ui dir="ltr" aria-label="أدوات تكبير مساحة الرسم"
+      className={`absolute left-2 z-20 flex items-center gap-0.5 rounded-xl border border-border bg-card/95 p-0.5 shadow-lg backdrop-blur-sm sm:hidden ${selected&&tool==="select"?"bottom-[4.75rem]":"bottom-3"}`}
+      onPointerDown={event=>event.stopPropagation()} onPointerMove={event=>event.stopPropagation()} onPointerUp={event=>event.stopPropagation()} onDoubleClick={event=>event.stopPropagation()}>
       <button type="button" onClick={() => changeZoom(1 / 1.3)}
         aria-label="تصغير مساحة الرسم" title="تصغير"
         className="flex h-11 w-11 items-center justify-center rounded-lg text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary">
