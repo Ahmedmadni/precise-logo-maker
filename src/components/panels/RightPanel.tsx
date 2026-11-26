@@ -2058,7 +2058,7 @@ export function RightPanel({
             </button>
           )}
           {onClose && <button type="button" onClick={onClose} aria-label="إغلاق اللوحة"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-foreground lg:hidden">
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-foreground">
             <X className="h-5 w-5" aria-hidden />
           </button>}
         </div>
