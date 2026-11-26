@@ -13,9 +13,9 @@ export function GlyphOverlapPicker({ items, currentId, onNext, onDismiss }: {
   const name = chosen?.sourceText || (chosen?.kind === "haraka" ? "حركة تشكيل"
     : chosen?.kind === "ornament" ? "زخرفة" : "عنصر عربي");
   return (
-    <div dir="rtl" role="group" aria-label="اختيار العناصر المتداخلة"
+    <div data-canvas-ui dir="rtl" role="group" aria-label="اختيار العناصر المتداخلة"
       className="absolute left-1/2 top-3 z-30 flex max-w-[95%] -translate-x-1/2 items-center gap-2 rounded-xl border border-primary/40 bg-card/95 px-2 py-1.5 text-foreground shadow-lg backdrop-blur-sm"
-      onPointerDown={(e) => e.stopPropagation()}>
+      onPointerDown={e=>e.stopPropagation()} onPointerMove={e=>e.stopPropagation()} onPointerUp={e=>e.stopPropagation()} onDoubleClick={e=>e.stopPropagation()}>
       <Layers3 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
       <div className="min-w-0 text-xs">
         <p className="truncate font-semibold">عناصر متداخلة: {index + 1} من {items.length}</p>
