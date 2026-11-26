@@ -44,7 +44,7 @@ import type { ReferenceImage } from "../objects/reference";
 import { booleanGeometryChecked, type BooleanOp } from "../objects/boolean";
 import { splitShapeAtAngle, splitShapeCurved, type SplitAxis } from "../objects/splitShape";
 import { cutOpenPath } from "../editor/scissors";
-import {composeGlyphTiers,type TierOptions} from "../calligraphy/tieredComposition";
+import {composeGlyphTiers,tierSelectionFits,type TierOptions} from "../calligraphy/tieredComposition";
 import {suggestDecorationPositions,arrangeDecorations,type DecorationBatchScope} from "../calligraphy/decorationPlacement";
 import { nudgePathNodes } from "../editor/path-nodes";
 import {translateGlyphSelection,transformGlyphSelection,arrangeGlyphSelection,spaceGlyphSelection,type GlyphGroupTransform,type GlyphArrangeAxis,type GlyphArrangeMode} from "../calligraphy/groupSelection";
@@ -442,7 +442,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       const s=get();
       if(!s.glyphLassoActive||s.guideLayer.edit||s.doc.lettering!==source||JSON.stringify(s.glyphMultiIds)!==JSON.stringify(ids))return false;
       const result=composeGlyphTiers(source,ids,options);
-      if(!result.ok||!result.changed)return false;
+      if(!result.ok||!result.changed||!tierSelectionFits(result.items,ids,s.doc.artboard))return false;
       commit("Compose tiered Arabic lettering",d=>({...d,lettering:result.items}));
       return true;
     },
