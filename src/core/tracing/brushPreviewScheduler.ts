@@ -5,8 +5,8 @@ export interface BrushFrameClock {
   request(callback: () => void): number;
   cancel(id: number): void;
 }
-export interface BrushPreviewScheduler {
-  enqueue(samples: readonly BrushSample[]): void;
+export interface BrushPreviewScheduler<T=BrushSample> {
+  enqueue(samples: readonly T[]): void;
   clear(): void;
   dispose(): void;
 }
@@ -16,14 +16,14 @@ export interface BrushPreviewScheduler {
  * Only React preview publications are coalesced to the display frame.
  * Do not use this scheduler's last published preview for final SVG geometry.
  */
-export function createBrushPreviewScheduler(
-  publish: (samples: BrushSample[]) => void,
+export function createBrushPreviewScheduler<T=BrushSample>(
+  publish: (samples: T[]) => void,
   clock: BrushFrameClock = {
     request: (callback) => requestAnimationFrame(callback),
     cancel: (id) => cancelAnimationFrame(id),
   },
-): BrushPreviewScheduler {
-  let latest: readonly BrushSample[] | null = null;
+): BrushPreviewScheduler<T> {
+  let latest: readonly T[] | null = null;
   let frame: number | null = null;
   let epoch = 0;
   let disposed = false;
