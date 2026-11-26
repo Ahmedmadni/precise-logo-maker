@@ -3,6 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ClientOnly } from "@tanstack/react-router";
 import { PanelRightOpen, SlidersHorizontal, X } from "lucide-react";
 import { StudioCanvas } from "../components/canvas/StudioCanvas";
+import { SelectionQuickEdit } from "../components/canvas/SelectionQuickEdit";
+import { MobileBrushControls } from "../mobile/MobileBrushControls";
+import { MobileNodeControls } from "../mobile/MobileNodeControls";
 import { RightPanel } from "../components/panels/RightPanel";
 import { StatusBar } from "../components/panels/StatusBar";
 import { ToolRail } from "../components/toolbar/ToolRail";
@@ -64,7 +67,7 @@ function StudioPage() {
   }, [panelOpen]);
 
   return (
-    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground pt-[env(safe-area-inset-top)] ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)]">
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <ClientOnly fallback={null}>
         <LanguageSync />
       </ClientOnly>
@@ -88,7 +91,11 @@ function StudioPage() {
           </ClientOnly>
           <StudioEmptyGuide openPanel={openProperties} />
           <ClientOnly fallback={null}>
-            <SelectionQuickEdit panelOpen={panelOpen} openPanel={openProperties} />
+            <>
+              <MobileBrushControls panelOpen={panelOpen} />
+              <MobileNodeControls panelOpen={panelOpen} />
+              <SelectionQuickEdit panelOpen={panelOpen} openPanel={openProperties} />
+            </>
           </ClientOnly>
           <ClientOnly fallback={null}>
             <PanelToggle open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
@@ -119,20 +126,6 @@ function StudioPage() {
   );
 }
 
-function SelectionQuickEdit({ panelOpen, openPanel }: { panelOpen: boolean; openPanel: () => void }) {
-  const glyph = useStudio((s) => s.selectedLetteringId);
-  const geometryCount = useStudio((s) => s.selection.length);
-  const setSection = useStudio((s) => s.setWorkspaceSection);
-  if (panelOpen || (!glyph && geometryCount === 0)) return null;
-  return (
-    <button type="button" onClick={() => { setSection("edit"); openPanel(); }}
-      aria-label="تحرير العنصر المحدد"
-      className="absolute bottom-4 end-3 z-20 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/60 bg-card/95 px-4 text-xs font-semibold text-primary shadow-xl backdrop-blur-sm sm:hidden">
-      <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-      {glyph ? "تعديل الحرف المحدد" : "تعديل الشكل المحدد"}
-    </button>
-  );
-}
 
 function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const t = useT();
