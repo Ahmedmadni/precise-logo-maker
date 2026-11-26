@@ -30,6 +30,7 @@ import { appendBrushSamples, brushPressure, buildBrushStroke, type BrushSample }
 import { vectorBrushPreviewOutline } from "../../core/tracing/brushPreview";
 import { createBrushPreviewScheduler, type BrushPreviewScheduler } from "../../core/tracing/brushPreviewScheduler";
 import {appendPenPoint} from "../../core/tracing/penTrace";
+import {hitObject} from "../../editor/objectHitTest";
 import { geometryToPathData } from "../../objects/render";
 import {lassoHits,combineLassoSelection,lassoNodeIndices,combineNodeSelection,type LassoMode} from "../../editor/lassoSelection";
 import { createLettering, type LetteringItem } from "../../calligraphy/model";
@@ -189,7 +190,7 @@ export function StudioCanvas() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [shiftDown, setShiftDown] = useState(false);
   const [measureStart, setMeasureStart] = useState<Point | null>(null);
-  const dragRef = useRef<{ start: Point; last: Point } | null>(null);
+  const dragRef = useRef<{ start: Point; source: VectorObject[]; ids: string[] } | null>(null);
   const letterDragRef = useRef<{ id: string; start: Point; scope: "glyph" | "word"; groupId?: string } | null>(null);
   const [letterOffset, setLetterOffset] = useState<Point | null>(null);
   const nodeDragRef = useRef<{ id: string; nodeId: number; startPath: string } | null>(null);
@@ -430,22 +431,7 @@ export function StudioCanvas() {
     [precision],
   );
 
-  const hitTest = useCallback(
-    (world: Point): string | null => {
-      const tol = HIT_PIXELS / view.zoom;
-      let best: { id: string; d: number } | null = null;
-      for (const o of doc.objects) {
-        if (!o.visible || o.locked) continue;
-        if (o.guide && (guideLayer.locked || guideLayer.hidden)) continue;
-        // Guide editing mode grabs guides only, so artwork can't shift by accident.
-        if (guideLayer.edit && !o.guide) continue;
-        const d = dist(closestPointOnGeometry(o.geometry, world), world);
-        if (d <= tol && (!best || d < best.d)) best = { id: o.id, d };
-      }
-      return best?.id ?? null;
-    },
-    [doc.objects, view.zoom, guideLayer],
-  );
+  const hitTest=useCallback((world:Point)=>hitObject(doc.objects,world,view.zoom,HIT_PIXELS,guideLayer),[doc.objects,view.zoom,guideLayer]);
 
   const cancelActiveInteraction = () => {
     panRef.current = null;
@@ -739,7 +725,9 @@ export function StudioCanvas() {
       if (hit) {
         if (e.shiftKey) toggleSelection(hit);
         else if (!selection.includes(hit)) setSelection([hit]);
-        dragRef.current = { start: world, last: world };
+        const state=useStudio.getState();
+        if(!state.selection.includes(hit))return;
+        dragRef.current = { start: world, source:state.doc.objects, ids:[...state.selection] };
         setDragOffset(pt(0, 0));
         return;
       }
@@ -914,6 +902,13 @@ export function StudioCanvas() {
       return;
     }
 
+    if(dragRef.current){
+      const drag=dragRef.current;
+      if(doc.objects!==drag.source){setDragOffset(null);return;}
+      const dx=world.x-drag.start.x,dy=world.y-drag.start.y;
+      setDragOffset(Math.hypot(dx,dy)*view.zoom>=2?pt(dx,dy):null);
+      return;
+    }
     // The cell brush works off raw grid arithmetic — no snapping pass needed.
     if (tool === "cell") {
       setSnap(null);
@@ -956,10 +951,7 @@ export function StudioCanvas() {
       }
       return;
     }
-    if (dragRef.current) {
-      setDragOffset(pt(point.x - dragRef.current.start.x, point.y - dragRef.current.start.y));
-      return;
-    }
+
     if (box) setBox({ ...box, end: world });
   };
 
@@ -1161,13 +1153,15 @@ export function StudioCanvas() {
       setHandleDrag(null);
       return;
     }
-    if (dragRef.current) {
-      const offset = dragOffset;
-      dragRef.current = null;
+    if(dragRef.current){
+      const drag=dragRef.current;
+      dragRef.current=null;
       setDragOffset(null);
-      if (offset && (Math.abs(offset.x) > 1e-6 || Math.abs(offset.y) > 1e-6)) {
-        translateSelection(offset.x, offset.y);
-      }
+      const state=useStudio.getState();
+      if(!e||state.doc.objects!==drag.source||JSON.stringify(state.selection)!==JSON.stringify(drag.ids))return;
+      const end=toWorld(e.clientX,e.clientY);
+      const dx=end.x-drag.start.x,dy=end.y-drag.start.y;
+      if(Math.hypot(dx,dy)*view.zoom>=2)translateSelection(dx,dy);
       return;
     }
     if (box) {
