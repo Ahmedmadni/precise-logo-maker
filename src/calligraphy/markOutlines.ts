@@ -1,8 +1,7 @@
-import { Buffer } from "buffer";
 import type { FontPreset, HarakaId } from "./model";
 import { HARAKAT, safePath } from "./model";
 import { parseOutline } from "./pathEditor";
-import { loadFontBytes } from "./shaping";
+import { loadParsedFont } from "./shaping";
 
 /** Normalize one genuine font-drawn diacritic into the same 100×100 viewport
  * as the legacy editor marks. Existing marks remain unchanged. Handles and
@@ -51,9 +50,7 @@ export async function markPathFromTypeface(
   const entry = HARAKAT.find((item) => item.id === mark);
   const codepoint = entry?.glyph.codePointAt(0);
   if (codepoint === undefined) throw new Error("الحركة المطلوبة غير معروفة.");
-  const data = await loadFontBytes(fontName, customFontData);
-  const kit = await import("fontkit");
-  const face = kit.create(Buffer.from(data));
+  const face=await loadParsedFont(fontName,customFontData);
   if (!face.hasGlyphForCodePoint(codepoint)) {
     throw new Error("الخط المختار لا يدعم هذه الحركة. اختر خطًا آخر أو الرسم اليدوي المبسط.");
   }
