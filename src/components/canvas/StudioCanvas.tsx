@@ -1246,22 +1246,29 @@ export function StudioCanvas() {
 
   // Resolve a temporary set of glyphs for live link-following previews during
   // touches, keyboard adjustments, and Bézier editing. This is never saved.
-  const sourceLettering = glyphMultiPreview&&glyphMultiPreview.source===doc.lettering ? glyphMultiPreview.next : doc.lettering ?? [];
-  const draggingGlyph = sourceLettering.find((item) => item.id === letterDragRef.current?.id);
-  const wordDrag = letterDragRef.current?.scope === "word" && !!draggingGlyph?.groupId;
-  const renderedLettering = sourceLettering.map((item) => {
-    const previewed = letteringPreview?.id === item.id
-      ? { ...item, ...letteringPreview.patch } : item;
-    const owner = item.kind === "haraka" && item.attachedToGlyphId
-      ? sourceLettering.find((glyph) => glyph.id === item.attachedToGlyphId) : undefined;
-    const moving = item.id === letterDragRef.current?.id ||
-      (wordDrag && item.groupId === draggingGlyph?.groupId) ||
-      (owner && (owner.id === letterDragRef.current?.id ||
-        (wordDrag && owner.groupId === draggingGlyph?.groupId)));
-    return letterOffset && moving
-      ? { ...previewed, x: previewed.x + letterOffset.x, y: previewed.y + letterOffset.y }
-      : { ...previewed, ...(nodePreview?.id === item.id ? { pathData: nodePreview.path } : {}) };
-  });
+  const sourceLettering = glyphMultiPreview&&glyphMultiPreview.source===doc.lettering ? glyphMultiPreview.next : doc.lettering;
+  const draggedId=letterDragRef.current?.id;
+  const dragScope=letterDragRef.current?.scope;
+  const renderedLettering=useMemo(()=>{
+    const items=sourceLettering??[];
+    if(!letteringPreview&&!letterOffset&&!nodePreview)return items;
+    const byId=new Map(items.map(item=>[item.id,item]));
+    const dragging=draggedId?byId.get(draggedId):undefined;
+    const wordDrag=dragScope==="word"&&!!dragging?.groupId;
+    return items.map(item=>{
+      let next=letteringPreview?.id===item.id?{...item,...letteringPreview.patch}:item;
+      const owner=item.kind==="haraka"&&item.attachedToGlyphId?byId.get(item.attachedToGlyphId):undefined;
+      const moving=item.id===draggedId||wordDrag&&item.groupId===dragging?.groupId||owner&&(owner.id===draggedId||wordDrag&&owner.groupId===dragging?.groupId);
+      if(letterOffset&&moving)next={...next,x:next.x+letterOffset.x,y:next.y+letterOffset.y};
+      if(nodePreview?.id===item.id)next={...next,pathData:nodePreview.path};
+      return next;
+    });
+  },[sourceLettering,draggedId,dragScope,letteringPreview,letterOffset,nodePreview]);
+  const orderedLettering=useMemo(()=>[
+    ...renderedLettering.filter(i=>!i.hidden&&i.kind==="bridge"),
+    ...renderedLettering.filter(i=>!i.hidden&&i.kind!=="bridge"),
+  ],[renderedLettering]);
+  const selectedGlyphs=useMemo(()=>new Set(glyphMultiIds),[glyphMultiIds]);
 
   const transform = `translate(${view.pan.x} ${view.pan.y}) rotate(${view.rotation}) scale(${view.zoom})`;
   const cursorStyle =
@@ -1391,24 +1398,9 @@ export function StudioCanvas() {
           </g>
           {/* Editable Arabic lettering and independently movable vector diacritics */}
           <g>
-            {[...sourceLettering.filter((item) => item.kind === "bridge" && !item.hidden),
-              ...sourceLettering.filter((item) => item.kind !== "bridge" && !item.hidden)].map((item) => {
-              const draggedId = letterDragRef.current?.id;
-              const dragging = draggedId ? doc.lettering?.find((glyph) => glyph.id === draggedId) : undefined;
-              const isWordDragged = letterDragRef.current?.scope === "word" && !!dragging?.groupId;
-              const linkedToDragged = item.kind === "haraka" && item.attachedToGlyphId &&
-                (item.attachedToGlyphId === draggedId ||
-                 (isWordDragged && !!doc.lettering?.find((glyph) =>
-                   glyph.id === item.attachedToGlyphId && glyph.groupId === dragging.groupId)));
-              const moved = item.id === selectedLetteringId ||
-                (isWordDragged && item.groupId === dragging?.groupId) || linkedToDragged;
-              return <LetteringGlyph key={item.id}
-                item={letteringPreview?.id === item.id ? { ...item, ...letteringPreview.patch } : item}
-                allItems={renderedLettering}
-                selected={item.id === selectedLetteringId||(glyphLasso&&glyphMultiIds.includes(item.id))}
-                offset={letterOffset && moved ? letterOffset : null}
-                overridePath={nodePreview?.id === item.id ? nodePreview.path : null} />;
-            })}
+            {orderedLettering.map(item=><LetteringGlyph key={item.id} item={item}
+                {...(item.kind==="bridge"?{allItems:renderedLettering}:{})}
+                selected={item.id===selectedLetteringId||(glyphLasso&&selectedGlyphs.has(item.id))}/>)}
           </g>
           {/* Live ribbon controls: direct touch editing only while selected. Not exported. */}
           {tool === "select" && (doc.lettering ?? [])
@@ -1600,7 +1592,7 @@ export function StudioCanvas() {
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {glyphLasso&&<g pointerEvents="none">{sourceLettering.filter(i=>i.kind==="outline"&&!i.hidden&&glyphMultiIds.includes(i.id)).map(i=>{const b=preciseGlyphBounds(i);return b?<rect key={i.id} x={b.x} y={b.y} width={b.width} height={b.height} fill="none" stroke="var(--color-primary)" strokeDasharray="4 3" strokeWidth="1" vectorEffect="non-scaling-stroke"/>:null;})}</g>}
+          {glyphLasso&&<g pointerEvents="none">{(sourceLettering??[]).filter(i=>i.kind==="outline"&&!i.hidden&&glyphMultiIds.includes(i.id)).map(i=>{const b=preciseGlyphBounds(i);return b?<rect key={i.id} x={b.x} y={b.y} width={b.width} height={b.height} fill="none" stroke="var(--color-primary)" strokeDasharray="4 3" strokeWidth="1" vectorEffect="non-scaling-stroke"/>:null;})}</g>}
           {nodeTarget&&nodePath&&<g pointerEvents="none">
             {(groupPreview?.id===nodeTarget.id&&groupPreview.source===nodePath?groupPreview.next:nodePath).points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={(selectedAnchors.includes(i)?5:3)/view.zoom} fill={selectedAnchors.includes(i)?"var(--color-primary)":"var(--color-background)"} stroke="var(--color-primary)" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/>)}
           </g>}
