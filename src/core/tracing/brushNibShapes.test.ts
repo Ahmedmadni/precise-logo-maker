@@ -19,6 +19,6 @@ describe("qalam nib shapes",()=>{
     }
   });
   it("rejects an unsupported nib shape",()=>{
-    expect(brushIsValid({...settings,nibShape:"invalid" as BrushSettings["nibShape"]})).toBe(false);
+    expect(brushIsValid({...settings,nibShape:"invalid" as NonNullable<BrushSettings["nibShape"]>})).toBe(false);
   });
 });
